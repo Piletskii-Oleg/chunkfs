@@ -1,26 +1,22 @@
 mod file_layer;
 mod storage;
+mod system;
+
+pub type Hash = Vec<u8>;
 
 pub struct Chunk {
     offset: usize,
     length: usize,
 }
 
-// written to base. make into a hashmap?
 pub struct Segment {
-    hash: u64,     // key
+    hash: Hash,
     data: Vec<u8>, // or [u8]? deduplicated?
 }
 
 pub struct Span {
-    hash: u64,
+    hash: Hash,
     length: usize,
-}
-
-// in file layer
-pub struct FileSpan {
-    hash: u64,
-    offset: usize,
 }
 
 pub trait Chunker {
@@ -28,9 +24,11 @@ pub trait Chunker {
 }
 
 pub trait Hasher {
-    fn hash(&mut self) -> u64; // type for hash?
+    fn hash(&mut self, data: &[u8]) -> Hash; // type for hash?
 }
 
 pub trait Base {
-    fn save(&mut self); // std::io::Result?
+    fn save(&mut self, segments: Vec<Segment>) -> std::io::Result<()>;
+
+    fn retrieve(&mut self) -> std::io::Result<Vec<Segment>>;
 }

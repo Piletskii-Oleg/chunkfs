@@ -1,6 +1,6 @@
-use crate::{Base, Chunker, Hasher};
+use crate::{Base, Chunker, Hash, Hasher, Segment, Span};
 
-struct Storage<C, H, B>
+pub struct Storage<C, H, B>
 where
     C: Chunker,
     H: Hasher,
@@ -17,7 +17,11 @@ where
     H: Hasher,
     B: Base,
 {
-    fn write(&mut self, data: &[u8]) -> Vec<(u64, usize)> {
+    fn write(&mut self, data: &[u8]) -> Vec<Span> {
+        todo!()
+    }
+
+    fn retrieve_chunks(&mut self, request: Vec<Hash>) -> Vec<Segment> {
         todo!()
     }
 }
