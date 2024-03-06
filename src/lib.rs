@@ -2,6 +2,8 @@ mod file_layer;
 mod storage;
 mod system;
 
+pub const SEG_SIZE: usize = 1024 * 1024; // 1MB
+
 pub type Hash = Vec<u8>;
 
 pub struct Chunk {
@@ -11,7 +13,7 @@ pub struct Chunk {
 
 pub struct Segment {
     hash: Hash,
-    data: Vec<u8>, // or [u8]? deduplicated?
+    data: Vec<u8>,
 }
 
 pub struct Span {
@@ -24,7 +26,7 @@ pub trait Chunker {
 }
 
 pub trait Hasher {
-    fn hash(&mut self, data: &[u8]) -> Hash; // type for hash?
+    fn hash(&mut self, data: &[u8]) -> Hash;
 }
 
 pub trait Base {
