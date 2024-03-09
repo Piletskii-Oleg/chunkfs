@@ -5,13 +5,13 @@ pub struct FileSpan {
     offset: usize,
 }
 
+pub struct File {
+    name: String,
+    spans: Vec<FileSpan>,
+}
+
 pub struct FileLayer {
     files: Vec<File>,
 }
 
 pub struct FileHandle {}
-
-pub struct File {
-    name: String,
-    spans: Vec<FileSpan>,
-}
