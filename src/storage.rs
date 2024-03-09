@@ -51,7 +51,7 @@ where
 {
     fn write(&mut self, data: &[u8]) -> std::io::Result<Vec<Span>> {
         // if there is no more data to be written
-        if data.len() == 0 {
+        if data.is_empty() {
             let hash = self.hasher.hash(&self.buffer);
 
             let segment = Segment {
