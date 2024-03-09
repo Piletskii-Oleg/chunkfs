@@ -33,7 +33,7 @@ pub struct Span {
 
 pub struct Storage<C, H, B>
 where
-    C: Iterator<Item = Chunk>,
+    C: Chunker,
     H: Hasher,
     B: Base,
 {
@@ -45,7 +45,7 @@ where
 
 impl<C, H, B> Storage<C, H, B>
 where
-    C: Iterator<Item = Chunk> + Chunker,
+    C: Chunker,
     H: Hasher,
     B: Base,
 {

@@ -1,9 +1,9 @@
 use crate::file_layer::{FileHandle, FileLayer};
-use crate::storage::{Base, Chunk, Hasher, Storage};
+use crate::storage::{Base, Chunker, Hasher, Storage};
 
 pub struct FileSystem<C, H, B>
 where
-    C: Iterator<Item = Chunk>,
+    C: Chunker,
     H: Hasher,
     B: Base,
 {
@@ -13,7 +13,7 @@ where
 
 impl<C, H, B> FileSystem<C, H, B>
 where
-    C: Iterator<Item = Chunk>,
+    C: Chunker,
     H: Hasher,
     B: Base,
 {
