@@ -98,7 +98,7 @@ where
         Ok(spans)
     }
 
-    fn retrieve_chunks(&mut self, request: Vec<Hash>) -> Vec<Segment> {
-        todo!()
+    pub fn retrieve_chunks(&mut self, request: Vec<Hash>) -> std::io::Result<Vec<Vec<u8>>> {
+        self.base.retrieve(request)
     }
 }

@@ -37,6 +37,7 @@ where
     }
 
     pub fn read(&mut self, handle: FileHandle) -> std::io::Result<Vec<u8>> {
-        todo!()
+        let hashes = self.file_layer.read(&handle);
+        Ok(self.storage.retrieve_chunks(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 }

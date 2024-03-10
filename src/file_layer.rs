@@ -80,4 +80,15 @@ impl FileLayer {
             None
         }
     }
+
+    pub fn read(&self, handle: &FileHandle) -> Vec<Hash> {
+        // this is probably not what was intended
+        // it simply reads all hashes continuously and copies them
+        handle
+            .file
+            .spans
+            .iter()
+            .map(|span| span.hash.clone()) // copying hashes, again
+            .collect()
+    }
 }
