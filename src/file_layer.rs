@@ -18,15 +18,12 @@ pub struct FileLayer {
 pub struct FileHandle<'a> {
     file: &'a mut File,
     spans: Vec<FileSpan>,
+    is_modified: bool,
 }
 
 impl File {
     fn new(name: String, spans: Vec<FileSpan>) -> Self {
         File { name, spans }
-    }
-
-    fn add_span(&mut self, file_span: FileSpan) {
-        self.spans.push(file_span);
     }
 }
 
@@ -35,6 +32,7 @@ impl<'a> FileHandle<'a> {
         FileHandle {
             file,
             spans: vec![],
+            is_modified: false,
         }
     }
 
@@ -48,20 +46,38 @@ impl<'a> FileHandle<'a> {
             });
             offset += span.length;
         }
+        self.is_modified = true;
     }
 
-    pub fn close(mut self) {
-        // full write only
-        if !self.file.spans.is_empty() {
+    pub fn close(self) {
+        // full rewrite on close if any writes were
+        if !self.is_modified {
             self.file.spans = self.spans;
         }
     }
 }
 
+pub enum FileError {
+    FileAlreadyExists,
+}
+
 impl FileLayer {
-    pub fn create(&mut self, name: String) -> FileHandle {
+    pub fn create(&mut self, name: String) -> Result<FileHandle, FileError> {
+        if self.files.iter().find(|file| file.name == name).is_some() {
+            return Err(FileError::FileAlreadyExists);
+        }
+
         let file = File::new(name, vec![]);
         self.files.push(file);
-        FileHandle::from_file(self.files.last_mut().unwrap())
+        Ok(FileHandle::from_file(self.files.last_mut().unwrap()))
+    }
+
+    pub fn open(&mut self, name: &str) -> Option<FileHandle> {
+        // uses iter_mut because FileHandle requires &mut File
+        if let Some(file) = self.files.iter_mut().find(|file| file.name == name) {
+            Some(FileHandle::from_file(file))
+        } else {
+            None
+        }
     }
 }

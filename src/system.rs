@@ -1,4 +1,4 @@
-use crate::file_layer::{FileHandle, FileLayer};
+use crate::file_layer::{FileError, FileHandle, FileLayer};
 use crate::storage::{Base, Chunker, Hasher, Storage};
 
 pub struct FileSystem<C, H, B>
@@ -17,11 +17,11 @@ where
     H: Hasher,
     B: Base,
 {
-    pub fn open(&self, name: String) -> std::io::Result<FileHandle> {
-        todo!()
+    pub fn open(&mut self, name: &str) -> Option<FileHandle> {
+        self.file_layer.open(name)
     }
 
-    pub fn create(&mut self, name: String) -> FileHandle {
+    pub fn create(&mut self, name: String) -> Result<FileHandle, FileError> {
         self.file_layer.create(name)
     }
 
