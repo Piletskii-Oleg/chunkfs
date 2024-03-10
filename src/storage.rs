@@ -19,16 +19,19 @@ impl Chunk {
     }
 }
 
+/// A data segment with hash
 pub struct Segment {
     hash: Hash,
     data: Vec<u8>,
 }
 
+/// Hashed span in a file
 pub struct Span {
     pub hash: Hash,
     pub length: usize,
 }
 
+/// Underlying storage for the actual stored data
 pub struct Storage<C, H, B>
 where
     C: Chunker,
@@ -47,6 +50,9 @@ where
     H: Hasher,
     B: Base,
 {
+    /// Writes 1 MB of data to the base storage after deduplication.
+    ///
+    /// Returns resulting lengths of chunks with corresponding hash
     pub fn write(&mut self, data: &[u8]) -> std::io::Result<Vec<Span>> {
         // if there is no more data to be written
         if data.is_empty() {
@@ -70,7 +76,7 @@ where
         self.buffer.extend_from_slice(data); // remove copying? we need to have `rest` stored and indexed
         let data = &self.buffer; // this, or replace all occurrences of data with self.buffer
         let all_chunks = self.chunker.chunk_data(data);
-        let (rest, chunks) = all_chunks.split_last().unwrap(); // should always be not empty?
+        let (rest, chunks) = all_chunks.split_last().unwrap(); // should always be not empty? for now at least, when data.len() is 1 MB
 
         let hashes = chunks
             .iter()
