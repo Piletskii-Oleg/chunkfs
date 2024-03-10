@@ -1,3 +1,5 @@
+pub use system::FileSystem;
+
 mod file_layer;
 mod storage;
 mod system;

@@ -22,15 +22,18 @@ where
     }
 
     pub fn create(&mut self, name: String) -> FileHandle {
-        todo!()
+        self.file_layer.create(name)
     }
 
-    pub fn write(&mut self, handle: FileHandle, data: &[u8]) -> std::io::Result<()> {
-        todo!()
+    pub fn write(&mut self, handle: &mut FileHandle, data: &[u8]) -> std::io::Result<()> {
+        let spans = self.storage.write(data)?;
+        handle.write(spans);
+        Ok(())
     }
 
     pub fn close(&mut self, handle: FileHandle) -> std::io::Result<()> {
-        todo!()
+        handle.close();
+        Ok(())
     }
 
     pub fn read(&mut self, handle: FileHandle) -> std::io::Result<Vec<u8>> {

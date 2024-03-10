@@ -1,5 +1,3 @@
-use std::io::Read;
-
 pub use crate::storage::base::Base;
 pub use crate::storage::chunker::Chunker;
 pub use crate::storage::hasher::Hasher;
@@ -27,8 +25,8 @@ pub struct Segment {
 }
 
 pub struct Span {
-    hash: Hash,
-    length: usize,
+    pub hash: Hash,
+    pub length: usize,
 }
 
 pub struct Storage<C, H, B>
@@ -49,7 +47,7 @@ where
     H: Hasher,
     B: Base,
 {
-    fn write(&mut self, data: &[u8]) -> std::io::Result<Vec<Span>> {
+    pub fn write(&mut self, data: &[u8]) -> std::io::Result<Vec<Span>> {
         // if there is no more data to be written
         if data.is_empty() {
             let hash = self.hasher.hash(&self.buffer);
