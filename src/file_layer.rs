@@ -19,8 +19,9 @@ pub struct FileLayer {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct FileHandle<'a> {
-    file: &'a mut File,
+pub struct FileHandle {
+    // can't make file_name a reference, or it would count as an immutable reference for FileSystem
+    file_name: String,
     spans: Vec<FileSpan>,
     is_modified: bool,
 }
@@ -31,10 +32,10 @@ impl File {
     }
 }
 
-impl<'a> FileHandle<'a> {
-    fn from_file(file: &'a mut File) -> Self {
+impl FileHandle {
+    fn from_file(file: &File) -> Self {
         FileHandle {
-            file,
+            file_name: file.name.clone(),
             spans: vec![],
             is_modified: false,
         }
@@ -56,7 +57,7 @@ impl<'a> FileHandle<'a> {
     pub fn close(self) {
         // full rewrite on close if any writes were done
         if !self.is_modified {
-            self.file.spans = self.spans;
+            // self.file.spans = self.spans;
         }
     }
 }
@@ -80,25 +81,52 @@ impl FileLayer {
         Ok(FileHandle::from_file(self.files.last_mut().unwrap()))
     }
 
-    pub fn open(&mut self, name: &str) -> Option<FileHandle> {
+    pub fn open(&self, name: &str) -> Option<FileHandle> {
         // uses iter_mut because FileHandle requires &mut File
-        if let Some(file) = self.files.iter_mut().find(|file| file.name == name) {
+        if let Some(file) = self.files.iter().find(|file| file.name == name) {
             Some(FileHandle::from_file(file))
         } else {
             None
         }
     }
 
+    fn find_file(&self, handle: &FileHandle) -> &File {
+        self.files
+            .iter()
+            .find(|file| file.name == handle.file_name)
+            .unwrap()
+    }
+
+    fn find_file_mut(&mut self, handle: &FileHandle) -> &mut File {
+        self.files
+            .iter_mut()
+            .find(|file| file.name == handle.file_name)
+            .unwrap()
+    }
+
     pub fn read(&self, handle: &FileHandle) -> Vec<Hash> {
+        let file = self.find_file(handle);
         // this is probably not what was intended
         // it simply reads all hashes continuously and clones them
-        handle
-            .file
-            .spans
+        file.spans
             .iter()
             .map(|span| span.hash.clone()) // cloning hashes
             .collect()
     }
+
+    pub fn write(&mut self, handle: &FileHandle, spans: Vec<Span>) {
+        let file = self.find_file_mut(handle);
+        let mut offset = 0;
+        for span in spans {
+            file.spans.push(FileSpan {
+                hash: span.hash,
+                offset,
+            });
+            offset += span.length;
+        }
+    }
+
+    pub fn close(&mut self, _handle: FileHandle) {}
 }
 
 #[cfg(test)]

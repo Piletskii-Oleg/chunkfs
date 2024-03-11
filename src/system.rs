@@ -1,6 +1,7 @@
 use crate::file_layer::{FileError, FileHandle, FileLayer};
 use crate::storage::{Base, Chunker, Hasher, Storage};
 
+#[derive(Debug)]
 pub struct FileSystem<C, H, B>
 where
     C: Chunker,
@@ -17,22 +18,26 @@ where
     H: Hasher,
     B: Base,
 {
-    pub fn open_file(&mut self, name: &str) -> Option<FileHandle> {
+    pub fn open_file(&self, name: &str) -> Option<FileHandle> {
         self.file_layer.open(name)
     }
 
+    // owned String or &str?
     pub fn create_file(&mut self, name: String) -> Result<FileHandle, FileError> {
         self.file_layer.create(name)
     }
 
-    pub fn write_to_file(&mut self, handle: &mut FileHandle, data: &[u8]) -> std::io::Result<()> {
+    pub fn write_to_file(&mut self, handle: &FileHandle, data: &[u8]) -> std::io::Result<()> {
         let spans = self.storage.write(data)?;
-        handle.write(spans);
+        self.file_layer.write(handle, spans);
         Ok(())
     }
 
     pub fn close_file(&mut self, handle: FileHandle) -> std::io::Result<()> {
-        handle.close();
+        let span = self.storage.flush()?;
+        self.file_layer.write(&handle, vec![span]);
+
+        self.file_layer.close(handle);
         Ok(())
     }
 
@@ -59,18 +64,21 @@ mod tests {
     }
 
     #[test]
-    fn create_write_test() {
+    fn write_read_test() {
         let mut fs = FileSystem {
             storage: Storage::new(FSChunker::new(4096), SimpleHasher, HashMapBase::new()),
             file_layer: FileLayer::new(),
         };
 
-        // first mutable borrow occurs here
-        let mut handle = fs.create_file("file".to_string()).unwrap();
-        // second mutable borrow occurs here - sadness
-        fs.write_to_file(&mut handle, &vec![1; 1024 * 1024])
-            .unwrap()
+        let handle = fs.create_file("file".to_string()).unwrap();
+        fs.write_to_file(&handle, &vec![1; 1024 * 1024]).unwrap();
 
-        // let handle_two = fs.open_file("file").unwrap();
+        // file has to be closed in order to flush all remaining data
+        // else test would not pass
+        // how do we go around that? is it fine?
+        fs.close_file(handle).unwrap();
+
+        let handle = fs.open_file("file").unwrap();
+        assert_eq!(fs.read_from_file(&handle).unwrap(), vec![1; 1024 * 1024]);
     }
 }

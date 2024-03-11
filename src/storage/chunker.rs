@@ -1,6 +1,20 @@
 use std::cmp::min;
 
-use crate::storage::Chunk;
+#[derive(Copy, Clone, Debug)]
+pub struct Chunk {
+    offset: usize,
+    length: usize,
+}
+
+impl Chunk {
+    pub fn new(offset: usize, length: usize) -> Self {
+        Self { offset, length }
+    }
+
+    pub fn range(&self) -> std::ops::Range<usize> {
+        self.offset..self.offset + self.length
+    }
+}
 
 pub trait Chunker {
     fn chunk_data(&mut self, data: &[u8]) -> Vec<Chunk>;

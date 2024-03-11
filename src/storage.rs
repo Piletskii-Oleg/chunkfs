@@ -8,29 +8,21 @@ pub mod base;
 pub mod chunker;
 mod hasher;
 
-#[derive(Clone)]
-pub struct Chunk {
-    offset: usize,
-    length: usize,
-}
-
-impl Chunk {
-    pub fn new(offset: usize, length: usize) -> Self {
-        Self { offset, length }
-    }
-
-    fn range(&self) -> std::ops::Range<usize> {
-        self.offset..self.offset + self.length
-    }
-}
-
 /// Hashed span in a file
+#[derive(Debug)]
 pub struct Span {
     pub hash: Hash,
     pub length: usize,
 }
 
+impl Span {
+    pub fn new(hash: Hash, length: usize) -> Self {
+        Self { hash, length }
+    }
+}
+
 /// Underlying storage for the actual stored data
+#[derive(Debug)]
 pub struct Storage<C, H, B>
 where
     C: Chunker,
@@ -40,6 +32,7 @@ where
     chunker: C,
     hasher: H,
     base: B,
+    // for one file at a time, else it would break when flush is used
     buffer: Vec<u8>,
 }
 
@@ -57,22 +50,14 @@ where
             buffer: vec![],
         }
     }
+
     /// Writes 1 MB of data to the base storage after deduplication.
     ///
     /// Returns resulting lengths of chunks with corresponding hash
     pub fn write(&mut self, data: &[u8]) -> std::io::Result<Vec<Span>> {
         // if there is no more data to be written
         if data.is_empty() {
-            let hash = self.hasher.hash(&self.buffer);
-
-            let segment = Segment::new(hash.clone(), self.buffer.clone());
-            self.base.save(vec![segment])?;
-
-            let span = Span {
-                hash,
-                length: self.buffer.len(),
-            };
-            return Ok(vec![span]);
+            return Ok(vec![]);
         }
 
         assert_eq!(data.len(), SEG_SIZE); // we assume that all given data segments are 1MB long for now
@@ -96,16 +81,24 @@ where
         // have to copy hashes? or do something else?
         let spans = segments
             .iter()
-            .map(|segment| Span {
-                hash: segment.hash.clone(),
-                length: segment.data.len(),
-            })
+            .map(|segment| Span::new(segment.hash.clone(), segment.data.len()))
             .collect();
         self.base.save(segments)?;
 
         self.buffer = data[rest.range()].to_vec();
 
         Ok(spans)
+    }
+
+    pub fn flush(&mut self) -> std::io::Result<Span> {
+        let hash = self.hasher.hash(&self.buffer);
+
+        let segment = Segment::new(hash.clone(), self.buffer.clone());
+        self.base.save(vec![segment])?;
+
+        let span = Span::new(hash, self.buffer.len());
+        self.buffer = vec![];
+        return Ok(span);
     }
 
     pub fn retrieve_chunks(&mut self, request: Vec<Hash>) -> std::io::Result<Vec<Vec<u8>>> {
