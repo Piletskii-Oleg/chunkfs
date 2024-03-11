@@ -1,4 +1,5 @@
 pub use crate::storage::base::Base;
+use crate::storage::base::Segment;
 pub use crate::storage::chunker::Chunker;
 pub use crate::storage::hasher::Hasher;
 use crate::{Hash, SEG_SIZE};
@@ -17,12 +18,6 @@ impl Chunk {
     fn range(&self) -> std::ops::Range<usize> {
         self.offset..self.offset + self.length
     }
-}
-
-/// A data segment with hash
-pub struct Segment {
-    hash: Hash,
-    data: Vec<u8>,
 }
 
 /// Hashed span in a file
@@ -50,6 +45,14 @@ where
     H: Hasher,
     B: Base,
 {
+    pub fn new(chunker: C, hasher: H, base: B) -> Self {
+        Self {
+            chunker,
+            hasher,
+            base,
+            buffer: vec![],
+        }
+    }
     /// Writes 1 MB of data to the base storage after deduplication.
     ///
     /// Returns resulting lengths of chunks with corresponding hash
@@ -58,10 +61,7 @@ where
         if data.is_empty() {
             let hash = self.hasher.hash(&self.buffer);
 
-            let segment = Segment {
-                hash: hash.clone(),
-                data: self.buffer.clone(),
-            };
+            let segment = Segment::new(hash.clone(), self.buffer.clone());
             self.base.save(vec![segment])?;
 
             let span = Span {
@@ -86,7 +86,7 @@ where
         let segments = hashes
             .into_iter()
             .zip(chunks.iter().map(|chunk| data[chunk.range()].to_vec()))
-            .map(|(hash, data)| Segment { hash, data })
+            .map(|(hash, data)| Segment::new(hash, data))
             .collect::<Vec<Segment>>();
 
         // have to copy hashes? or do something else?
