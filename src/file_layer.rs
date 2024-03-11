@@ -20,9 +20,10 @@ pub struct FileLayer {
 
 #[derive(Debug, PartialEq)]
 pub struct FileHandle {
-    // can't make file_name a reference, or it would count as an immutable reference for FileSystem
+    // can't make file_name a reference
+    // or have a reference to File,
+    // or it would count as an immutable reference for FileSystem
     file_name: String,
-    spans: Vec<FileSpan>,
     is_modified: bool,
 }
 
@@ -36,28 +37,7 @@ impl FileHandle {
     fn from_file(file: &File) -> Self {
         FileHandle {
             file_name: file.name.clone(),
-            spans: vec![],
             is_modified: false,
-        }
-    }
-
-    pub fn write(&mut self, spans: Vec<Span>) {
-        let mut offset = 0;
-        for span in spans {
-            // pushes spans to itself first, pushes them to file after close
-            self.spans.push(FileSpan {
-                hash: span.hash,
-                offset,
-            });
-            offset += span.length;
-        }
-        self.is_modified = true;
-    }
-
-    pub fn close(self) {
-        // full rewrite on close if any writes were done
-        if !self.is_modified {
-            // self.file.spans = self.spans;
         }
     }
 }
