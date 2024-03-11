@@ -24,6 +24,14 @@ pub struct HashMapBase {
     segment_map: HashMap<Hash, Vec<u8>>,
 }
 
+impl HashMapBase {
+    pub fn new() -> Self {
+        Self {
+            segment_map: HashMap::new(),
+        }
+    }
+}
+
 impl Base for HashMapBase {
     fn save(&mut self, segments: Vec<Segment>) -> std::io::Result<()> {
         for segment in segments {

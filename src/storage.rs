@@ -4,8 +4,8 @@ pub use crate::storage::chunker::Chunker;
 pub use crate::storage::hasher::Hasher;
 use crate::{Hash, SEG_SIZE};
 
-mod base;
-mod chunker;
+pub mod base;
+pub mod chunker;
 mod hasher;
 
 #[derive(Clone)]
@@ -15,6 +15,10 @@ pub struct Chunk {
 }
 
 impl Chunk {
+    pub fn new(offset: usize, length: usize) -> Self {
+        Self { offset, length }
+    }
+
     fn range(&self) -> std::ops::Range<usize> {
         self.offset..self.offset + self.length
     }
