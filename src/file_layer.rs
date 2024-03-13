@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use std::io::ErrorKind;
 
 use crate::storage::Span;
-use crate::Hash;
+use crate::VecHash;
 
+/// Hashed span, starting at `offset`
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct FileSpan {
-    hash: Hash,
+    hash: VecHash,
     offset: usize,
 }
 
@@ -15,18 +16,21 @@ pub struct File {
     spans: Vec<FileSpan>,
 }
 
+/// Layer that contains all files
 #[derive(Default)]
 pub struct FileLayer {
     files: HashMap<String, File>,
 }
 
+/// Handle for an opened file
 #[derive(Debug, PartialEq)]
 pub struct FileHandle {
     // can't make file_name a reference
     // or have a reference to File,
     // or it would count as an immutable reference for FileSystem
     file_name: String,
-    is_modified: bool,
+    // store offset of the file, so that reading/writing can be done by blocks
+    offset: usize,
 }
 
 impl File {
@@ -39,12 +43,13 @@ impl FileHandle {
     fn new(file: &File) -> Self {
         FileHandle {
             file_name: file.name.clone(),
-            is_modified: false,
+            offset: 0,
         }
     }
 }
 
 impl FileLayer {
+    /// Creates a file and returns its `FileHandle`
     pub fn create(&mut self, name: String) -> std::io::Result<FileHandle> {
         if self.files.contains_key(&name) {
             return Err(std::io::Error::from(ErrorKind::AlreadyExists));
@@ -55,8 +60,8 @@ impl FileLayer {
         Ok(FileHandle::new(file))
     }
 
+    /// Opens a file based on its name and returns its `FileHandle`
     pub fn open(&self, name: &str) -> Option<FileHandle> {
-        // uses iter_mut because FileHandle requires &mut File
         self.files.get(name).map(FileHandle::new)
     }
 
@@ -68,7 +73,8 @@ impl FileLayer {
         self.files.get_mut(&handle.file_name).unwrap()
     }
 
-    pub fn read(&self, handle: &FileHandle) -> Vec<Hash> {
+    /// Reads all hashes of the file
+    pub fn read_complete(&self, handle: &FileHandle) -> Vec<VecHash> {
         let file = self.find_file(handle);
         // this is probably not what was intended
         // it simply reads all hashes continuously and clones them
@@ -78,15 +84,15 @@ impl FileLayer {
             .collect()
     }
 
-    pub fn write(&mut self, handle: &FileHandle, spans: Vec<Span>) {
+    /// Writes spans to the file
+    pub fn write(&mut self, handle: &mut FileHandle, spans: Vec<Span>) {
         let file = self.find_file_mut(handle);
-        let mut offset = 0;
         for span in spans {
             file.spans.push(FileSpan {
                 hash: span.hash,
-                offset,
+                offset: handle.offset,
             });
-            offset += span.length;
+            handle.offset += span.length;
         }
     }
 }

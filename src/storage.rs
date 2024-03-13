@@ -2,21 +2,21 @@ pub use crate::storage::base::Base;
 use crate::storage::base::Segment;
 pub use crate::storage::chunker::Chunker;
 pub use crate::storage::hasher::Hasher;
-use crate::{Hash, SEG_SIZE};
+use crate::{VecHash, SEG_SIZE};
 
 pub mod base;
 pub mod chunker;
 pub mod hasher;
 
-/// Hashed span in a file
+/// Hashed span in a file with a certain length
 #[derive(Debug)]
 pub struct Span {
-    pub hash: Hash,
+    pub hash: VecHash,
     pub length: usize,
 }
 
 impl Span {
-    pub fn new(hash: Hash, length: usize) -> Self {
+    pub fn new(hash: VecHash, length: usize) -> Self {
         Self { hash, length }
     }
 }
@@ -44,6 +44,7 @@ where
 {
     pub fn new(chunker: C, hasher: H, base: B) -> Self {
         Self {
+            // create during process? and add function to return `rest`
             chunker,
             hasher,
             base,
@@ -70,7 +71,7 @@ where
         let hashes = chunks
             .iter()
             .map(|chunk| self.hasher.hash(&self.buffer[chunk.range()]))
-            .collect::<Vec<Hash>>();
+            .collect::<Vec<VecHash>>();
 
         let segments = hashes
             .into_iter()
@@ -94,6 +95,7 @@ where
         Ok(spans)
     }
 
+    /// Returns remaining data in the buffer
     pub fn flush(&mut self) -> std::io::Result<Span> {
         let hash = self.hasher.hash(&self.buffer);
 
@@ -105,7 +107,9 @@ where
         Ok(span)
     }
 
-    pub fn retrieve_chunks(&mut self, request: Vec<Hash>) -> std::io::Result<Vec<Vec<u8>>> {
+    /// Retrieves the data from the storage based on hashes of the data segments,
+    /// or Error(NotFound) if some of the hashes were not present in the base
+    pub fn retrieve(&mut self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>> {
         self.base.retrieve(request)
     }
 }

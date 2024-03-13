@@ -24,6 +24,7 @@ where
         }
     }
 
+    // is it fine that we can open file in two different handles?
     pub fn open_file(&self, name: &str) -> Option<FileHandle> {
         self.file_layer.open(name)
     }
@@ -33,21 +34,24 @@ where
         self.file_layer.create(name)
     }
 
-    pub fn write_to_file(&mut self, handle: &FileHandle, data: &[u8]) -> std::io::Result<()> {
+    pub fn write_to_file(&mut self, handle: &mut FileHandle, data: &[u8]) -> std::io::Result<()> {
         let spans = self.storage.write(data)?;
         self.file_layer.write(handle, spans);
         Ok(())
     }
 
-    pub fn close_file(&mut self, handle: FileHandle) -> std::io::Result<()> {
+    /// Closes the file and ensures that all data that was written to it
+    /// is stored.
+    pub fn close_file(&mut self, mut handle: FileHandle) -> std::io::Result<()> {
         let span = self.storage.flush()?;
-        self.file_layer.write(&handle, vec![span]);
+        self.file_layer.write(&mut handle, vec![span]);
         Ok(())
     }
 
+    // this is a full read; must be able to read by blocks
     pub fn read_from_file(&mut self, handle: &FileHandle) -> std::io::Result<Vec<u8>> {
-        let hashes = self.file_layer.read(handle);
-        Ok(self.storage.retrieve_chunks(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
+        let hashes = self.file_layer.read_complete(handle);
+        Ok(self.storage.retrieve(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 }
 
@@ -57,12 +61,12 @@ mod tests {
     use crate::storage::base::HashMapBase;
     use crate::storage::chunker::FSChunker;
     use crate::storage::{Hasher, Storage};
-    use crate::{FileSystem, Hash};
+    use crate::{FileSystem, VecHash};
 
     struct SimpleHasher;
 
     impl Hasher for SimpleHasher {
-        fn hash(&mut self, data: &[u8]) -> Hash {
+        fn hash(&mut self, data: &[u8]) -> VecHash {
             data.to_vec()
         }
     }
@@ -74,8 +78,9 @@ mod tests {
             file_layer: FileLayer::default(),
         };
 
-        let handle = fs.create_file("file".to_string()).unwrap();
-        fs.write_to_file(&handle, &vec![1; 1024 * 1024]).unwrap();
+        let mut handle = fs.create_file("file".to_string()).unwrap();
+        fs.write_to_file(&mut handle, &vec![1; 1024 * 1024])
+            .unwrap();
 
         // file has to be closed in order to flush all remaining data
         // else test would not pass

@@ -1,29 +1,34 @@
 use std::collections::HashMap;
 use std::io::ErrorKind;
 
-use crate::Hash;
+use crate::VecHash;
 
+/// Serves as base functionality for storing the actual data
 pub trait Base {
+    /// Saves given data to the underlying storage
     fn save(&mut self, segments: Vec<Segment>) -> std::io::Result<()>;
 
-    fn retrieve(&mut self, request: Vec<Hash>) -> std::io::Result<Vec<Vec<u8>>>;
+    /// Clones and returns the data corresponding to the given hashes, or Error(NotFound),
+    /// if some of the hashes were not found
+    fn retrieve(&mut self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>>;
 }
 
-/// A data segment with hash
+/// A data segment with corresponding hash
 pub struct Segment {
-    pub hash: Hash,
+    pub hash: VecHash,
     pub data: Vec<u8>,
 }
 
 impl Segment {
-    pub fn new(hash: Hash, data: Vec<u8>) -> Self {
+    pub fn new(hash: VecHash, data: Vec<u8>) -> Self {
         Self { hash, data }
     }
 }
 
+/// Simple in-memory hashmap-based storage
 #[derive(Default)]
 pub struct HashMapBase {
-    segment_map: HashMap<Hash, Vec<u8>>,
+    segment_map: HashMap<VecHash, Vec<u8>>,
 }
 
 impl Base for HashMapBase {
@@ -34,7 +39,7 @@ impl Base for HashMapBase {
         Ok(())
     }
 
-    fn retrieve(&mut self, request: Vec<Hash>) -> std::io::Result<Vec<Vec<u8>>> {
+    fn retrieve(&mut self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>> {
         // 1. unwrapping if no data is found. what kind of error can be used here?
         // 2. cloning stored data instead of passing reference.
         // is it how it is supposed to be or should we give a reference to underlying data?
