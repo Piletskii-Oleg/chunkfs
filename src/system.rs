@@ -1,7 +1,6 @@
-use crate::file_layer::{FileError, FileHandle, FileLayer};
+use crate::file_layer::{FileHandle, FileLayer};
 use crate::storage::{Base, Chunker, Hasher, Storage};
 
-#[derive(Debug)]
 pub struct FileSystem<C, H, B>
 where
     C: Chunker,
@@ -23,7 +22,7 @@ where
     }
 
     // owned String or &str?
-    pub fn create_file(&mut self, name: String) -> Result<FileHandle, FileError> {
+    pub fn create_file(&mut self, name: String) -> std::io::Result<FileHandle> {
         self.file_layer.create(name)
     }
 
@@ -67,7 +66,7 @@ mod tests {
     fn write_read_test() {
         let mut fs = FileSystem {
             storage: Storage::new(FSChunker::new(4096), SimpleHasher, HashMapBase::new()),
-            file_layer: FileLayer::new(),
+            file_layer: FileLayer::default(),
         };
 
         let handle = fs.create_file("file".to_string()).unwrap();

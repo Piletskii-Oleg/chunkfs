@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::io::ErrorKind;
+
 use crate::storage::Span;
 use crate::Hash;
 
@@ -7,15 +10,14 @@ pub struct FileSpan {
     offset: usize,
 }
 
-#[derive(Debug, PartialEq)]
 pub struct File {
     name: String,
     spans: Vec<FileSpan>,
 }
 
-#[derive(Debug)]
+#[derive(Default)]
 pub struct FileLayer {
-    files: Vec<File>,
+    files: HashMap<String, File>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -34,7 +36,7 @@ impl File {
 }
 
 impl FileHandle {
-    fn from_file(file: &File) -> Self {
+    fn new(file: &File) -> Self {
         FileHandle {
             file_name: file.name.clone(),
             is_modified: false,
@@ -42,46 +44,28 @@ impl FileHandle {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum FileError {
-    FileAlreadyExists,
-}
-
 impl FileLayer {
-    pub fn new() -> Self {
-        FileLayer { files: vec![] }
-    }
-    pub fn create(&mut self, name: String) -> Result<FileHandle, FileError> {
-        if self.files.iter().find(|file| file.name == name).is_some() {
-            return Err(FileError::FileAlreadyExists);
+    pub fn create(&mut self, name: String) -> std::io::Result<FileHandle> {
+        if self.files.contains_key(&name) {
+            return Err(std::io::Error::from(ErrorKind::AlreadyExists));
         }
 
-        let file = File::new(name, vec![]);
-        self.files.push(file);
-        Ok(FileHandle::from_file(self.files.last_mut().unwrap()))
+        let file = File::new(name.clone(), vec![]);
+        let file = self.files.entry(name).or_insert(file);
+        Ok(FileHandle::new(&file))
     }
 
     pub fn open(&self, name: &str) -> Option<FileHandle> {
         // uses iter_mut because FileHandle requires &mut File
-        if let Some(file) = self.files.iter().find(|file| file.name == name) {
-            Some(FileHandle::from_file(file))
-        } else {
-            None
-        }
+        self.files.get(name).map(FileHandle::new)
     }
 
     fn find_file(&self, handle: &FileHandle) -> &File {
-        self.files
-            .iter()
-            .find(|file| file.name == handle.file_name)
-            .unwrap()
+        self.files.get(&handle.file_name).unwrap()
     }
 
     fn find_file_mut(&mut self, handle: &FileHandle) -> &mut File {
-        self.files
-            .iter_mut()
-            .find(|file| file.name == handle.file_name)
-            .unwrap()
+        self.files.get_mut(&handle.file_name).unwrap()
     }
 
     pub fn read(&self, handle: &FileHandle) -> Vec<Hash> {
@@ -111,24 +95,27 @@ impl FileLayer {
 
 #[cfg(test)]
 mod tests {
-    use crate::file_layer::{FileError, FileLayer};
+    use std::io::ErrorKind;
+
+    use crate::file_layer::FileLayer;
 
     #[test]
     fn file_layer_create_file() {
-        let mut fl = FileLayer::new();
-        fl.create("hello".to_string()).unwrap();
+        let mut fl = FileLayer::default();
+        let name = "hello".to_string();
+        fl.create(name.clone()).unwrap();
 
-        assert_eq!(fl.files[0].name, "hello");
-        assert_eq!(fl.files[0].spans, vec![]);
+        assert_eq!(fl.files.get(&name).unwrap().name, "hello");
+        assert_eq!(fl.files.get(&name).unwrap().spans, vec![]);
     }
 
     #[test]
     fn cant_create_two_files_with_same_name() {
-        let mut fl = FileLayer::new();
+        let mut fl = FileLayer::default();
         fl.create("hello".to_string()).unwrap();
-        assert_eq!(
-            fl.create("hello".to_string()),
-            Err(FileError::FileAlreadyExists)
-        )
+
+        let result = fl.create("hello".to_string());
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().kind(), ErrorKind::AlreadyExists);
     }
 }
