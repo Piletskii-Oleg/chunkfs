@@ -17,6 +17,13 @@ where
     H: Hasher,
     B: Base,
 {
+    pub fn new(chunker: C, hasher: H, base: B) -> Self {
+        Self {
+            storage: Storage::new(chunker, hasher, base),
+            file_layer: Default::default(),
+        }
+    }
+
     pub fn open_file(&self, name: &str) -> Option<FileHandle> {
         self.file_layer.open(name)
     }
