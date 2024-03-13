@@ -1,3 +1,4 @@
+pub use storage::{chunker, hasher};
 pub use system::FileSystem;
 
 mod file_layer;

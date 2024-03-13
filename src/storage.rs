@@ -6,7 +6,7 @@ use crate::{Hash, SEG_SIZE};
 
 pub mod base;
 pub mod chunker;
-mod hasher;
+pub mod hasher;
 
 /// Hashed span in a file
 #[derive(Debug)]
@@ -60,21 +60,25 @@ where
             return Ok(vec![]);
         }
 
-        assert_eq!(data.len(), SEG_SIZE); // we assume that all given data segments are 1MB long for now
+        debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
         self.buffer.extend_from_slice(data); // remove copying? we need to have `rest` stored and indexed
-        let data = &self.buffer; // this, or replace all occurrences of data with self.buffer
-        let all_chunks = self.chunker.chunk_data(data);
+
+        let all_chunks = self.chunker.chunk_data(&self.buffer);
         let (rest, chunks) = all_chunks.split_last().unwrap(); // should always be not empty? for now at least, when data.len() is 1 MB
 
         let hashes = chunks
             .iter()
-            .map(|chunk| self.hasher.hash(&data[chunk.range()]))
+            .map(|chunk| self.hasher.hash(&self.buffer[chunk.range()]))
             .collect::<Vec<Hash>>();
 
         let segments = hashes
             .into_iter()
-            .zip(chunks.iter().map(|chunk| data[chunk.range()].to_vec()))
+            .zip(
+                chunks
+                    .iter()
+                    .map(|chunk| self.buffer[chunk.range()].to_vec()),
+            )
             .map(|(hash, data)| Segment::new(hash, data))
             .collect::<Vec<Segment>>();
 
@@ -85,7 +89,7 @@ where
             .collect();
         self.base.save(segments)?;
 
-        self.buffer = data[rest.range()].to_vec();
+        self.buffer = self.buffer[rest.range()].to_vec();
 
         Ok(spans)
     }
@@ -98,7 +102,7 @@ where
 
         let span = Span::new(hash, self.buffer.len());
         self.buffer = vec![];
-        return Ok(span);
+        Ok(span)
     }
 
     pub fn retrieve_chunks(&mut self, request: Vec<Hash>) -> std::io::Result<Vec<Vec<u8>>> {

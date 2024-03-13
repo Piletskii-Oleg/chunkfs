@@ -4,7 +4,7 @@ use std::io::ErrorKind;
 use crate::storage::Span;
 use crate::Hash;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct FileSpan {
     hash: Hash,
     offset: usize,
@@ -52,7 +52,7 @@ impl FileLayer {
 
         let file = File::new(name.clone(), vec![]);
         let file = self.files.entry(name).or_insert(file);
-        Ok(FileHandle::new(&file))
+        Ok(FileHandle::new(file))
     }
 
     pub fn open(&self, name: &str) -> Option<FileHandle> {
@@ -89,8 +89,6 @@ impl FileLayer {
             offset += span.length;
         }
     }
-
-    pub fn close(&mut self, _handle: FileHandle) {}
 }
 
 #[cfg(test)]

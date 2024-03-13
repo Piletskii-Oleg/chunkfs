@@ -35,13 +35,11 @@ where
     pub fn close_file(&mut self, handle: FileHandle) -> std::io::Result<()> {
         let span = self.storage.flush()?;
         self.file_layer.write(&handle, vec![span]);
-
-        self.file_layer.close(handle);
         Ok(())
     }
 
     pub fn read_from_file(&mut self, handle: &FileHandle) -> std::io::Result<Vec<u8>> {
-        let hashes = self.file_layer.read(&handle);
+        let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve_chunks(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 }
@@ -65,7 +63,7 @@ mod tests {
     #[test]
     fn write_read_test() {
         let mut fs = FileSystem {
-            storage: Storage::new(FSChunker::new(4096), SimpleHasher, HashMapBase::new()),
+            storage: Storage::new(FSChunker::new(4096), SimpleHasher, HashMapBase::default()),
             file_layer: FileLayer::default(),
         };
 
