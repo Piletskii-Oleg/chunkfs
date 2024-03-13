@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io::ErrorKind;
 
 use crate::Hash;
 
@@ -20,16 +21,9 @@ impl Segment {
     }
 }
 
+#[derive(Default)]
 pub struct HashMapBase {
     segment_map: HashMap<Hash, Vec<u8>>,
-}
-
-impl HashMapBase {
-    pub fn new() -> Self {
-        Self {
-            segment_map: HashMap::new(),
-        }
-    }
 }
 
 impl Base for HashMapBase {
@@ -44,9 +38,14 @@ impl Base for HashMapBase {
         // 1. unwrapping if no data is found. what kind of error can be used here?
         // 2. cloning stored data instead of passing reference.
         // is it how it is supposed to be or should we give a reference to underlying data?
-        Ok(request
+        request
             .into_iter()
-            .map(|hash| self.segment_map.get(&hash).unwrap().clone())
-            .collect())
+            .map(|hash| {
+                self.segment_map
+                    .get(&hash)
+                    .cloned()
+                    .ok_or(std::io::Error::from(ErrorKind::NotFound))
+            })
+            .collect()
     }
 }
