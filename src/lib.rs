@@ -1,5 +1,5 @@
 pub use storage::{base, chunker, hasher};
-pub use system::FileSystem;
+pub use system::{FileSystem, FileSystemBuilder};
 
 mod file_layer;
 mod storage;

@@ -64,67 +64,64 @@ where
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::file_layer::FileLayer;
-    use crate::storage::base::HashMapBase;
-    use crate::storage::chunker::FSChunker;
-    use crate::storage::{Hasher, Storage};
-    use crate::{FileSystem, VecHash};
+pub struct FileSystemBuilder<C, H, B>
+where
+    C: Chunker,
+    H: Hasher,
+    B: Base,
+{
+    chunker: Option<C>,
+    hasher: Option<H>,
+    base: Option<B>,
+}
 
-    struct SimpleHasher;
-
-    impl Hasher for SimpleHasher {
-        fn hash(&mut self, data: &[u8]) -> VecHash {
-            data.to_vec()
+impl<C, H, B> FileSystemBuilder<C, H, B>
+where
+    C: Chunker,
+    H: Hasher,
+    B: Base,
+{
+    pub fn new() -> Self {
+        FileSystemBuilder {
+            chunker: None,
+            hasher: None,
+            base: None,
         }
     }
 
-    #[test]
-    fn write_read_complete_test() {
-        let mut fs = FileSystem {
-            storage: Storage::new(FSChunker::new(4096), SimpleHasher, HashMapBase::default()),
-            file_layer: FileLayer::default(),
-        };
-
-        let mut handle = fs.create_file("file".to_string()).unwrap();
-        fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
-        fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
-
-        fs.close_file(handle).unwrap();
-
-        let handle = fs.open_file("file").unwrap();
-        assert_eq!(
-            fs.read_file_complete(&handle).unwrap(),
-            vec![1; 1024 * 1024 * 2]
-        );
+    pub fn with_chunker(mut self, chunker: C) -> Self {
+        self.chunker = Some(chunker);
+        self
     }
 
-    #[test]
-    fn write_read_blocks_test() {
-        let mut fs = FileSystem {
-            storage: Storage::new(FSChunker::new(4096), SimpleHasher, HashMapBase::default()),
-            file_layer: FileLayer::default(),
-        };
+    pub fn with_hasher(mut self, hasher: H) -> Self {
+        self.hasher = Some(hasher);
+        self
+    }
 
-        let mut handle = fs.create_file("file".to_string()).unwrap();
-        fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
-        fs.write_to_file(&mut handle, &[2; 1024 * 1024]).unwrap();
-        fs.write_to_file(&mut handle, &[3; 1024 * 1024]).unwrap();
-        fs.close_file(handle).unwrap();
+    pub fn with_base(mut self, base: B) -> Self {
+        self.base = Some(base);
+        self
+    }
 
-        let mut handle = fs.open_file("file").unwrap();
-        assert_eq!(
-            fs.read_from_file(&mut handle).unwrap(),
-            vec![1; 1024 * 1024]
-        );
-        assert_eq!(
-            fs.read_from_file(&mut handle).unwrap(),
-            vec![2; 1024 * 1024]
-        );
-        assert_eq!(
-            fs.read_from_file(&mut handle).unwrap(),
-            vec![3; 1024 * 1024]
-        );
+    pub fn build(self) -> Result<FileSystem<C, H, B>, String> {
+        let chunker = self.chunker.ok_or("No chunker provided")?;
+        let hasher = self.hasher.ok_or("No hasher provided")?;
+        let base = self.base.ok_or("No base provided")?;
+        Ok(FileSystem {
+            storage: Storage::new(chunker, hasher, base),
+            file_layer: Default::default(),
+        })
+    }
+}
+
+impl<C, H, B> Default for FileSystemBuilder<C, H, B>
+where
+    C: Chunker,
+    H: Hasher,
+    B: Base,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
