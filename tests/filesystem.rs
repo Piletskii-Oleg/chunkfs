@@ -3,16 +3,11 @@ extern crate chunkfs;
 use chunkfs::base::HashMapBase;
 use chunkfs::chunker::FSChunker;
 use chunkfs::hasher::SimpleHasher;
-use chunkfs::FileSystemBuilder;
+use chunkfs::{FileSystem, FileSystemBuilder};
 
 #[test]
 fn write_read_complete_test() {
-    let mut fs = FileSystemBuilder::new()
-        .with_chunker(FSChunker::new(4096))
-        .with_hasher(SimpleHasher)
-        .with_base(HashMapBase::default())
-        .build()
-        .unwrap();
+    let mut fs = FileSystem::new(FSChunker::new(4096), SimpleHasher, HashMapBase::default());
 
     let mut handle = fs.create_file("file".to_string()).unwrap();
     fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();

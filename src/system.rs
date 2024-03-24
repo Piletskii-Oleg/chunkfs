@@ -64,6 +64,7 @@ where
     }
 }
 
+/// Used to create `FileSystem` with the given chunker, hasher and base.
 pub struct FileSystemBuilder<C, H, B>
 where
     C: Chunker,
@@ -81,6 +82,7 @@ where
     H: Hasher,
     B: Base,
 {
+    /// Creates an empty template for the `FileSystem`.
     pub fn new() -> Self {
         FileSystemBuilder {
             chunker: None,
@@ -104,6 +106,9 @@ where
         self
     }
 
+    /// Tries to build the `FileSystem` if all components were provided.
+    ///
+    /// Returns an error otherwise.
     pub fn build(self) -> Result<FileSystem<C, H, B>, String> {
         let chunker = self.chunker.ok_or("No chunker provided")?;
         let hasher = self.hasher.ok_or("No hasher provided")?;
