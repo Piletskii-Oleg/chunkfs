@@ -8,7 +8,7 @@ pub mod base;
 pub mod chunker;
 pub mod hasher;
 
-/// Hashed span in a file with a certain length
+/// Hashed span in a file with a certain length.
 #[derive(Debug)]
 pub struct Span {
     pub hash: VecHash,
@@ -54,7 +54,7 @@ where
 
     /// Writes 1 MB of data to the base storage after deduplication.
     ///
-    /// Returns resulting lengths of chunks with corresponding hash
+    /// Returns resulting lengths of chunks with corresponding hash.
     pub fn write(&mut self, data: &[u8]) -> std::io::Result<Vec<Span>> {
         // if there is no more data to be written
         if data.is_empty() {
@@ -65,8 +65,7 @@ where
 
         self.buffer.extend_from_slice(data); // remove copying? we need to have `rest` stored and indexed
 
-        let all_chunks = self.chunker.chunk_data(&self.buffer);
-        let (rest, chunks) = all_chunks.split_last().unwrap(); // should always be not empty? for now at least, when data.len() is 1 MB
+        let chunks = self.chunker.chunk_data(&self.buffer);
 
         let hashes = chunks
             .iter()
@@ -90,12 +89,12 @@ where
             .collect();
         self.base.save(segments)?;
 
-        self.buffer = self.buffer[rest.range()].to_vec();
+        self.buffer = self.chunker.rest().to_vec();
 
         Ok(spans)
     }
 
-    /// Returns remaining data in the buffer
+    /// Flushes remaining data to the storage and returns its span.
     pub fn flush(&mut self) -> std::io::Result<Span> {
         let hash = self.hasher.hash(&self.buffer);
 
@@ -109,7 +108,7 @@ where
 
     /// Retrieves the data from the storage based on hashes of the data segments,
     /// or Error(NotFound) if some of the hashes were not present in the base
-    pub fn retrieve(&mut self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>> {
+    pub fn retrieve(&self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>> {
         self.base.retrieve(request)
     }
 }

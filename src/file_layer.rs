@@ -11,6 +11,8 @@ pub struct FileSpan {
     offset: usize,
 }
 
+/// A named file, doesn't store actual contents,
+/// but rather hashes for them.
 pub struct File {
     name: String,
     spans: Vec<FileSpan>,
@@ -65,10 +67,12 @@ impl FileLayer {
         self.files.get(name).map(FileHandle::new)
     }
 
+    /// Returns reference to a file using `FileHandle` that corresponds to it.
     fn find_file(&self, handle: &FileHandle) -> &File {
         self.files.get(&handle.file_name).unwrap()
     }
 
+    /// Returns mutable reference to a file using `FileHandle` that corresponds to it.
     fn find_file_mut(&mut self, handle: &FileHandle) -> &mut File {
         self.files.get_mut(&handle.file_name).unwrap()
     }
@@ -94,6 +98,8 @@ impl FileLayer {
         }
     }
 
+    /// Reads 1 MB of data from the open file and returns received hashes,
+    /// starting point is based on the `FileHandle`'s offset.
     pub fn read(&mut self, handle: &mut FileHandle) -> Vec<VecHash> {
         let file = self.find_file(handle);
 

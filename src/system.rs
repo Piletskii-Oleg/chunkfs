@@ -24,16 +24,19 @@ where
         }
     }
 
-    // is it fine that we can open file in two different handles?
+    /// Tries to open a file with the given name and returns its `FileHandle` if it exists,
+    /// or `None`, if it doesn't.
     pub fn open_file(&self, name: &str) -> Option<FileHandle> {
         self.file_layer.open(name)
     }
 
-    // owned String or &str?
+    /// Creates a file with the given name and returns its `FileHandle`.
+    /// Returns `ErrorKind::AlreadyExists`, if the file with the same name exists in the file system.
     pub fn create_file(&mut self, name: String) -> std::io::Result<FileHandle> {
         self.file_layer.create(name)
     }
 
+    /// Writes given data to the file. Size of the slice must be exactly 1 MB.
     pub fn write_to_file(&mut self, handle: &mut FileHandle, data: &[u8]) -> std::io::Result<()> {
         let spans = self.storage.write(data)?;
         self.file_layer.write(handle, spans);
@@ -48,11 +51,13 @@ where
         Ok(())
     }
 
-    pub fn read_file_complete(&mut self, handle: &FileHandle) -> std::io::Result<Vec<u8>> {
+    /// Reads all contents of the file from beginning to end and returns them.
+    pub fn read_file_complete(&self, handle: &FileHandle) -> std::io::Result<Vec<u8>> {
         let hashes = self.file_layer.read_complete(handle);
         Ok(self.storage.retrieve(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 
+    /// Reads 1 MB of data from a file and returns it.
     pub fn read_from_file(&mut self, handle: &mut FileHandle) -> std::io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(hashes)?.concat())

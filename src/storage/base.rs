@@ -10,7 +10,7 @@ pub trait Base {
 
     /// Clones and returns the data corresponding to the given hashes, or Error(NotFound),
     /// if some of the hashes were not found
-    fn retrieve(&mut self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>>;
+    fn retrieve(&self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>>;
 }
 
 /// A data segment with corresponding hash
@@ -39,7 +39,7 @@ impl Base for HashMapBase {
         Ok(())
     }
 
-    fn retrieve(&mut self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>> {
+    fn retrieve(&self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>> {
         // 1. unwrapping if no data is found. what kind of error can be used here?
         // 2. cloning stored data instead of passing reference.
         // is it how it is supposed to be or should we give a reference to underlying data?
