@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::ErrorKind;
 
 use crate::storage::Span;
-use crate::VecHash;
+use crate::{VecHash, SEG_SIZE};
 
 /// Hashed span, starting at `offset`
 #[derive(Debug, PartialEq, Eq, Default)]
@@ -73,18 +73,16 @@ impl FileLayer {
         self.files.get_mut(&handle.file_name).unwrap()
     }
 
-    /// Reads all hashes of the file
+    /// Reads all hashes of the file, from beginning to end
     pub fn read_complete(&self, handle: &FileHandle) -> Vec<VecHash> {
         let file = self.find_file(handle);
-        // this is probably not what was intended
-        // it simply reads all hashes continuously and clones them
         file.spans
             .iter()
             .map(|span| span.hash.clone()) // cloning hashes
             .collect()
     }
 
-    /// Writes spans to the file
+    /// Writes spans to the end of the file
     pub fn write(&mut self, handle: &mut FileHandle, spans: Vec<Span>) {
         let file = self.find_file_mut(handle);
         for span in spans {
@@ -94,6 +92,26 @@ impl FileLayer {
             });
             handle.offset += span.length;
         }
+    }
+
+    pub fn read(&mut self, handle: &mut FileHandle) -> Vec<VecHash> {
+        let file = self.find_file(handle);
+
+        let mut bytes_read = 0;
+        let mut last_offset = handle.offset;
+        let hashes = file
+            .spans
+            .iter()
+            .skip_while(|span| span.offset < handle.offset)
+            .take_while(|span| {
+                bytes_read += span.offset - last_offset;
+                last_offset = span.offset;
+                bytes_read < SEG_SIZE
+            })
+            .map(|span| span.hash.clone())
+            .collect();
+        handle.offset += bytes_read;
+        hashes
     }
 }
 

@@ -48,10 +48,14 @@ where
         Ok(())
     }
 
-    // this is a full read; must be able to read by blocks
-    pub fn read_from_file(&mut self, handle: &FileHandle) -> std::io::Result<Vec<u8>> {
+    pub fn read_file_complete(&mut self, handle: &FileHandle) -> std::io::Result<Vec<u8>> {
         let hashes = self.file_layer.read_complete(handle);
         Ok(self.storage.retrieve(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
+    }
+
+    pub fn read_from_file(&mut self, handle: &mut FileHandle) -> std::io::Result<Vec<u8>> {
+        let hashes = self.file_layer.read(handle);
+        Ok(self.storage.retrieve(hashes)?.concat())
     }
 }
 
@@ -72,22 +76,50 @@ mod tests {
     }
 
     #[test]
-    fn write_read_test() {
+    fn write_read_complete_test() {
         let mut fs = FileSystem {
             storage: Storage::new(FSChunker::new(4096), SimpleHasher, HashMapBase::default()),
             file_layer: FileLayer::default(),
         };
 
         let mut handle = fs.create_file("file".to_string()).unwrap();
-        fs.write_to_file(&mut handle, &vec![1; 1024 * 1024])
-            .unwrap();
+        fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
+        fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
 
-        // file has to be closed in order to flush all remaining data
-        // else test would not pass
-        // how do we go around that? is it fine?
         fs.close_file(handle).unwrap();
 
         let handle = fs.open_file("file").unwrap();
-        assert_eq!(fs.read_from_file(&handle).unwrap(), vec![1; 1024 * 1024]);
+        assert_eq!(
+            fs.read_file_complete(&handle).unwrap(),
+            vec![1; 1024 * 1024 * 2]
+        );
+    }
+
+    #[test]
+    fn write_read_blocks_test() {
+        let mut fs = FileSystem {
+            storage: Storage::new(FSChunker::new(4096), SimpleHasher, HashMapBase::default()),
+            file_layer: FileLayer::default(),
+        };
+
+        let mut handle = fs.create_file("file".to_string()).unwrap();
+        fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
+        fs.write_to_file(&mut handle, &[2; 1024 * 1024]).unwrap();
+        fs.write_to_file(&mut handle, &[3; 1024 * 1024]).unwrap();
+        fs.close_file(handle).unwrap();
+
+        let mut handle = fs.open_file("file").unwrap();
+        assert_eq!(
+            fs.read_from_file(&mut handle).unwrap(),
+            vec![1; 1024 * 1024]
+        );
+        assert_eq!(
+            fs.read_from_file(&mut handle).unwrap(),
+            vec![2; 1024 * 1024]
+        );
+        assert_eq!(
+            fs.read_from_file(&mut handle).unwrap(),
+            vec![3; 1024 * 1024]
+        );
     }
 }
