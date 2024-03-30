@@ -36,8 +36,11 @@ pub struct FileHandle {
 }
 
 impl File {
-    fn new(name: String, spans: Vec<FileSpan>) -> Self {
-        File { name, spans }
+    fn new(name: String) -> Self {
+        File {
+            name,
+            spans: vec![],
+        }
     }
 }
 
@@ -57,7 +60,7 @@ impl FileLayer {
             return Err(std::io::Error::from(ErrorKind::AlreadyExists));
         }
 
-        let file = File::new(name.clone(), vec![]);
+        let file = File::new(name.clone());
         let file = self.files.entry(name).or_insert(file);
         Ok(FileHandle::new(file))
     }
