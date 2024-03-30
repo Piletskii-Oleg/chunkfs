@@ -16,7 +16,7 @@ pub type VecHash = Vec<u8>;
 
 /// Measurements that are received after writing data to a file.
 /// Contain time spent for chunking and for hashing.
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Default, Clone)] // copy?
 pub struct WriteMeasurements {
     chunk_time: Duration,
     hash_time: Duration,

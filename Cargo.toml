@@ -6,3 +6,4 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chunking = { git = "https://github.com/Piletskii-Oleg/rust-chunking.git" }

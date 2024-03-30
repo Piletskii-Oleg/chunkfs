@@ -87,3 +87,29 @@ impl Chunker for FSChunker {
         data.len() / self.chunk_size + 1
     }
 }
+
+#[derive(Default)]
+pub struct LeapChunker {
+    rest: Vec<u8>,
+}
+
+impl Chunker for LeapChunker {
+    fn chunk_data(&mut self, data: &[u8], empty: Vec<Chunk>) -> Vec<Chunk> {
+        let chunker = chunking::leap_based::Chunker::new(data);
+        let mut chunks = empty;
+        for chunk in chunker {
+            chunks.push(Chunk::new(chunk.pos, chunk.len));
+        }
+
+        self.rest = data[chunks.pop().unwrap().range()].to_vec();
+        chunks
+    }
+
+    fn rest(&self) -> &[u8] {
+        &self.rest
+    }
+
+    fn estimate_chunk_count(&self, data: &[u8]) -> usize {
+        data.len() / 1024 * 16
+    }
+}

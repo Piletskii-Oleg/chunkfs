@@ -5,15 +5,15 @@ use crate::VecHash;
 
 /// Serves as base functionality for storing the actual data
 pub trait Base {
-    /// Saves given data to the underlying storage
+    /// Saves given data to the underlying storage.
     fn save(&mut self, segments: Vec<Segment>) -> std::io::Result<()>;
 
-    /// Clones and returns the data corresponding to the given hashes, or Error(NotFound),
-    /// if some of the hashes were not found
+    /// Clones and returns the data corresponding to the given hashes, or returns Error(NotFound),
+    /// if some of the hashes were not found.
     fn retrieve(&self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>>;
 }
 
-/// A data segment with corresponding hash
+/// A data segment with corresponding hash.
 pub struct Segment {
     pub hash: VecHash,
     pub data: Vec<u8>,
@@ -25,7 +25,7 @@ impl Segment {
     }
 }
 
-/// Simple in-memory hashmap-based storage
+/// Simple in-memory hashmap-based storage.
 #[derive(Default)]
 pub struct HashMapBase {
     segment_map: HashMap<VecHash, Vec<u8>>,

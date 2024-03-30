@@ -1,13 +1,13 @@
 extern crate chunkfs;
 
 use chunkfs::base::HashMapBase;
-use chunkfs::chunker::FSChunker;
+use chunkfs::chunker::{FSChunker, LeapChunker};
 use chunkfs::hasher::SimpleHasher;
 use chunkfs::{FileSystem, FileSystemBuilder};
 
 #[test]
 fn write_read_complete_test() {
-    let mut fs = FileSystem::new(FSChunker::new(4096), SimpleHasher, HashMapBase::default());
+    let mut fs = FileSystem::new(LeapChunker::default(), SimpleHasher, HashMapBase::default());
 
     let mut handle = fs.create_file("file".to_string()).unwrap();
     fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
@@ -17,10 +17,9 @@ fn write_read_complete_test() {
     println!("{:?}", measurements);
 
     let handle = fs.open_file("file").unwrap();
-    assert_eq!(
-        fs.read_file_complete(&handle).unwrap(),
-        vec![1; 1024 * 1024 * 2]
-    );
+    let read = fs.read_file_complete(&handle).unwrap();
+    assert_eq!(read.len(), 1024 * 1024 * 2);
+    assert_eq!(read, [1; 1024 * 1024 * 2]);
 }
 
 #[test]

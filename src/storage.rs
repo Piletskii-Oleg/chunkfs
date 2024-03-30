@@ -69,7 +69,7 @@ where
 
         self.buffer.extend_from_slice(data); // remove copying? we need to have `rest` stored and indexed
 
-        let empty = Vec::with_capacity(self.chunker.estimate_chunk_count(data));
+        let empty = Vec::with_capacity(self.chunker.estimate_chunk_count(&self.buffer));
 
         let start = Instant::now();
         let chunks = self.chunker.chunk_data(&self.buffer, empty);
