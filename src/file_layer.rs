@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::io::ErrorKind;
+use std::time::Duration;
 
-use crate::storage::Span;
+use crate::storage::SpansInfo;
 use crate::{VecHash, SEG_SIZE};
 
 /// Hashed span, starting at `offset`
@@ -31,8 +32,10 @@ pub struct FileHandle {
     // or have a reference to File,
     // or it would count as an immutable reference for FileSystem
     file_name: String,
-    // store offset of the file, so that reading/writing can be done by blocks
     offset: usize,
+    pub chunk_time: Duration,
+    // pub or do something else?
+    pub hash_time: Duration,
 }
 
 impl File {
@@ -49,6 +52,8 @@ impl FileHandle {
         FileHandle {
             file_name: file.name.clone(),
             offset: 0,
+            chunk_time: Default::default(),
+            hash_time: Default::default(),
         }
     }
 }
@@ -90,15 +95,18 @@ impl FileLayer {
     }
 
     /// Writes spans to the end of the file
-    pub fn write(&mut self, handle: &mut FileHandle, spans: Vec<Span>) {
+    pub fn write(&mut self, handle: &mut FileHandle, info: SpansInfo) {
         let file = self.find_file_mut(handle);
-        for span in spans {
+        for span in info.spans {
             file.spans.push(FileSpan {
                 hash: span.hash,
                 offset: handle.offset,
             });
             handle.offset += span.length;
         }
+
+        handle.chunk_time += info.chunk_time;
+        handle.hash_time += info.hash_time;
     }
 
     /// Reads 1 MB of data from the open file and returns received hashes,
@@ -111,15 +119,17 @@ impl FileLayer {
         let hashes = file
             .spans
             .iter()
-            .skip_while(|span| span.offset < handle.offset)
+            .skip_while(|span| span.offset < handle.offset) // find current span in the file
             .take_while(|span| {
                 bytes_read += span.offset - last_offset;
                 last_offset = span.offset;
                 bytes_read < SEG_SIZE
-            })
-            .map(|span| span.hash.clone())
+            }) // take 1 MB of spans after current one
+            .map(|span| span.hash.clone()) // take their hashes
             .collect();
+
         handle.offset += bytes_read;
+
         hashes
     }
 }

@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 pub use crate::storage::base::Base;
 use crate::storage::base::Segment;
 pub use crate::storage::chunker::Chunker;
@@ -13,6 +15,13 @@ pub mod hasher;
 pub struct Span {
     pub hash: VecHash,
     pub length: usize,
+}
+
+#[derive(Debug)]
+pub struct SpansInfo {
+    pub spans: Vec<Span>,
+    pub chunk_time: Duration,
+    pub hash_time: Duration,
 }
 
 impl Span {
@@ -55,29 +64,30 @@ where
     /// Writes 1 MB of data to the base storage after deduplication.
     ///
     /// Returns resulting lengths of chunks with corresponding hash.
-    pub fn write(&mut self, data: &[u8]) -> std::io::Result<Vec<Span>> {
-        // if there is no more data to be written
-        if data.is_empty() {
-            return Ok(vec![]);
-        }
-
+    pub fn write(&mut self, data: &[u8]) -> std::io::Result<SpansInfo> {
         debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
         self.buffer.extend_from_slice(data); // remove copying? we need to have `rest` stored and indexed
 
-        let chunks = self.chunker.chunk_data(&self.buffer);
+        let empty = Vec::with_capacity(self.chunker.estimate_chunk_count(data));
 
+        let start = Instant::now();
+        let chunks = self.chunker.chunk_data(&self.buffer, empty);
+        let chunk_time = start.elapsed();
+
+        let start = Instant::now();
         let hashes = chunks
             .iter()
             .map(|chunk| self.hasher.hash(&self.buffer[chunk.range()]))
             .collect::<Vec<VecHash>>();
+        let hash_time = start.elapsed();
 
         let segments = hashes
             .into_iter()
             .zip(
                 chunks
                     .iter()
-                    .map(|chunk| self.buffer[chunk.range()].to_vec()),
+                    .map(|chunk| self.buffer[chunk.range()].to_vec()), // cloning buffer data again
             )
             .map(|(hash, data)| Segment::new(hash, data))
             .collect::<Vec<Segment>>();
@@ -91,19 +101,29 @@ where
 
         self.buffer = self.chunker.rest().to_vec();
 
-        Ok(spans)
+        Ok(SpansInfo {
+            spans,
+            chunk_time,
+            hash_time,
+        })
     }
 
     /// Flushes remaining data to the storage and returns its span.
-    pub fn flush(&mut self) -> std::io::Result<Span> {
+    pub fn flush(&mut self) -> std::io::Result<SpansInfo> {
+        let start = Instant::now();
         let hash = self.hasher.hash(&self.buffer);
+        let hash_time = start.elapsed();
 
         let segment = Segment::new(hash.clone(), self.buffer.clone());
         self.base.save(vec![segment])?;
 
         let span = Span::new(hash, self.buffer.len());
         self.buffer = vec![];
-        Ok(span)
+        Ok(SpansInfo {
+            spans: vec![span],
+            chunk_time: Duration::default(),
+            hash_time,
+        })
     }
 
     /// Retrieves the data from the storage based on hashes of the data segments,

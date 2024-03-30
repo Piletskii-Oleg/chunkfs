@@ -13,7 +13,8 @@ fn write_read_complete_test() {
     fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
     fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
 
-    fs.close_file(handle).unwrap();
+    let measurements = fs.close_file(handle).unwrap();
+    println!("{:?}", measurements);
 
     let handle = fs.open_file("file").unwrap();
     assert_eq!(
@@ -35,7 +36,8 @@ fn write_read_blocks_test() {
     fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
     fs.write_to_file(&mut handle, &[2; 1024 * 1024]).unwrap();
     fs.write_to_file(&mut handle, &[3; 1024 * 1024]).unwrap();
-    fs.close_file(handle).unwrap();
+    let measurements = fs.close_file(handle).unwrap();
+    println!("{:?}", measurements);
 
     let mut handle = fs.open_file("file").unwrap();
     assert_eq!(
