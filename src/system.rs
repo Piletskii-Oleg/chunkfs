@@ -1,13 +1,6 @@
-use std::time::Duration;
-
 use crate::file_layer::{FileHandle, FileLayer};
 use crate::storage::{Base, Chunker, Hasher, Storage};
-
-#[derive(Debug)]
-pub struct WriteMeasurements {
-    chunk_time: Duration,
-    hash_time: Duration,
-}
+use crate::WriteMeasurements;
 
 pub struct FileSystem<C, H, B>
 where
@@ -52,14 +45,11 @@ where
     }
 
     /// Closes the file and ensures that all data that was written to it
-    /// is stored.
+    /// is stored. Returns time spent on chunking and hashing.
     pub fn close_file(&mut self, mut handle: FileHandle) -> std::io::Result<WriteMeasurements> {
         let span = self.storage.flush()?;
         self.file_layer.write(&mut handle, span);
-        Ok(WriteMeasurements {
-            chunk_time: handle.chunk_time,
-            hash_time: handle.hash_time,
-        })
+        Ok(handle.close())
     }
 
     /// Reads all contents of the file from beginning to end and returns them.
@@ -72,16 +62,6 @@ where
     pub fn read_from_file(&mut self, handle: &mut FileHandle) -> std::io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(hashes)?.concat())
-    }
-}
-
-impl WriteMeasurements {
-    pub fn chunk_time(&self) -> Duration {
-        self.chunk_time
-    }
-
-    pub fn hash_time(&self) -> Duration {
-        self.hash_time
     }
 }
 

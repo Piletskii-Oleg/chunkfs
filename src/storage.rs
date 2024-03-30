@@ -63,7 +63,8 @@ where
 
     /// Writes 1 MB of data to the base storage after deduplication.
     ///
-    /// Returns resulting lengths of chunks with corresponding hash.
+    /// Returns resulting lengths of chunks with corresponding hash,
+    /// along with amount of time spent on chunking and hashing.
     pub fn write(&mut self, data: &[u8]) -> std::io::Result<SpansInfo> {
         debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
@@ -108,7 +109,7 @@ where
         })
     }
 
-    /// Flushes remaining data to the storage and returns its span.
+    /// Flushes remaining data to the storage and returns its span with hashing and chunking times.
     pub fn flush(&mut self) -> std::io::Result<SpansInfo> {
         let start = Instant::now();
         let hash = self.hasher.hash(&self.buffer);

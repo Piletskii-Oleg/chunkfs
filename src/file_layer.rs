@@ -3,7 +3,7 @@ use std::io::ErrorKind;
 use std::time::Duration;
 
 use crate::storage::SpansInfo;
-use crate::{VecHash, SEG_SIZE};
+use crate::{VecHash, WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`
 #[derive(Debug, PartialEq, Eq, Default)]
@@ -33,9 +33,9 @@ pub struct FileHandle {
     // or it would count as an immutable reference for FileSystem
     file_name: String,
     offset: usize,
-    pub chunk_time: Duration,
+    chunk_time: Duration,
     // pub or do something else?
-    pub hash_time: Duration,
+    hash_time: Duration,
 }
 
 impl File {
@@ -54,6 +54,14 @@ impl FileHandle {
             offset: 0,
             chunk_time: Default::default(),
             hash_time: Default::default(),
+        }
+    }
+
+    /// Closes handle and returns `WriteMeasurements` made while file was open.
+    pub fn close(self) -> WriteMeasurements {
+        WriteMeasurements {
+            chunk_time: self.chunk_time,
+            hash_time: self.hash_time,
         }
     }
 }
