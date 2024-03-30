@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::io::ErrorKind;
-use std::time::Duration;
 
 use crate::storage::SpansInfo;
 use crate::{VecHash, WriteMeasurements, SEG_SIZE};
@@ -33,9 +32,7 @@ pub struct FileHandle {
     // or it would count as an immutable reference for FileSystem
     file_name: String,
     offset: usize,
-    chunk_time: Duration,
-    // pub or do something else?
-    hash_time: Duration,
+    measurements: WriteMeasurements,
 }
 
 impl File {
@@ -52,17 +49,13 @@ impl FileHandle {
         FileHandle {
             file_name: file.name.clone(),
             offset: 0,
-            chunk_time: Default::default(),
-            hash_time: Default::default(),
+            measurements: Default::default(),
         }
     }
 
     /// Closes handle and returns `WriteMeasurements` made while file was open.
     pub fn close(self) -> WriteMeasurements {
-        WriteMeasurements {
-            chunk_time: self.chunk_time,
-            hash_time: self.hash_time,
-        }
+        self.measurements
     }
 }
 
@@ -113,8 +106,7 @@ impl FileLayer {
             handle.offset += span.length;
         }
 
-        handle.chunk_time += info.chunk_time;
-        handle.hash_time += info.hash_time;
+        handle.measurements += info.measurements;
     }
 
     /// Reads 1 MB of data from the open file and returns received hashes,

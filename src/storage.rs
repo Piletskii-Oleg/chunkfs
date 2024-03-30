@@ -4,7 +4,7 @@ pub use crate::storage::base::Base;
 use crate::storage::base::Segment;
 pub use crate::storage::chunker::Chunker;
 pub use crate::storage::hasher::Hasher;
-use crate::{VecHash, SEG_SIZE};
+use crate::{VecHash, WriteMeasurements, SEG_SIZE};
 
 pub mod base;
 pub mod chunker;
@@ -20,8 +20,7 @@ pub struct Span {
 #[derive(Debug)]
 pub struct SpansInfo {
     pub spans: Vec<Span>,
-    pub chunk_time: Duration,
-    pub hash_time: Duration,
+    pub measurements: WriteMeasurements,
 }
 
 impl Span {
@@ -104,8 +103,7 @@ where
 
         Ok(SpansInfo {
             spans,
-            chunk_time,
-            hash_time,
+            measurements: WriteMeasurements::new(chunk_time, hash_time),
         })
     }
 
@@ -122,8 +120,7 @@ where
         self.buffer = vec![];
         Ok(SpansInfo {
             spans: vec![span],
-            chunk_time: Duration::default(),
-            hash_time,
+            measurements: WriteMeasurements::new(Duration::default(), hash_time),
         })
     }
 
