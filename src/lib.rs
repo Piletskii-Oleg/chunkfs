@@ -10,13 +10,13 @@ mod system;
 
 /// Block size, used by `read` and `write` methods in the `FileSystem`.
 /// Blocks given to the user or by them must be of this size.
-pub const SEG_SIZE: usize = 1024 * 1024; // 1MB
+const SEG_SIZE: usize = 1024 * 1024; // 1MB
 
 pub type VecHash = Vec<u8>;
 
 /// Measurements that are received after writing data to a file.
 /// Contain time spent for chunking and for hashing.
-#[derive(Debug, PartialEq, Default, Clone)] // copy?
+#[derive(Debug, PartialEq, Default, Clone, Copy)]
 pub struct WriteMeasurements {
     chunk_time: Duration,
     hash_time: Duration,

@@ -110,6 +110,6 @@ impl Chunker for LeapChunker {
     }
 
     fn estimate_chunk_count(&self, data: &[u8]) -> usize {
-        data.len() / 1024 * 16
+        data.len() / 1024 * 8
     }
 }

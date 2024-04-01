@@ -4,7 +4,7 @@ use std::io::ErrorKind;
 use crate::storage::SpansInfo;
 use crate::{VecHash, WriteMeasurements, SEG_SIZE};
 
-/// Hashed span, starting at `offset`
+/// Hashed span, starting at `offset`.
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct FileSpan {
     hash: VecHash,
@@ -18,13 +18,13 @@ pub struct File {
     spans: Vec<FileSpan>,
 }
 
-/// Layer that contains all files
+/// Layer that contains all files, accessed by their names.
 #[derive(Default)]
 pub struct FileLayer {
     files: HashMap<String, File>,
 }
 
-/// Handle for an opened file
+/// Handle for an open file.
 #[derive(Debug, PartialEq)]
 pub struct FileHandle {
     // can't make file_name a reference
@@ -54,7 +54,7 @@ impl FileHandle {
     }
 
     /// Closes handle and returns `WriteMeasurements` made while file was open.
-    pub fn close(self) -> WriteMeasurements {
+    pub(crate) fn close(self) -> WriteMeasurements {
         self.measurements
     }
 }
@@ -67,8 +67,8 @@ impl FileLayer {
         }
 
         let file = File::new(name.clone());
-        let file = self.files.entry(name).or_insert(file);
-        Ok(FileHandle::new(file))
+        let written_file = self.files.entry(name).or_insert(file);
+        Ok(FileHandle::new(written_file))
     }
 
     /// Opens a file based on its name and returns its `FileHandle`
