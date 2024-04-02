@@ -1,14 +1,12 @@
 use std::time::{Duration, Instant};
 
+pub use crate::chunker::Chunker;
+pub use crate::hasher::Hasher;
 pub use crate::storage::base::Base;
 use crate::storage::base::Segment;
-pub use crate::storage::chunker::Chunker;
-pub use crate::storage::hasher::Hasher;
 use crate::{VecHash, WriteMeasurements, SEG_SIZE};
 
 pub mod base;
-pub mod chunker;
-pub mod hasher;
 
 /// Hashed span in a file with a certain length.
 #[derive(Debug)]
@@ -31,31 +29,69 @@ impl Span {
 
 /// Underlying storage for the actual stored data
 #[derive(Debug)]
-pub struct Storage<C, H, B>
+pub struct Storage<B>
+where
+    B: Base,
+{
+    base: B,
+}
+
+impl<B> Storage<B>
+where
+    B: Base,
+{
+    pub fn new(base: B) -> Self {
+        Self { base }
+    }
+
+    /// Writes 1 MB of data to the base storage after deduplication.
+    ///
+    /// Returns resulting lengths of chunks with corresponding hash,
+    /// along with amount of time spent on chunking and hashing.
+    pub fn write<C: Chunker, H: Hasher>(
+        &mut self,
+        data: &[u8],
+        worker: &mut StorageWriter<C, H>,
+    ) -> std::io::Result<SpansInfo> {
+        worker.write(data, &mut self.base)
+    }
+
+    /// Flushes remaining data to the storage and returns its span with hashing and chunking times.
+    pub fn flush<C: Chunker, H: Hasher>(
+        &mut self,
+        worker: &mut StorageWriter<C, H>,
+    ) -> std::io::Result<SpansInfo> {
+        worker.flush(&mut self.base)
+    }
+
+    /// Retrieves the data from the storage based on hashes of the data segments,
+    /// or Error(NotFound) if some of the hashes were not present in the base
+    pub fn retrieve(&self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>> {
+        self.base.retrieve(request)
+    }
+}
+
+#[derive(Debug)]
+pub struct StorageWriter<C, H>
 where
     C: Chunker,
     H: Hasher,
-    B: Base,
 {
     chunker: C,
     hasher: H,
-    base: B,
-    // for one file at a time, else it would break when flush is used
     buffer: Vec<u8>,
 }
 
-impl<C, H, B> Storage<C, H, B>
+impl<C, H> StorageWriter<C, H>
 where
     C: Chunker,
     H: Hasher,
-    B: Base,
 {
-    pub fn new(chunker: C, hasher: H, base: B) -> Self {
+    pub fn new(chunker: C, hasher: H) -> Self {
         Self {
             // create during process? and add function to return `rest`
             chunker,
             hasher,
-            base,
             buffer: vec![],
         }
     }
@@ -64,7 +100,11 @@ where
     ///
     /// Returns resulting lengths of chunks with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    pub fn write(&mut self, data: &[u8]) -> std::io::Result<SpansInfo> {
+    pub fn write<'storage, B: Base>(
+        &mut self,
+        data: &[u8],
+        base: &'storage mut B,
+    ) -> std::io::Result<SpansInfo> {
         debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
         self.buffer.extend_from_slice(data); // remove copying? we need to have `rest` stored and indexed
@@ -97,7 +137,7 @@ where
             .iter()
             .map(|segment| Span::new(segment.hash.clone(), segment.data.len()))
             .collect();
-        self.base.save(segments)?;
+        base.save(segments)?;
 
         self.buffer = self.chunker.rest().to_vec();
 
@@ -108,13 +148,13 @@ where
     }
 
     /// Flushes remaining data to the storage and returns its span with hashing and chunking times.
-    pub fn flush(&mut self) -> std::io::Result<SpansInfo> {
+    pub fn flush<B: Base>(&mut self, base: &mut B) -> std::io::Result<SpansInfo> {
         let start = Instant::now();
         let hash = self.hasher.hash(&self.buffer);
         let hash_time = start.elapsed();
 
         let segment = Segment::new(hash.clone(), self.buffer.clone());
-        self.base.save(vec![segment])?;
+        base.save(vec![segment])?;
 
         let span = Span::new(hash, self.buffer.len());
         self.buffer = vec![];
@@ -122,11 +162,5 @@ where
             spans: vec![span],
             measurements: WriteMeasurements::new(Duration::default(), hash_time),
         })
-    }
-
-    /// Retrieves the data from the storage based on hashes of the data segments,
-    /// or Error(NotFound) if some of the hashes were not present in the base
-    pub fn retrieve(&self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>> {
-        self.base.retrieve(request)
     }
 }

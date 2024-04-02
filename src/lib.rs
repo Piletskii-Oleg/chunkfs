@@ -1,10 +1,12 @@
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
 
-pub use storage::{base, chunker, hasher};
-pub use system::{FileSystem, FileSystemBuilder};
+pub use storage::base;
+pub use system::FileSystem;
 
+pub mod chunker;
 mod file_layer;
+pub mod hasher;
 mod storage;
 mod system;
 

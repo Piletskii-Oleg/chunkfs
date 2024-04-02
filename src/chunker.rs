@@ -46,6 +46,7 @@ pub trait Chunker {
 
 /// Chunker that utilizes Fixed Sized Chunking (FSC) algorithm,
 /// splitting file into even-sized chunks.
+#[derive(Debug)]
 pub struct FSChunker {
     chunk_size: usize,
     rest: Vec<u8>,
@@ -88,7 +89,7 @@ impl Chunker for FSChunker {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct LeapChunker {
     rest: Vec<u8>,
 }

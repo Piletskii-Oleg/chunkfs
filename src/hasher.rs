@@ -6,6 +6,7 @@ pub trait Hasher {
     fn hash(&mut self, data: &[u8]) -> VecHash;
 }
 
+#[derive(Debug)]
 pub struct SimpleHasher;
 
 impl Hasher for SimpleHasher {
