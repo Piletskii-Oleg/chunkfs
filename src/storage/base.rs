@@ -49,7 +49,7 @@ impl Base for HashMapBase {
                 self.segment_map
                     .get(&hash)
                     .cloned()
-                    .ok_or(std::io::Error::from(ErrorKind::NotFound))
+                    .ok_or(ErrorKind::NotFound.into())
             })
             .collect()
     }

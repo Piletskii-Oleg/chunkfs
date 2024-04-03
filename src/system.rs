@@ -1,3 +1,7 @@
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+use std::io::ErrorKind;
+
 use crate::file_layer::{FileHandle, FileLayer};
 use crate::storage::{Base, Chunker, Hasher, Storage};
 use crate::WriteMeasurements;
@@ -21,6 +25,10 @@ where
         }
     }
 
+    pub fn file_exists(&self, name: &str) -> bool {
+        self.file_layer.file_exists(name)
+    }
+
     /// Tries to open a file with the given name and returns its `FileHandle` if it exists,
     /// or `None`, if it doesn't.
     pub fn open_file<C: Chunker, H: Hasher>(
@@ -28,7 +36,7 @@ where
         name: &str,
         c: C,
         h: H,
-    ) -> Option<FileHandle<C, H>> {
+    ) -> std::io::Result<FileHandle<C, H>> {
         self.file_layer.open(name, c, h)
     }
 
@@ -81,5 +89,111 @@ where
     ) -> std::io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(hashes)?.concat())
+    }
+}
+
+pub struct FileOpener<C, H>
+where
+    C: Chunker,
+    H: Hasher,
+{
+    chunker: Option<C>,
+    hasher: Option<H>,
+    create_new: bool,
+}
+
+#[derive(Debug)]
+pub enum OpenError {
+    NoChunkerProvided,
+    NoHasherProvided,
+    IoError(std::io::Error),
+}
+
+impl Display for OpenError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OpenError::NoChunkerProvided => write!(
+                f,
+                "No chunker was provided. A chunker is necessary to write to the file."
+            ),
+            OpenError::NoHasherProvided => write!(
+                f,
+                "No hasher was provided. A hasher is necessary to write to the file."
+            ),
+            OpenError::IoError(io) => io.fmt(f),
+        }
+    }
+}
+
+impl Error for OpenError {}
+
+impl From<std::io::Error> for OpenError {
+    fn from(value: std::io::Error) -> Self {
+        Self::IoError(value)
+    }
+}
+
+impl From<ErrorKind> for OpenError {
+    fn from(value: ErrorKind) -> Self {
+        Self::IoError(value.into())
+    }
+}
+
+impl<C, H> FileOpener<C, H>
+where
+    C: Chunker,
+    H: Hasher,
+{
+    pub fn new() -> Self {
+        Self {
+            chunker: None,
+            hasher: None,
+            create_new: false,
+        }
+    }
+
+    pub fn with_chunker(mut self, chunker: C) -> Self {
+        self.chunker = Some(chunker);
+        self
+    }
+
+    pub fn with_hasher(mut self, hasher: H) -> Self {
+        self.hasher = Some(hasher);
+        self
+    }
+
+    pub fn create_new(mut self, create_new: bool) -> Self {
+        self.create_new = create_new;
+        self
+    }
+
+    pub fn open<B: Base>(
+        self,
+        fs: &mut FileSystem<B>,
+        name: &str,
+    ) -> Result<FileHandle<C, H>, OpenError> {
+        let chunker = self.chunker.ok_or(OpenError::NoChunkerProvided)?;
+        let hasher = self.hasher.ok_or(OpenError::NoHasherProvided)?;
+
+        if self.create_new && fs.file_exists(name) {
+            return Err(ErrorKind::AlreadyExists.into());
+        } else if self.create_new {
+            return fs
+                .create_file(name.to_string(), chunker, hasher)
+                .map_err(OpenError::IoError);
+        }
+
+        fs.open_file(name, chunker, hasher)
+            .map_err(OpenError::IoError)
+    }
+}
+
+impl<C, H> Default for FileOpener<C, H>
+where
+    C: Chunker,
+    H: Hasher,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }

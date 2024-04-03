@@ -68,6 +68,10 @@ where
     pub(crate) fn close(self) -> WriteMeasurements {
         self.measurements
     }
+
+    pub fn name(&self) -> &str {
+        &self.file_name
+    }
 }
 
 impl FileLayer {
@@ -79,7 +83,7 @@ impl FileLayer {
         h: H,
     ) -> std::io::Result<FileHandle<C, H>> {
         if self.files.contains_key(&name) {
-            return Err(std::io::Error::from(ErrorKind::AlreadyExists));
+            return Err(ErrorKind::AlreadyExists.into());
         }
 
         let file = File::new(name.clone());
@@ -88,8 +92,16 @@ impl FileLayer {
     }
 
     /// Opens a file based on its name and returns its `FileHandle`
-    pub fn open<C: Chunker, H: Hasher>(&self, name: &str, c: C, h: H) -> Option<FileHandle<C, H>> {
-        self.files.get(name).map(|file| FileHandle::new(file, c, h))
+    pub fn open<C: Chunker, H: Hasher>(
+        &self,
+        name: &str,
+        c: C,
+        h: H,
+    ) -> std::io::Result<FileHandle<C, H>> {
+        self.files
+            .get(name)
+            .map(|file| FileHandle::new(file, c, h))
+            .ok_or(ErrorKind::NotFound.into())
     }
 
     /// Returns reference to a file using `FileHandle` that corresponds to it.
@@ -147,6 +159,10 @@ impl FileLayer {
         handle.offset += bytes_read;
 
         hashes
+    }
+
+    pub fn file_exists(&self, name: &str) -> bool {
+        self.files.contains_key(name)
     }
 }
 

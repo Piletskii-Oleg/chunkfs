@@ -3,7 +3,7 @@ extern crate chunkfs;
 use chunkfs::base::HashMapBase;
 use chunkfs::chunker::{FSChunker, LeapChunker};
 use chunkfs::hasher::SimpleHasher;
-use chunkfs::FileSystem;
+use chunkfs::{FileOpener, FileSystem};
 
 #[test]
 fn write_read_complete_test() {
@@ -18,8 +18,10 @@ fn write_read_complete_test() {
     let measurements = fs.close_file(handle).unwrap();
     println!("{:?}", measurements);
 
-    let handle = fs
-        .open_file("file", LeapChunker::default(), SimpleHasher)
+    let handle = FileOpener::new()
+        .with_hasher(SimpleHasher)
+        .with_chunker(LeapChunker::default())
+        .open(&mut fs, "file")
         .unwrap();
     let read = fs.read_file_complete(&handle).unwrap();
     assert_eq!(read.len(), 1024 * 1024 * 2);
