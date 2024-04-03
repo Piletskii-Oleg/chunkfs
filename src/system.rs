@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::io;
 use std::io::ErrorKind;
 
 use crate::file_layer::{FileHandle, FileLayer};
@@ -36,7 +37,7 @@ where
         name: &str,
         c: C,
         h: H,
-    ) -> std::io::Result<FileHandle<C, H>> {
+    ) -> io::Result<FileHandle<C, H>> {
         self.file_layer.open(name, c, h)
     }
 
@@ -47,7 +48,7 @@ where
         name: String,
         c: C,
         h: H,
-    ) -> std::io::Result<FileHandle<C, H>> {
+    ) -> io::Result<FileHandle<C, H>> {
         self.file_layer.create(name, c, h)
     }
 
@@ -56,7 +57,7 @@ where
         &mut self,
         handle: &mut FileHandle<C, H>,
         data: &[u8],
-    ) -> std::io::Result<()> {
+    ) -> io::Result<()> {
         let spans = self.storage.write(data, &mut handle.writer)?;
         self.file_layer.write(handle, spans);
         Ok(())
@@ -67,7 +68,7 @@ where
     pub fn close_file<C: Chunker, H: Hasher>(
         &mut self,
         mut handle: FileHandle<C, H>,
-    ) -> std::io::Result<WriteMeasurements> {
+    ) -> io::Result<WriteMeasurements> {
         let span = self.storage.flush(&mut handle.writer)?;
         self.file_layer.write(&mut handle, span);
         Ok(handle.close())
@@ -77,7 +78,7 @@ where
     pub fn read_file_complete<C: Chunker, H: Hasher>(
         &self,
         handle: &FileHandle<C, H>,
-    ) -> std::io::Result<Vec<u8>> {
+    ) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read_complete(handle);
         Ok(self.storage.retrieve(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
@@ -86,7 +87,7 @@ where
     pub fn read_from_file<C: Chunker, H: Hasher>(
         &mut self,
         handle: &mut FileHandle<C, H>,
-    ) -> std::io::Result<Vec<u8>> {
+    ) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(hashes)?.concat())
     }

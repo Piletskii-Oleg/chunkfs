@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::io::ErrorKind;
 
 use crate::VecHash;
@@ -6,11 +7,11 @@ use crate::VecHash;
 /// Serves as base functionality for storing the actual data
 pub trait Base {
     /// Saves given data to the underlying storage.
-    fn save(&mut self, segments: Vec<Segment>) -> std::io::Result<()>;
+    fn save(&mut self, segments: Vec<Segment>) -> io::Result<()>;
 
     /// Clones and returns the data corresponding to the given hashes, or returns Error(NotFound),
     /// if some of the hashes were not found.
-    fn retrieve(&self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>>;
+    fn retrieve(&self, request: Vec<VecHash>) -> io::Result<Vec<Vec<u8>>>;
 }
 
 /// A data segment with corresponding hash.
@@ -32,14 +33,14 @@ pub struct HashMapBase {
 }
 
 impl Base for HashMapBase {
-    fn save(&mut self, segments: Vec<Segment>) -> std::io::Result<()> {
+    fn save(&mut self, segments: Vec<Segment>) -> io::Result<()> {
         for segment in segments {
             self.segment_map.entry(segment.hash).or_insert(segment.data);
         }
         Ok(())
     }
 
-    fn retrieve(&self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>> {
+    fn retrieve(&self, request: Vec<VecHash>) -> io::Result<Vec<Vec<u8>>> {
         // 1. unwrapping if no data is found. what kind of error can be used here?
         // 2. cloning stored data instead of passing reference.
         // is it how it is supposed to be or should we give a reference to underlying data?

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::io::ErrorKind;
 
 use crate::chunker::Chunker;
@@ -81,7 +82,7 @@ impl FileLayer {
         name: String,
         c: C,
         h: H,
-    ) -> std::io::Result<FileHandle<C, H>> {
+    ) -> io::Result<FileHandle<C, H>> {
         if self.files.contains_key(&name) {
             return Err(ErrorKind::AlreadyExists.into());
         }
@@ -97,7 +98,7 @@ impl FileLayer {
         name: &str,
         c: C,
         h: H,
-    ) -> std::io::Result<FileHandle<C, H>> {
+    ) -> io::Result<FileHandle<C, H>> {
         self.files
             .get(name)
             .map(|file| FileHandle::new(file, c, h))

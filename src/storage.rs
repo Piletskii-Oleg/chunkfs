@@ -1,3 +1,4 @@
+use std::io;
 use std::time::{Duration, Instant};
 
 pub use crate::chunker::Chunker;
@@ -52,7 +53,7 @@ where
         &mut self,
         data: &[u8],
         worker: &mut StorageWriter<C, H>,
-    ) -> std::io::Result<SpansInfo> {
+    ) -> io::Result<SpansInfo> {
         worker.write(data, &mut self.base)
     }
 
@@ -60,13 +61,13 @@ where
     pub fn flush<C: Chunker, H: Hasher>(
         &mut self,
         worker: &mut StorageWriter<C, H>,
-    ) -> std::io::Result<SpansInfo> {
+    ) -> io::Result<SpansInfo> {
         worker.flush(&mut self.base)
     }
 
     /// Retrieves the data from the storage based on hashes of the data segments,
     /// or Error(NotFound) if some of the hashes were not present in the base
-    pub fn retrieve(&self, request: Vec<VecHash>) -> std::io::Result<Vec<Vec<u8>>> {
+    pub fn retrieve(&self, request: Vec<VecHash>) -> io::Result<Vec<Vec<u8>>> {
         self.base.retrieve(request)
     }
 }
@@ -100,7 +101,7 @@ where
     ///
     /// Returns resulting lengths of chunks with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    pub fn write<B: Base>(&mut self, data: &[u8], base: &mut B) -> std::io::Result<SpansInfo> {
+    pub fn write<B: Base>(&mut self, data: &[u8], base: &mut B) -> io::Result<SpansInfo> {
         debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
         self.buffer.extend_from_slice(data); // remove copying? we need to have `rest` stored and indexed
@@ -144,7 +145,7 @@ where
     }
 
     /// Flushes remaining data to the storage and returns its span with hashing and chunking times.
-    pub fn flush<B: Base>(&mut self, base: &mut B) -> std::io::Result<SpansInfo> {
+    pub fn flush<B: Base>(&mut self, base: &mut B) -> io::Result<SpansInfo> {
         // is this necessary?
         if self.buffer.is_empty() {
             return Ok(SpansInfo {
