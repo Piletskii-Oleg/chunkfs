@@ -39,9 +39,10 @@ where
     file_name: String,
     offset: usize,
     measurements: WriteMeasurements,
-    pub chunker: C,
-    pub hasher: H,
-    pub write_buffer: Option<Vec<u8>>,
+    // maybe not pub(crate) but something else? cannot think of anything
+    pub(crate) chunker: C,
+    pub(crate) hasher: H,
+    pub(crate) write_buffer: Option<Vec<u8>>,
 }
 
 impl File {
@@ -69,13 +70,13 @@ where
         }
     }
 
+    pub fn name(&self) -> &str {
+        &self.file_name
+    }
+
     /// Closes handle and returns `WriteMeasurements` made while file was open.
     pub(crate) fn close(self) -> WriteMeasurements {
         self.measurements
-    }
-
-    pub fn name(&self) -> &str {
-        &self.file_name
     }
 }
 
