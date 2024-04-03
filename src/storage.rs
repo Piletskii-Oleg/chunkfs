@@ -73,27 +73,27 @@ where
 }
 
 #[derive(Debug)]
-pub struct StorageWriter<C, H>
+pub struct StorageWriter<'handle, C, H>
 where
     C: Chunker,
     H: Hasher,
 {
-    chunker: C,
-    hasher: H,
+    chunker: &'handle mut C,
+    hasher: &'handle mut H,
     buffer: Vec<u8>,
 }
 
-impl<C, H> StorageWriter<C, H>
+impl<'handle, C, H> StorageWriter<'handle, C, H>
 where
     C: Chunker,
     H: Hasher,
 {
-    pub fn new(chunker: C, hasher: H) -> Self {
+    pub fn new(chunker: &'handle mut C, hasher: &'handle mut H, buffer: Vec<u8>) -> Self {
         Self {
             // create during process? and add function to return `rest`
             chunker,
             hasher,
-            buffer: vec![],
+            buffer,
         }
     }
 
@@ -167,5 +167,9 @@ where
             spans: vec![span],
             measurements: WriteMeasurements::new(Duration::default(), hash_time),
         })
+    }
+
+    pub fn finish(self) -> Vec<u8> {
+        self.buffer
     }
 }

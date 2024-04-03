@@ -4,7 +4,7 @@ use std::io;
 use std::io::ErrorKind;
 
 use crate::file_layer::{FileHandle, FileLayer};
-use crate::storage::{Base, Chunker, Hasher, Storage};
+use crate::storage::{Base, Chunker, Hasher, Storage, StorageWriter};
 use crate::WriteMeasurements;
 
 pub struct FileSystem<B>
@@ -58,8 +58,17 @@ where
         handle: &mut FileHandle<C, H>,
         data: &[u8],
     ) -> io::Result<()> {
-        let spans = self.storage.write(data, &mut handle.writer)?;
+        let mut writer = StorageWriter::new(
+            &mut handle.chunker,
+            &mut handle.hasher,
+            handle.write_buffer.take().unwrap(), // to reduce copying. unwrap should always be safe, because FileHandle is initialized with Some(vec)
+        );
+
+        let spans = self.storage.write(data, &mut writer)?;
+        handle.write_buffer = Some(writer.finish());
+
         self.file_layer.write(handle, spans);
+
         Ok(())
     }
 
@@ -69,8 +78,15 @@ where
         &mut self,
         mut handle: FileHandle<C, H>,
     ) -> io::Result<WriteMeasurements> {
-        let span = self.storage.flush(&mut handle.writer)?;
+        let mut writer = StorageWriter::new(
+            &mut handle.chunker,
+            &mut handle.hasher,
+            handle.write_buffer.take().unwrap(),
+        );
+
+        let span = self.storage.flush(&mut writer)?;
         self.file_layer.write(&mut handle, span);
+
         Ok(handle.close())
     }
 

@@ -3,7 +3,7 @@ use std::io;
 use std::io::ErrorKind;
 
 use crate::chunker::Chunker;
-use crate::storage::{Hasher, SpansInfo, StorageWriter};
+use crate::storage::{Hasher, SpansInfo};
 use crate::{VecHash, WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
@@ -39,7 +39,9 @@ where
     file_name: String,
     offset: usize,
     measurements: WriteMeasurements,
-    pub writer: StorageWriter<C, H>,
+    pub chunker: C,
+    pub hasher: H,
+    pub write_buffer: Option<Vec<u8>>,
 }
 
 impl File {
@@ -61,7 +63,9 @@ where
             file_name: file.name.clone(),
             offset: 0,
             measurements: Default::default(),
-            writer: StorageWriter::new(chunker, hasher),
+            chunker,
+            hasher,
+            write_buffer: Some(vec![]),
         }
     }
 
