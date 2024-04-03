@@ -70,6 +70,7 @@ where
         }
     }
 
+    /// Returns name of the file.
     pub fn name(&self) -> &str {
         &self.file_name
     }
@@ -87,13 +88,15 @@ impl FileLayer {
         name: String,
         c: C,
         h: H,
+        create_new: bool,
     ) -> io::Result<FileHandle<C, H>> {
-        if self.files.contains_key(&name) {
+        if !create_new && self.files.contains_key(&name) {
             return Err(ErrorKind::AlreadyExists.into());
         }
 
         let file = File::new(name.clone());
-        let written_file = self.files.entry(name).or_insert(file);
+        let _ = self.files.insert(name.clone(), file);
+        let written_file = self.files.get(&name).unwrap();
         Ok(FileHandle::new(written_file, c, h))
     }
 
@@ -167,6 +170,7 @@ impl FileLayer {
         hashes
     }
 
+    /// Checks if the file with the given name exists.
     pub fn file_exists(&self, name: &str) -> bool {
         self.files.contains_key(name)
     }
@@ -184,7 +188,7 @@ mod tests {
     fn file_layer_create_file() {
         let mut fl = FileLayer::default();
         let name = "hello".to_string();
-        fl.create(name.clone(), FSChunker::new(4096), SimpleHasher)
+        fl.create(name.clone(), FSChunker::new(4096), SimpleHasher, true)
             .unwrap();
 
         assert_eq!(fl.files.get(&name).unwrap().name, "hello");
@@ -194,10 +198,20 @@ mod tests {
     #[test]
     fn cant_create_two_files_with_same_name() {
         let mut fl = FileLayer::default();
-        fl.create("hello".to_string(), FSChunker::new(4096), SimpleHasher)
-            .unwrap();
+        fl.create(
+            "hello".to_string(),
+            FSChunker::new(4096),
+            SimpleHasher,
+            false,
+        )
+        .unwrap();
 
-        let result = fl.create("hello".to_string(), FSChunker::new(4096), SimpleHasher);
+        let result = fl.create(
+            "hello".to_string(),
+            FSChunker::new(4096),
+            SimpleHasher,
+            false,
+        );
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind(), ErrorKind::AlreadyExists);
     }

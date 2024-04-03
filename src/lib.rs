@@ -2,7 +2,7 @@ use std::ops::{Add, AddAssign};
 use std::time::Duration;
 
 pub use storage::base;
-pub use system::{FileOpener, FileSystem};
+pub use system::{FileOpener, FileSystem, OpenError};
 
 pub mod chunker;
 mod file_layer;

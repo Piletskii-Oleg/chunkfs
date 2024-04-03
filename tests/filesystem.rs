@@ -10,7 +10,12 @@ fn write_read_complete_test() {
     let mut fs = FileSystem::new(HashMapBase::default());
 
     let mut handle = fs
-        .create_file("file".to_string(), LeapChunker::default(), SimpleHasher)
+        .create_file(
+            "file".to_string(),
+            LeapChunker::default(),
+            SimpleHasher,
+            true,
+        )
         .unwrap();
     fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
     fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
@@ -33,7 +38,7 @@ fn write_read_blocks_test() {
     let mut fs = FileSystem::new(HashMapBase::default());
 
     let mut handle = fs
-        .create_file("file".to_string(), FSChunker::new(4096), SimpleHasher)
+        .create_file("file".to_string(), FSChunker::new(4096), SimpleHasher, true)
         .unwrap();
     fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
     fs.write_to_file(&mut handle, &[2; 1024 * 1024]).unwrap();

@@ -19,6 +19,7 @@ impl<B> FileSystem<B>
 where
     B: Base,
 {
+    /// Creates a file system with the given [`base`][Base].
     pub fn new(base: B) -> Self {
         Self {
             storage: Storage::new(base),
@@ -26,6 +27,7 @@ where
         }
     }
 
+    /// Checks if the file with the given name exists.
     pub fn file_exists(&self, name: &str) -> bool {
         self.file_layer.file_exists(name)
     }
@@ -48,8 +50,9 @@ where
         name: String,
         c: C,
         h: H,
+        create_new: bool,
     ) -> io::Result<FileHandle<C, H>> {
-        self.file_layer.create(name, c, h)
+        self.file_layer.create(name, c, h, create_new)
     }
 
     /// Writes given data to the file. Size of the slice must be exactly 1 MB.
@@ -81,7 +84,7 @@ where
         let mut writer = StorageWriter::new(
             &mut handle.chunker,
             &mut handle.hasher,
-            handle.write_buffer.take().unwrap(),
+            handle.write_buffer.take().unwrap(), // doesn't give anything back afterward, since FileHandle is dropped
         );
 
         let span = self.storage.flush(&mut writer)?;
@@ -109,6 +112,8 @@ where
     }
 }
 
+/// Used to open a file with the given chunker and hasher, with some other options.
+/// Chunker and hasher must be provided using [with_chunker][`Self::with_chunker`] and [with_hasher][`Self::with_hasher`].
 pub struct FileOpener<C, H>
 where
     C: Chunker,
@@ -119,11 +124,12 @@ where
     create_new: bool,
 }
 
+/// Error that may happen when opening a file using [FileOpener].
 #[derive(Debug)]
 pub enum OpenError {
     NoChunkerProvided,
     NoHasherProvided,
-    IoError(std::io::Error),
+    IoError(io::Error),
 }
 
 impl Display for OpenError {
@@ -144,8 +150,8 @@ impl Display for OpenError {
 
 impl Error for OpenError {}
 
-impl From<std::io::Error> for OpenError {
-    fn from(value: std::io::Error) -> Self {
+impl From<io::Error> for OpenError {
+    fn from(value: io::Error) -> Self {
         Self::IoError(value)
     }
 }
@@ -161,6 +167,9 @@ where
     C: Chunker,
     H: Hasher,
 {
+    /// Initializes [FileOpener] with empty fields.
+    /// `chunker` and `hasher` must be explicitly given using [with_chunker][`Self::with_chunker`]
+    /// and [with_hasher][`Self::with_hasher`].
     pub fn new() -> Self {
         Self {
             chunker: None,
@@ -169,21 +178,26 @@ where
         }
     }
 
+    /// Sets a [`chunker`][Chunker] that will be used to split the written data into chunks.
     pub fn with_chunker(mut self, chunker: C) -> Self {
         self.chunker = Some(chunker);
         self
     }
 
+    /// Sets a [`hash`][Hasher] that will be used to hash written data.
     pub fn with_hasher(mut self, hasher: H) -> Self {
         self.hasher = Some(hasher);
         self
     }
 
+    /// Sets a flag that indicates whether new file should be created, and if it exists, be overwritten.
     pub fn create_new(mut self, create_new: bool) -> Self {
         self.create_new = create_new;
         self
     }
 
+    /// Opens a file in the given [FileSystem] and with the given name. Creates new file if the flag was set.
+    /// Returns an [OpenError] if the `chunker` or `hasher` were not set.
     pub fn open<B: Base>(
         self,
         fs: &mut FileSystem<B>,
@@ -192,16 +206,13 @@ where
         let chunker = self.chunker.ok_or(OpenError::NoChunkerProvided)?;
         let hasher = self.hasher.ok_or(OpenError::NoHasherProvided)?;
 
-        if self.create_new && fs.file_exists(name) {
-            return Err(ErrorKind::AlreadyExists.into());
-        } else if self.create_new {
-            return fs
-                .create_file(name.to_string(), chunker, hasher)
-                .map_err(OpenError::IoError);
+        if self.create_new {
+            fs.create_file(name.to_string(), chunker, hasher, self.create_new)
+                .map_err(OpenError::IoError)
+        } else {
+            fs.open_file(name, chunker, hasher)
+                .map_err(OpenError::IoError)
         }
-
-        fs.open_file(name, chunker, hasher)
-            .map_err(OpenError::IoError)
     }
 }
 

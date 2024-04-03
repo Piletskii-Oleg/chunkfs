@@ -4,7 +4,7 @@ use std::io::ErrorKind;
 
 use crate::VecHash;
 
-/// Serves as base functionality for storing the actual data
+/// Serves as base functionality for storing the actual data.
 pub trait Base {
     /// Saves given data to the underlying storage.
     fn save(&mut self, segments: Vec<Segment>) -> io::Result<()>;

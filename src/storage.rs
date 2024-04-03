@@ -16,6 +16,7 @@ pub struct Span {
     pub length: usize,
 }
 
+/// Spans received after [Storage::write] or [Storage::flush], along with time measurements.
 #[derive(Debug)]
 pub struct SpansInfo {
     pub spans: Vec<Span>,
@@ -28,7 +29,7 @@ impl Span {
     }
 }
 
-/// Underlying storage for the actual stored data
+/// Underlying storage for the actual stored data.
 #[derive(Debug)]
 pub struct Storage<B>
 where
@@ -72,6 +73,9 @@ where
     }
 }
 
+/// Writer that conducts operations on [Storage].
+/// Only exists during [FileSystem::write_to_file][crate::FileSystem::write_to_file].
+/// Receives `buffer` from [FileHandle][crate::file_layer::FileHandle] and gives it back after a successful write.
 #[derive(Debug)]
 pub struct StorageWriter<'handle, C, H>
 where
@@ -90,7 +94,6 @@ where
 {
     pub fn new(chunker: &'handle mut C, hasher: &'handle mut H, buffer: Vec<u8>) -> Self {
         Self {
-            // create during process? and add function to return `rest`
             chunker,
             hasher,
             buffer,
@@ -104,7 +107,7 @@ where
     pub fn write<B: Base>(&mut self, data: &[u8], base: &mut B) -> io::Result<SpansInfo> {
         debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
-        self.buffer.extend_from_slice(data); // remove copying? we need to have `rest` stored and indexed
+        self.buffer.extend_from_slice(data);
 
         let empty = Vec::with_capacity(self.chunker.estimate_chunk_count(&self.buffer));
 
@@ -169,6 +172,9 @@ where
         })
     }
 
+    /// Returns own buffer after conducting work on storage.
+    /// Used for persisting remaining data among different writes,
+    /// as the object only lives during a single write operation and is destroyed afterward.
     pub fn finish(self) -> Vec<u8> {
         self.buffer
     }
