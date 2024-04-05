@@ -1,7 +1,7 @@
-Chunkfs is a file system that can be used to benchmark different chunking algorithms, utilizing different hash
+Chunkfs is a file system that can be used to benchmark different chunking algorithms, utilizing different hashing
 algorithms and storage types.
 
-Chunkfs is currently under active development.
+Chunkfs is currently under active development, breaking changes can always happen.
 
 ## Chunking algorithms
 
@@ -17,6 +17,15 @@ pub trait Chunker {
 ``` 
 
 Comments for each method are provided in [chunker.rs](src/chunker.rs).
+
+## Usage
+
+Add the following dependency to your `Cargo.toml`:
+
+```toml
+[dependencies]
+chunkfs = { git = "https://github.com/Piletskii-Oleg/chunkfs.git" }
+```
 
 ## Example
 
