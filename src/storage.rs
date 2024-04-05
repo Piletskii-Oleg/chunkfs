@@ -9,7 +9,7 @@ use crate::{VecHash, WriteMeasurements, SEG_SIZE};
 
 pub mod base;
 
-/// Hashed span in a file with a certain length.
+/// Hashed span in a [`file`][crate::file_layer::File] with a certain length.
 #[derive(Debug)]
 pub struct Span {
     pub hash: VecHash,
@@ -46,9 +46,9 @@ where
         Self { base }
     }
 
-    /// Writes 1 MB of data to the base storage after deduplication.
+    /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
     ///
-    /// Returns resulting lengths of chunks with corresponding hash,
+    /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
     pub fn write<C: Chunker, H: Hasher>(
         &mut self,
@@ -58,7 +58,7 @@ where
         worker.write(data, &mut self.base)
     }
 
-    /// Flushes remaining data to the storage and returns its span with hashing and chunking times.
+    /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
     pub fn flush<C: Chunker, H: Hasher>(
         &mut self,
         worker: &mut StorageWriter<C, H>,
@@ -66,8 +66,8 @@ where
         worker.flush(&mut self.base)
     }
 
-    /// Retrieves the data from the storage based on hashes of the data segments,
-    /// or Error(NotFound) if some of the hashes were not present in the base
+    /// Retrieves the data from the storage based on hashes of the data [`segments`][Segment],
+    /// or Error(NotFound) if some of the hashes were not present in the base.
     pub fn retrieve(&self, request: Vec<VecHash>) -> io::Result<Vec<Vec<u8>>> {
         self.base.retrieve(request)
     }
@@ -100,9 +100,9 @@ where
         }
     }
 
-    /// Writes 1 MB of data to the base storage after deduplication.
+    /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
     ///
-    /// Returns resulting lengths of chunks with corresponding hash,
+    /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
     pub fn write<B: Base>(&mut self, data: &[u8], base: &mut B) -> io::Result<SpansInfo> {
         debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
@@ -147,7 +147,7 @@ where
         })
     }
 
-    /// Flushes remaining data to the storage and returns its span with hashing and chunking times.
+    /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
     pub fn flush<B: Base>(&mut self, base: &mut B) -> io::Result<SpansInfo> {
         // is this necessary?
         if self.buffer.is_empty() {

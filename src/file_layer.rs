@@ -20,13 +20,13 @@ pub struct File {
     spans: Vec<FileSpan>,
 }
 
-/// Layer that contains all files, accessed by their names.
+/// Layer that contains all [`files`][File], accessed by their names.
 #[derive(Default)]
 pub struct FileLayer {
     files: HashMap<String, File>,
 }
 
-/// Handle for an open file.
+/// Handle for an open [`file`][File].
 #[derive(Debug)]
 pub struct FileHandle<C, H>
 where
@@ -75,14 +75,14 @@ where
         &self.file_name
     }
 
-    /// Closes handle and returns `WriteMeasurements` made while file was open.
+    /// Closes handle and returns [`WriteMeasurements`] made while file was open.
     pub(crate) fn close(self) -> WriteMeasurements {
         self.measurements
     }
 }
 
 impl FileLayer {
-    /// Creates a file and returns its `FileHandle`
+    /// Creates a [`file`][File] and returns its [`FileHandle`]
     pub fn create<C: Chunker, H: Hasher>(
         &mut self,
         name: String,
@@ -100,7 +100,7 @@ impl FileLayer {
         Ok(FileHandle::new(written_file, c, h))
     }
 
-    /// Opens a file based on its name and returns its `FileHandle`
+    /// Opens a [`file`][File] based on its name and returns its [`FileHandle`]
     pub fn open<C: Chunker, H: Hasher>(
         &self,
         name: &str,
@@ -113,12 +113,12 @@ impl FileLayer {
             .ok_or(ErrorKind::NotFound.into())
     }
 
-    /// Returns reference to a file using `FileHandle` that corresponds to it.
+    /// Returns reference to a file using [`FileHandle`] that corresponds to it.
     fn find_file<C: Chunker, H: Hasher>(&self, handle: &FileHandle<C, H>) -> &File {
         self.files.get(&handle.file_name).unwrap()
     }
 
-    /// Returns mutable reference to a file using `FileHandle` that corresponds to it.
+    /// Returns mutable reference to a file using [`FileHandle`] that corresponds to it.
     fn find_file_mut<C: Chunker, H: Hasher>(&mut self, handle: &FileHandle<C, H>) -> &mut File {
         self.files.get_mut(&handle.file_name).unwrap()
     }

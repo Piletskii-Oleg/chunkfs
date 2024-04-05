@@ -7,6 +7,7 @@ use crate::file_layer::{FileHandle, FileLayer};
 use crate::storage::{Base, Chunker, Hasher, Storage, StorageWriter};
 use crate::WriteMeasurements;
 
+/// A file system provided by chunkfs.
 pub struct FileSystem<B>
 where
     B: Base,
@@ -27,7 +28,7 @@ where
         }
     }
 
-    /// Checks if the file with the given name exists.
+    /// Checks if the file with the given `name` exists.
     pub fn file_exists(&self, name: &str) -> bool {
         self.file_layer.file_exists(name)
     }
@@ -76,7 +77,7 @@ where
     }
 
     /// Closes the file and ensures that all data that was written to it
-    /// is stored. Returns time spent on chunking and hashing.
+    /// is stored. Returns [WriteMeasurements] containing chunking and hashing times.
     pub fn close_file<C: Chunker, H: Hasher>(
         &mut self,
         mut handle: FileHandle<C, H>,
@@ -148,7 +149,15 @@ impl Display for OpenError {
     }
 }
 
-impl Error for OpenError {}
+impl Error for OpenError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            OpenError::NoChunkerProvided => None,
+            OpenError::NoHasherProvided => None,
+            OpenError::IoError(io) => Some(io),
+        }
+    }
+}
 
 impl From<io::Error> for OpenError {
     fn from(value: io::Error) -> Self {

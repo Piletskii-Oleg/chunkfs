@@ -10,7 +10,8 @@ pub mod hasher;
 mod storage;
 mod system;
 
-/// Block size, used by `read` and `write` methods in the `FileSystem`.
+/// Block size, used by [`read`][crate::FileSystem::read_from_file]
+/// and [`write`][crate::FileSystem::write_to_file] methods in the [`FileSystem`].
 /// Blocks given to the user or by them must be of this size.
 const SEG_SIZE: usize = 1024 * 1024; // 1MB
 

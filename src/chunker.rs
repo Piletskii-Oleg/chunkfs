@@ -22,20 +22,21 @@ impl Chunk {
 /// Base functionality for objects that split given data into chunks.
 /// Doesn't modify the given data or do anything else.
 ///
-/// Chunks that are found are returned by `chunk_data` method.
+/// Chunks that are found are returned by [`chunk_data`][Chunker::chunk_data] method.
 /// If some contents were cut because the end of `data` and not the end of the chunk was reached,
-/// it must be returned with `rest` method instead of storing it in the `chunk_data`'s output.
+/// it must be returned with [`rest`][Chunker::rest] instead of storing it in the [`chunk_data`][Chunker::chunk_data]'s output.
 pub trait Chunker {
     /// Goes through whole `data` and finds chunks. If last chunk is not actually a chunk but a leftover,
-    /// it is returned via `rest` method and is not contained in the vector.
+    /// it is returned via [`rest`][Chunker::rest] method and is not contained in the vector.
     ///
-    /// `empty` is an empty vector whose capacity is determined by `estimate_chunk_count`.
+    /// `empty` is an empty vector whose capacity is determined by [`estimate_chunk_count`][Chunker::estimate_chunk_count].
     /// Resulting chunks should be written right to it, and it should be returned as result.
     fn chunk_data(&mut self, data: &[u8], empty: Vec<Chunk>) -> Vec<Chunk>;
 
-    /// Empty if the whole file was successfully chunked,
-    /// or contains leftover data that was not enough for chunk to be found,
+    /// Returns leftover data that was not enough for chunk to be found,
     /// but had to be cut because no more data is available.
+    ///
+    /// Empty if the whole file was successfully chunked.
     fn rest(&self) -> &[u8];
 
     /// Returns an estimate amount of chunks that will be created once the algorithm runs through the whole

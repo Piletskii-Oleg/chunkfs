@@ -41,8 +41,7 @@ impl Base for HashMapBase {
     }
 
     fn retrieve(&self, request: Vec<VecHash>) -> io::Result<Vec<Vec<u8>>> {
-        // 1. unwrapping if no data is found. what kind of error can be used here?
-        // 2. cloning stored data instead of passing reference.
+        // cloning stored data instead of passing reference.
         // is it how it is supposed to be or should we give a reference to underlying data?
         request
             .into_iter()
