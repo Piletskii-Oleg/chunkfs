@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 chunking = { git = "https://github.com/Piletskii-Oleg/rust-chunking.git" }
+rand = "0.8.5"
 
 [profile.release-deb]
 inherits = "release"
