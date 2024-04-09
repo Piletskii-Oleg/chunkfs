@@ -128,7 +128,7 @@ impl FileLayer {
         let file = self.find_file(handle);
         file.spans
             .iter()
-            .map(|span| span.hash.clone()) // cloning hashes
+            .map(|span| span.hash.clone()) // cloning hashes, takes a lot of time
             .collect()
     }
 

@@ -35,7 +35,7 @@ pub struct HashMapBase {
 impl Base for HashMapBase {
     fn save(&mut self, segments: Vec<Segment>) -> io::Result<()> {
         for segment in segments {
-            self.segment_map.entry(segment.hash).or_insert(segment.data);
+            self.segment_map.entry(segment.hash).or_insert(segment.data); // VecHash is very heavy, I guess
         }
         Ok(())
     }
@@ -48,7 +48,7 @@ impl Base for HashMapBase {
             .map(|hash| {
                 self.segment_map
                     .get(&hash)
-                    .cloned()
+                    .cloned() // takes a lo-o-ot of time
                     .ok_or(ErrorKind::NotFound.into())
             })
             .collect()
