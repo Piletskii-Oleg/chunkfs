@@ -15,8 +15,6 @@ mod system;
 /// Blocks given to the user or by them must be of this size.
 const SEG_SIZE: usize = 1024 * 1024; // 1MB
 
-pub type VecHash = Vec<u8>;
-
 /// Measurements that are received after writing data to a file.
 /// Contain time spent for chunking and for hashing.
 #[derive(Debug, PartialEq, Default, Clone, Copy)]

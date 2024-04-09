@@ -6,22 +6,28 @@ use std::time::Instant;
 
 use chunkfs::base::HashMapBase;
 use chunkfs::chunker::{Chunker, FSChunker, LeapChunker};
-use chunkfs::hasher::SimpleHasher;
+use chunkfs::hasher::{Hasher, Sha256Hasher, SimpleHasher};
 use chunkfs::FileSystem;
 
 fn main() -> io::Result<()> {
-    parametrized_write(FSChunker::new(16384))?;
+    parametrized_write(FSChunker::new(16384), SimpleHasher)?;
+    parametrized_write(FSChunker::new(16384), Sha256Hasher::default())?;
     println!();
-    parametrized_write(LeapChunker::default())?;
+    parametrized_write(LeapChunker::default(), SimpleHasher)?;
+    parametrized_write(LeapChunker::default(), Sha256Hasher::default())?;
     Ok(())
 }
 
-fn parametrized_write(chunker: impl Chunker + Debug) -> io::Result<()> {
+fn parametrized_write(
+    chunker: impl Chunker + Debug,
+    hasher: impl Hasher + Debug,
+) -> io::Result<()> {
     println!("Current chunker: {:?}", chunker);
+    println!("Current hasher: {:?}", hasher);
     let base = HashMapBase::default();
     let mut fs = FileSystem::new(base);
 
-    let mut file = fs.create_file("file".to_string(), chunker, SimpleHasher, true)?;
+    let mut file = fs.create_file("file".to_string(), chunker, hasher, true)?;
 
     const MB_COUNT: usize = 1024;
     let data = generate_data(1024);

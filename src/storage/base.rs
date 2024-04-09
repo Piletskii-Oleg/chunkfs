@@ -33,7 +33,7 @@ pub struct HashMapBase<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
 impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> Base<Hash> for HashMapBase<Hash> {
     fn save(&mut self, segments: Vec<Segment<Hash>>) -> io::Result<()> {
         for segment in segments {
-            self.segment_map.entry(segment.hash).or_insert(segment.data); // VecHash is very heavy, I guess
+            self.segment_map.entry(segment.hash).or_insert(segment.data);
         }
         Ok(())
     }

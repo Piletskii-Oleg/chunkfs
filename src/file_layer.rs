@@ -198,11 +198,10 @@ mod tests {
     use crate::chunker::FSChunker;
     use crate::file_layer::FileLayer;
     use crate::hasher::SimpleHasher;
-    use crate::VecHash;
 
     #[test]
     fn file_layer_create_file() {
-        let mut fl: FileLayer<VecHash> = FileLayer::default();
+        let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
         let name = "hello".to_string();
         fl.create(name.clone(), FSChunker::new(4096), SimpleHasher, true)
             .unwrap();
@@ -213,7 +212,7 @@ mod tests {
 
     #[test]
     fn cant_create_two_files_with_same_name() {
-        let mut fl: FileLayer<VecHash> = FileLayer::default();
+        let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
         fl.create(
             "hello".to_string(),
             FSChunker::new(4096),
