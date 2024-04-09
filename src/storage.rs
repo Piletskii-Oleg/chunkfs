@@ -1,74 +1,81 @@
-use std::io;
+use std::marker::PhantomData;
 use std::time::{Duration, Instant};
+use std::{hash, io};
 
 pub use crate::chunker::Chunker;
 pub use crate::hasher::Hasher;
 pub use crate::storage::base::Base;
 use crate::storage::base::Segment;
-use crate::{VecHash, WriteMeasurements, SEG_SIZE};
+use crate::{WriteMeasurements, SEG_SIZE};
 
 pub mod base;
 
 /// Hashed span in a [`file`][crate::file_layer::File] with a certain length.
 #[derive(Debug)]
-pub struct Span {
-    pub hash: VecHash,
+pub struct Span<Hash: hash::Hash + Eq + PartialEq + Clone> {
+    pub hash: Hash,
     pub length: usize,
 }
 
 /// Spans received after [Storage::write] or [Storage::flush], along with time measurements.
 #[derive(Debug)]
-pub struct SpansInfo {
-    pub spans: Vec<Span>,
+pub struct SpansInfo<Hash: hash::Hash + Eq + PartialEq + Clone> {
+    pub spans: Vec<Span<Hash>>,
     pub measurements: WriteMeasurements,
 }
 
-impl Span {
-    pub fn new(hash: VecHash, length: usize) -> Self {
+impl<Hash: hash::Hash + Eq + PartialEq + Clone> Span<Hash> {
+    pub fn new(hash: Hash, length: usize) -> Self {
         Self { hash, length }
     }
 }
 
 /// Underlying storage for the actual stored data.
 #[derive(Debug)]
-pub struct Storage<B>
+pub struct Storage<B, Hash>
 where
-    B: Base,
+    B: Base<Hash>,
+    Hash: hash::Hash + Clone + Eq + PartialEq,
 {
     base: B,
+    d: PhantomData<Hash>,
 }
 
-impl<B> Storage<B>
+impl<B, Hash> Storage<B, Hash>
 where
-    B: Base,
+    B: Base<Hash>,
+    Hash: hash::Hash + Clone + Eq + PartialEq,
 {
     pub fn new(base: B) -> Self {
-        Self { base }
+        Self {
+            base,
+            d: Default::default(),
+        }
     }
 
     /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    pub fn write<C: Chunker, H: Hasher>(
+    pub fn write<C: Chunker, H: Hasher<Hash>>(
         &mut self,
         data: &[u8],
-        worker: &mut StorageWriter<C, H>,
-    ) -> io::Result<SpansInfo> {
+        worker: &mut StorageWriter<C, H, Hash>,
+    ) -> io::Result<SpansInfo<Hash>> {
         worker.write(data, &mut self.base)
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
-    pub fn flush<C: Chunker, H: Hasher>(
+    pub fn flush<C: Chunker, H: Hasher<Hash>>(
         &mut self,
-        worker: &mut StorageWriter<C, H>,
-    ) -> io::Result<SpansInfo> {
+        worker: &mut StorageWriter<C, H, Hash>,
+    ) -> io::Result<SpansInfo<Hash>> {
         worker.flush(&mut self.base)
     }
 
     /// Retrieves the data from the storage based on hashes of the data [`segments`][Segment],
     /// or Error(NotFound) if some of the hashes were not present in the base.
-    pub fn retrieve(&self, request: Vec<VecHash>) -> io::Result<Vec<Vec<u8>>> {
+    pub fn retrieve(&self, request: Vec<Hash>) -> io::Result<Vec<Vec<u8>>> {
         self.base.retrieve(request)
     }
 }
@@ -77,26 +84,30 @@ where
 /// Only exists during [FileSystem::write_to_file][crate::FileSystem::write_to_file].
 /// Receives `buffer` from [FileHandle][crate::file_layer::FileHandle] and gives it back after a successful write.
 #[derive(Debug)]
-pub struct StorageWriter<'handle, C, H>
+pub struct StorageWriter<'handle, C, H, Hash>
 where
     C: Chunker,
-    H: Hasher,
+    H: Hasher<Hash>,
+    Hash: hash::Hash + Clone + Eq + PartialEq,
 {
     chunker: &'handle mut C,
     hasher: &'handle mut H,
     buffer: Vec<u8>,
+    d: PhantomData<Hash>,
 }
 
-impl<'handle, C, H> StorageWriter<'handle, C, H>
+impl<'handle, C, H, Hash> StorageWriter<'handle, C, H, Hash>
 where
     C: Chunker,
-    H: Hasher,
+    H: Hasher<Hash>,
+    Hash: hash::Hash + Clone + Eq + PartialEq,
 {
     pub fn new(chunker: &'handle mut C, hasher: &'handle mut H, buffer: Vec<u8>) -> Self {
         Self {
             chunker,
             hasher,
             buffer,
+            d: Default::default(),
         }
     }
 
@@ -104,7 +115,11 @@ where
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    pub fn write<B: Base>(&mut self, data: &[u8], base: &mut B) -> io::Result<SpansInfo> {
+    pub fn write<B: Base<Hash>>(
+        &mut self,
+        data: &[u8],
+        base: &mut B,
+    ) -> io::Result<SpansInfo<Hash>> {
         debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
         self.buffer.extend_from_slice(data);
@@ -148,7 +163,7 @@ where
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
-    pub fn flush<B: Base>(&mut self, base: &mut B) -> io::Result<SpansInfo> {
+    pub fn flush<B: Base<Hash>>(&mut self, base: &mut B) -> io::Result<SpansInfo<Hash>> {
         // is this necessary?
         if self.buffer.is_empty() {
             return Ok(SpansInfo {
