@@ -119,7 +119,7 @@ where
         let hashes = chunks
             .iter()
             .map(|chunk| self.hasher.hash(&self.buffer[chunk.range()]))
-            .collect::<Vec<VecHash>>();
+            .collect::<Vec<_>>();
         let hash_time = start.elapsed();
 
         let segments = hashes
@@ -130,7 +130,7 @@ where
                     .map(|chunk| self.buffer[chunk.range()].to_vec()), // cloning buffer data again
             )
             .map(|(hash, data)| Segment::new(hash, data))
-            .collect::<Vec<Segment>>();
+            .collect::<Vec<_>>();
 
         // have to copy hashes? or do something else?
         let spans = segments

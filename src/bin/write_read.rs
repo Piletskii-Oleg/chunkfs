@@ -1,23 +1,27 @@
 extern crate chunkfs;
 
+use std::fmt::Debug;
 use std::io;
 use std::time::Instant;
 
 use chunkfs::base::HashMapBase;
-use chunkfs::chunker::{FSChunker, LeapChunker};
+use chunkfs::chunker::{Chunker, FSChunker, LeapChunker};
 use chunkfs::hasher::SimpleHasher;
 use chunkfs::FileSystem;
 
 fn main() -> io::Result<()> {
+    parametrized_write(FSChunker::new(16384))?;
+    println!();
+    parametrized_write(LeapChunker::default())?;
+    Ok(())
+}
+
+fn parametrized_write(chunker: impl Chunker + Debug) -> io::Result<()> {
+    println!("Current chunker: {:?}", chunker);
     let base = HashMapBase::default();
     let mut fs = FileSystem::new(base);
 
-    let mut file = fs.create_file(
-        "file".to_string(),
-        FSChunker::new(16384),
-        SimpleHasher,
-        true,
-    )?;
+    let mut file = fs.create_file("file".to_string(), chunker, SimpleHasher, true)?;
 
     const MB_COUNT: usize = 1024;
     let data = generate_data(1024);
@@ -27,7 +31,6 @@ fn main() -> io::Result<()> {
     }
     let write_time = watch.elapsed();
     let measurements = fs.close_file(file)?;
-    println!("{:?}", measurements);
     println!(
         "Written {MB_COUNT} MB in {} seconds => write speed is {:.3} MB/s",
         write_time.as_secs_f64(),
