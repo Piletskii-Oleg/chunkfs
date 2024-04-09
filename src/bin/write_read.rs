@@ -17,16 +17,25 @@ fn main() -> io::Result<()> {
         SimpleHasher,
         true,
     )?;
+
+    const MB_COUNT: usize = 1024 * 3;
     let data = vec![10; 1024 * 1024];
-    fs.write_to_file(&mut file, &data)?;
+    for _ in 0..MB_COUNT {
+        fs.write_to_file(&mut file, &data)?;
+    }
     let measurements = fs.close_file(file)?;
     println!("{:?}", measurements);
 
+    let speed = MB_COUNT as f64 / measurements.chunk_time().as_nanos() as f64;
+    println!(
+        "chunked {MB_COUNT} MB: {:.3} MB/s",
+        speed * 1000.0 * 1000000.0
+    );
     let mut file = fs.open_file("file", LeapChunker::default(), SimpleHasher)?;
-    let read = fs.read_from_file(&mut file)?;
+    let read = fs.read_file_complete(&mut file)?;
 
-    assert_eq!(read.len(), 1024 * 1024);
-    assert_eq!(read, data);
+    assert_eq!(read.len(), 1024 * 1024 * MB_COUNT);
+    assert_eq!(read, vec![10; 1024 * 1024 * MB_COUNT]);
 
     Ok(())
 }
