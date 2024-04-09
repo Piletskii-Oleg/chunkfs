@@ -3,28 +3,27 @@ use std::io::ErrorKind;
 use std::marker::PhantomData;
 use std::{hash, io};
 
-use crate::base::Base;
 use crate::chunker::Chunker;
 use crate::storage::{Hasher, SpansInfo};
 use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
 #[derive(Debug, PartialEq, Eq, Default)]
-pub struct FileSpan<Hash: hash::Hash + Eq + PartialEq + Clone> {
+pub struct FileSpan<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
     hash: Hash,
     offset: usize,
 }
 
 /// A named file, doesn't store actual contents,
 /// but rather hashes for them.
-pub struct File<Hash: hash::Hash + Eq + PartialEq + Clone> {
+pub struct File<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
     name: String,
     spans: Vec<FileSpan<Hash>>,
 }
 
 /// Layer that contains all [`files`][File], accessed by their names.
 #[derive(Default)]
-pub struct FileLayer<Hash: hash::Hash + Eq + PartialEq + Clone> {
+pub struct FileLayer<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
     files: HashMap<String, File<Hash>>,
 }
 
@@ -33,8 +32,8 @@ pub struct FileLayer<Hash: hash::Hash + Eq + PartialEq + Clone> {
 pub struct FileHandle<C, H, Hash>
 where
     C: Chunker,
-    H: Hasher<Hash>,
-    Hash: hash::Hash + Clone + Eq + PartialEq,
+    H: Hasher,
+    Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     // can't make file_name a reference
     // or have a reference to File,
@@ -46,10 +45,10 @@ where
     pub(crate) chunker: C,
     pub(crate) hasher: H,
     pub(crate) write_buffer: Option<Vec<u8>>,
-    d: PhantomData<Hash>,
+    hash_phantom: PhantomData<Hash>,
 }
 
-impl<Hash: hash::Hash + Eq + PartialEq + Clone> File<Hash> {
+impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> File<Hash> {
     fn new(name: String) -> Self {
         File {
             name,
@@ -61,8 +60,8 @@ impl<Hash: hash::Hash + Eq + PartialEq + Clone> File<Hash> {
 impl<C, H, Hash> FileHandle<C, H, Hash>
 where
     C: Chunker,
-    H: Hasher<Hash>,
-    Hash: hash::Hash + Clone + Eq + PartialEq,
+    H: Hasher,
+    Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     fn new(file: &File<Hash>, chunker: C, hasher: H) -> Self {
         FileHandle {
@@ -72,7 +71,7 @@ where
             chunker,
             hasher,
             write_buffer: Some(vec![]),
-            d: Default::default(),
+            hash_phantom: Default::default(),
         }
     }
 
@@ -87,9 +86,9 @@ where
     }
 }
 
-impl<Hash: hash::Hash + Eq + PartialEq + Clone> FileLayer<Hash> {
+impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> FileLayer<Hash> {
     /// Creates a [`file`][File] and returns its [`FileHandle`]
-    pub fn create<C: Chunker, H: Hasher<Hash>>(
+    pub fn create<C: Chunker, H: Hasher>(
         &mut self,
         name: String,
         c: C,
@@ -107,7 +106,7 @@ impl<Hash: hash::Hash + Eq + PartialEq + Clone> FileLayer<Hash> {
     }
 
     /// Opens a [`file`][File] based on its name and returns its [`FileHandle`]
-    pub fn open<C: Chunker, H: Hasher<Hash>>(
+    pub fn open<C: Chunker, H: Hasher>(
         &self,
         name: &str,
         c: C,
@@ -120,15 +119,12 @@ impl<Hash: hash::Hash + Eq + PartialEq + Clone> FileLayer<Hash> {
     }
 
     /// Returns reference to a file using [`FileHandle`] that corresponds to it.
-    fn find_file<C: Chunker, H: Hasher<Hash>>(
-        &self,
-        handle: &FileHandle<C, H, Hash>,
-    ) -> &File<Hash> {
+    fn find_file<C: Chunker, H: Hasher>(&self, handle: &FileHandle<C, H, Hash>) -> &File<Hash> {
         self.files.get(&handle.file_name).unwrap()
     }
 
     /// Returns mutable reference to a file using [`FileHandle`] that corresponds to it.
-    fn find_file_mut<C: Chunker, H: Hasher<Hash>>(
+    fn find_file_mut<C: Chunker, H: Hasher>(
         &mut self,
         handle: &FileHandle<C, H, Hash>,
     ) -> &mut File<Hash> {
@@ -136,7 +132,7 @@ impl<Hash: hash::Hash + Eq + PartialEq + Clone> FileLayer<Hash> {
     }
 
     /// Reads all hashes of the file, from beginning to end.
-    pub fn read_complete<C: Chunker, H: Hasher<Hash>>(
+    pub fn read_complete<C: Chunker, H: Hasher>(
         &self,
         handle: &FileHandle<C, H, Hash>,
     ) -> Vec<Hash> {
@@ -148,7 +144,7 @@ impl<Hash: hash::Hash + Eq + PartialEq + Clone> FileLayer<Hash> {
     }
 
     /// Writes spans to the end of the file.
-    pub fn write<C: Chunker, H: Hasher<Hash>>(
+    pub fn write<C: Chunker, H: Hasher>(
         &mut self,
         handle: &mut FileHandle<C, H, Hash>,
         info: SpansInfo<Hash>,
@@ -167,10 +163,7 @@ impl<Hash: hash::Hash + Eq + PartialEq + Clone> FileLayer<Hash> {
 
     /// Reads 1 MB of data from the open file and returns received hashes,
     /// starting point is based on the `FileHandle`'s offset.
-    pub fn read<C: Chunker, H: Hasher<Hash>>(
-        &self,
-        handle: &mut FileHandle<C, H, Hash>,
-    ) -> Vec<Hash> {
+    pub fn read<C: Chunker, H: Hasher>(&self, handle: &mut FileHandle<C, H, Hash>) -> Vec<Hash> {
         let file = self.find_file(handle);
 
         let mut bytes_read = 0;
@@ -205,10 +198,11 @@ mod tests {
     use crate::chunker::FSChunker;
     use crate::file_layer::FileLayer;
     use crate::hasher::SimpleHasher;
+    use crate::VecHash;
 
     #[test]
     fn file_layer_create_file() {
-        let mut fl = FileLayer::default();
+        let mut fl: FileLayer<VecHash> = FileLayer::default();
         let name = "hello".to_string();
         fl.create(name.clone(), FSChunker::new(4096), SimpleHasher, true)
             .unwrap();
@@ -219,7 +213,7 @@ mod tests {
 
     #[test]
     fn cant_create_two_files_with_same_name() {
-        let mut fl = FileLayer::default();
+        let mut fl: FileLayer<VecHash> = FileLayer::default();
         fl.create(
             "hello".to_string(),
             FSChunker::new(4096),
