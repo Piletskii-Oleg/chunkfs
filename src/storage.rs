@@ -60,16 +60,20 @@ where
     pub fn write<C: Chunker, H: Hasher<Hash = Hash>>(
         &mut self,
         data: &[u8],
-        writer: &mut StorageWriter<C, H, Hash>,
+        chunker: &mut C,
+        hasher: &mut H,
     ) -> io::Result<SpansInfo<Hash>> {
+        let mut writer = StorageWriter::new(chunker, hasher);
         writer.write(data, &mut self.base)
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
     pub fn flush<C: Chunker, H: Hasher<Hash = Hash>>(
         &mut self,
-        writer: &mut StorageWriter<C, H, Hash>,
+        chunker: &mut C,
+        hasher: &mut H,
     ) -> io::Result<SpansInfo<Hash>> {
+        let mut writer = StorageWriter::new(chunker, hasher);
         writer.flush(&mut self.base)
     }
 
@@ -84,7 +88,7 @@ where
 /// Only exists during [FileSystem::write_to_file][crate::FileSystem::write_to_file].
 /// Receives `buffer` from [FileHandle][crate::file_layer::FileHandle] and gives it back after a successful write.
 #[derive(Debug)]
-pub struct StorageWriter<'handle, C, H, Hash>
+struct StorageWriter<'handle, C, H, Hash>
 where
     C: Chunker,
     H: Hasher,
@@ -101,7 +105,7 @@ where
     H: Hasher<Hash = Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
-    pub fn new(chunker: &'handle mut C, hasher: &'handle mut H) -> Self {
+    fn new(chunker: &'handle mut C, hasher: &'handle mut H) -> Self {
         Self {
             chunker,
             hasher,
@@ -113,7 +117,7 @@ where
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    pub fn write<B: Database<Hash>>(
+    fn write<B: Database<Hash>>(
         &mut self,
         data: &[u8],
         base: &mut B,
@@ -158,7 +162,7 @@ where
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
-    pub fn flush<B: Database<Hash>>(&mut self, base: &mut B) -> io::Result<SpansInfo<Hash>> {
+    fn flush<B: Database<Hash>>(&mut self, base: &mut B) -> io::Result<SpansInfo<Hash>> {
         // is this necessary?
         if self.chunker.remainder().is_empty() {
             return Ok(SpansInfo {

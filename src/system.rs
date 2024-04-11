@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::{hash, io};
 
 use crate::file_layer::{FileHandle, FileLayer};
-use crate::storage::{Chunker, Database, Hasher, Storage, StorageWriter};
+use crate::storage::{Chunker, Database, Hasher, Storage};
 use crate::WriteMeasurements;
 
 /// A file system provided by chunkfs.
@@ -63,9 +63,9 @@ where
         handle: &mut FileHandle<C, Hash>,
         data: &[u8],
     ) -> io::Result<()> {
-        let mut writer = StorageWriter::new(&mut handle.chunker, &mut self.hasher);
-
-        let spans = self.storage.write(data, &mut writer)?;
+        let spans = self
+            .storage
+            .write(data, &mut handle.chunker, &mut self.hasher)?;
 
         self.file_layer.write(handle, spans);
 
@@ -78,9 +78,7 @@ where
         &mut self,
         mut handle: FileHandle<C, Hash>,
     ) -> io::Result<WriteMeasurements> {
-        let mut writer = StorageWriter::new(&mut handle.chunker, &mut self.hasher);
-
-        let span = self.storage.flush(&mut writer)?;
+        let span = self.storage.flush(&mut handle.chunker, &mut self.hasher)?;
         self.file_layer.write(&mut handle, span);
 
         Ok(handle.close())
