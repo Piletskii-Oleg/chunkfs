@@ -4,7 +4,7 @@ use std::{hash, io};
 
 pub use crate::chunker::Chunker;
 pub use crate::hasher::Hasher;
-pub use crate::storage::base::Base;
+pub use crate::storage::base::Database;
 use crate::storage::base::Segment;
 use crate::{WriteMeasurements, SEG_SIZE};
 
@@ -34,7 +34,7 @@ impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> Span<Hash> {
 #[derive(Debug)]
 pub struct Storage<B, Hash>
 where
-    B: Base<Hash>,
+    B: Database<Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     base: B,
@@ -43,7 +43,7 @@ where
 
 impl<B, Hash> Storage<B, Hash>
 where
-    B: Base<Hash>,
+    B: Database<Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     pub fn new(base: B) -> Self {
@@ -115,7 +115,7 @@ where
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    pub fn write<B: Base<Hash>>(
+    pub fn write<B: Database<Hash>>(
         &mut self,
         data: &[u8],
         base: &mut B,
@@ -154,7 +154,7 @@ where
             .collect();
         base.save(segments)?;
 
-        self.buffer = self.chunker.rest().to_vec();
+        self.buffer = self.chunker.remainder().to_vec();
 
         Ok(SpansInfo {
             spans,
@@ -163,7 +163,7 @@ where
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
-    pub fn flush<B: Base<Hash>>(&mut self, base: &mut B) -> io::Result<SpansInfo<Hash>> {
+    pub fn flush<B: Database<Hash>>(&mut self, base: &mut B) -> io::Result<SpansInfo<Hash>> {
         // is this necessary?
         if self.buffer.is_empty() {
             return Ok(SpansInfo {

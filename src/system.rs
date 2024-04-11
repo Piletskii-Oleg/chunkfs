@@ -5,13 +5,13 @@ use std::marker::PhantomData;
 use std::{hash, io};
 
 use crate::file_layer::{FileHandle, FileLayer};
-use crate::storage::{Base, Chunker, Hasher, Storage, StorageWriter};
+use crate::storage::{Chunker, Database, Hasher, Storage, StorageWriter};
 use crate::WriteMeasurements;
 
 /// A file system provided by chunkfs.
 pub struct FileSystem<B, Hash>
 where
-    B: Base<Hash>,
+    B: Database<Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     storage: Storage<B, Hash>,
@@ -20,7 +20,7 @@ where
 
 impl<B, Hash> FileSystem<B, Hash>
 where
-    B: Base<Hash>,
+    B: Database<Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     /// Creates a file system with the given [`base`][Base].
@@ -214,7 +214,7 @@ where
 
     /// Opens a file in the given [FileSystem] and with the given name. Creates new file if the flag was set.
     /// Returns an [OpenError] if the `chunker` or `hasher` were not set.
-    pub fn open<B: Base<Hash>>(
+    pub fn open<B: Database<Hash>>(
         self,
         fs: &mut FileSystem<B, Hash>,
         name: &str,

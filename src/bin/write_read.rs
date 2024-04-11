@@ -27,34 +27,34 @@ fn parametrized_write(
     let base = HashMapBase::default();
     let mut fs = FileSystem::new(base);
 
-    let mut file = fs.create_file("file".to_string(), chunker, hasher, true)?;
+    let mut handle = fs.create_file("file".to_string(), chunker, hasher, true)?;
 
     const MB_COUNT: usize = 1024;
     let data = generate_data(1024);
     let watch = Instant::now();
     for i in 0..MB_COUNT {
-        fs.write_to_file(&mut file, &data[1024 * 1024 * i..1024 * 1024 * (i + 1)])?;
+        fs.write_to_file(&mut handle, &data[1024 * 1024 * i..1024 * 1024 * (i + 1)])?;
     }
     let write_time = watch.elapsed();
-    let measurements = fs.close_file(file)?;
+    let measurements = fs.close_file(handle)?;
     println!(
-        "Written {MB_COUNT} MB in {} seconds => write speed is {:.3} MB/s",
+        "Written {MB_COUNT} MB in {:.3} seconds => write speed is {:.3} MB/s",
         write_time.as_secs_f64(),
         MB_COUNT as f64 / write_time.as_secs_f64()
     );
 
     let speed = MB_COUNT as f64 / measurements.chunk_time().as_secs_f64();
     println!(
-        "Chunked {MB_COUNT} MB in {} ns => chunk speed is {:.3} MB/s",
+        "Chunked {MB_COUNT} MB in {:.3} ns => chunk speed is {:.3} MB/s",
         measurements.chunk_time().as_nanos(),
         speed
     );
-    let file = fs.open_file("file", LeapChunker::default(), SimpleHasher)?;
+    let handle = fs.open_file("file", LeapChunker::default(), SimpleHasher)?;
     let watch = Instant::now();
-    let read = fs.read_file_complete(&file)?;
+    let read = fs.read_file_complete(&handle)?;
     let read_time = watch.elapsed().as_secs_f64();
     println!(
-        "Read {MB_COUNT} MB in {} seconds => chunk speed is {:.3} MB/s",
+        "Read {MB_COUNT} MB in {:.3} seconds => chunk speed is {:.3} MB/s",
         read_time,
         MB_COUNT as f64 / read_time
     );
