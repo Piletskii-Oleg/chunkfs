@@ -32,7 +32,6 @@ impl Hasher for Sha256Hasher {
 
     fn hash(&mut self, data: &[u8]) -> Self::Hash {
         Digest::update(&mut self.hasher, data);
-        let result = Digest::finalize_reset(&mut self.hasher);
-        result
+        Digest::finalize_reset(&mut self.hasher)
     }
 }

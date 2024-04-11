@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 use std::{hash, io};
 
@@ -32,48 +31,42 @@ impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> Span<Hash> {
 
 /// Underlying storage for the actual stored data.
 #[derive(Debug)]
-pub struct Storage<B, Hash>
+pub struct Storage<B, H, Hash>
 where
     B: Database<Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     base: B,
-    hash_phantom: PhantomData<Hash>,
+    hasher: H,
 }
 
-impl<B, Hash> Storage<B, Hash>
+impl<B, H, Hash> Storage<B, H, Hash>
 where
     B: Database<Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
-    pub fn new(base: B) -> Self {
-        Self {
-            base,
-            hash_phantom: Default::default(),
-        }
+    pub fn new(base: B, hasher: H) -> Self {
+        Self { base, hasher }
     }
 
     /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    pub fn write<C: Chunker, H: Hasher<Hash = Hash>>(
+    pub fn write<C: Chunker>(
         &mut self,
         data: &[u8],
         chunker: &mut C,
-        hasher: &mut H,
     ) -> io::Result<SpansInfo<Hash>> {
-        let mut writer = StorageWriter::new(chunker, hasher);
+        let mut writer = StorageWriter::new(chunker, &mut self.hasher);
         writer.write(data, &mut self.base)
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
-    pub fn flush<C: Chunker, H: Hasher<Hash = Hash>>(
-        &mut self,
-        chunker: &mut C,
-        hasher: &mut H,
-    ) -> io::Result<SpansInfo<Hash>> {
-        let mut writer = StorageWriter::new(chunker, hasher);
+    pub fn flush<C: Chunker>(&mut self, chunker: &mut C) -> io::Result<SpansInfo<Hash>> {
+        let mut writer = StorageWriter::new(chunker, &mut self.hasher);
         writer.flush(&mut self.base)
     }
 
@@ -88,40 +81,33 @@ where
 /// Only exists during [FileSystem::write_to_file][crate::FileSystem::write_to_file].
 /// Receives `buffer` from [FileHandle][crate::file_layer::FileHandle] and gives it back after a successful write.
 #[derive(Debug)]
-struct StorageWriter<'handle, C, H, Hash>
+struct StorageWriter<'handle, C, H>
 where
     C: Chunker,
     H: Hasher,
-    Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     chunker: &'handle mut C,
     hasher: &'handle mut H,
-    hash_phantom: PhantomData<Hash>,
 }
 
-impl<'handle, C, H, Hash> StorageWriter<'handle, C, H, Hash>
+impl<'handle, C, H> StorageWriter<'handle, C, H>
 where
     C: Chunker,
-    H: Hasher<Hash = Hash>,
-    Hash: hash::Hash + Clone + Eq + PartialEq + Default,
+    H: Hasher,
 {
     fn new(chunker: &'handle mut C, hasher: &'handle mut H) -> Self {
-        Self {
-            chunker,
-            hasher,
-            hash_phantom: Default::default(),
-        }
+        Self { chunker, hasher }
     }
 
     /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    fn write<B: Database<Hash>>(
+    fn write<B: Database<H::Hash>>(
         &mut self,
         data: &[u8],
         base: &mut B,
-    ) -> io::Result<SpansInfo<Hash>> {
+    ) -> io::Result<SpansInfo<H::Hash>> {
         debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
         let mut buffer = self.chunker.remainder().to_vec();
@@ -162,7 +148,7 @@ where
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
-    fn flush<B: Database<Hash>>(&mut self, base: &mut B) -> io::Result<SpansInfo<Hash>> {
+    fn flush<B: Database<H::Hash>>(&mut self, base: &mut B) -> io::Result<SpansInfo<H::Hash>> {
         // is this necessary?
         if self.chunker.remainder().is_empty() {
             return Ok(SpansInfo {
