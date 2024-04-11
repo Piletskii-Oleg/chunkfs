@@ -63,14 +63,9 @@ where
         handle: &mut FileHandle<C, Hash>,
         data: &[u8],
     ) -> io::Result<()> {
-        let mut writer = StorageWriter::new(
-            &mut handle.chunker,
-            &mut self.hasher,
-            handle.write_buffer.take().unwrap(), // to reduce copying. unwrap should always be safe, because FileHandle is initialized with Some(vec)
-        );
+        let mut writer = StorageWriter::new(&mut handle.chunker, &mut self.hasher);
 
         let spans = self.storage.write(data, &mut writer)?;
-        handle.write_buffer = Some(writer.finish());
 
         self.file_layer.write(handle, spans);
 
@@ -83,11 +78,7 @@ where
         &mut self,
         mut handle: FileHandle<C, Hash>,
     ) -> io::Result<WriteMeasurements> {
-        let mut writer = StorageWriter::new(
-            &mut handle.chunker,
-            &mut self.hasher,
-            handle.write_buffer.take().unwrap(), // doesn't give anything back afterward, since FileHandle is dropped
-        );
+        let mut writer = StorageWriter::new(&mut handle.chunker, &mut self.hasher);
 
         let span = self.storage.flush(&mut writer)?;
         self.file_layer.write(&mut handle, span);

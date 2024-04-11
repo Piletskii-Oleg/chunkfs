@@ -92,7 +92,6 @@ where
 {
     chunker: &'handle mut C,
     hasher: &'handle mut H,
-    buffer: Vec<u8>,
     hash_phantom: PhantomData<Hash>,
 }
 
@@ -102,11 +101,10 @@ where
     H: Hasher<Hash = Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
-    pub fn new(chunker: &'handle mut C, hasher: &'handle mut H, buffer: Vec<u8>) -> Self {
+    pub fn new(chunker: &'handle mut C, hasher: &'handle mut H) -> Self {
         Self {
             chunker,
             hasher,
-            buffer,
             hash_phantom: Default::default(),
         }
     }
@@ -122,27 +120,26 @@ where
     ) -> io::Result<SpansInfo<Hash>> {
         debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
-        self.buffer.extend_from_slice(data);
+        let mut buffer = self.chunker.remainder().to_vec();
+        buffer.extend_from_slice(data);
 
-        let empty = Vec::with_capacity(self.chunker.estimate_chunk_count(&self.buffer));
+        let empty = Vec::with_capacity(self.chunker.estimate_chunk_count(&buffer));
 
         let start = Instant::now();
-        let chunks = self.chunker.chunk_data(&self.buffer, empty);
+        let chunks = self.chunker.chunk_data(&buffer, empty);
         let chunk_time = start.elapsed();
 
         let start = Instant::now();
         let hashes = chunks
             .iter()
-            .map(|chunk| self.hasher.hash(&self.buffer[chunk.range()]))
+            .map(|chunk| self.hasher.hash(&buffer[chunk.range()]))
             .collect::<Vec<_>>();
         let hash_time = start.elapsed();
 
         let segments = hashes
             .into_iter()
             .zip(
-                chunks
-                    .iter()
-                    .map(|chunk| self.buffer[chunk.range()].to_vec()), // cloning buffer data again
+                chunks.iter().map(|chunk| buffer[chunk.range()].to_vec()), // cloning buffer data again
             )
             .map(|(hash, data)| Segment::new(hash, data))
             .collect::<Vec<_>>();
@@ -154,8 +151,6 @@ where
             .collect();
         base.save(segments)?;
 
-        self.buffer = self.chunker.remainder().to_vec();
-
         Ok(SpansInfo {
             spans,
             measurements: WriteMeasurements::new(chunk_time, hash_time),
@@ -165,32 +160,25 @@ where
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
     pub fn flush<B: Database<Hash>>(&mut self, base: &mut B) -> io::Result<SpansInfo<Hash>> {
         // is this necessary?
-        if self.buffer.is_empty() {
+        if self.chunker.remainder().is_empty() {
             return Ok(SpansInfo {
                 spans: vec![],
                 measurements: Default::default(),
             });
         }
 
+        let remainder = self.chunker.remainder().to_vec();
         let start = Instant::now();
-        let hash = self.hasher.hash(&self.buffer);
+        let hash = self.hasher.hash(&remainder);
         let hash_time = start.elapsed();
 
-        let segment = Segment::new(hash.clone(), self.buffer.clone());
+        let segment = Segment::new(hash.clone(), remainder.clone());
         base.save(vec![segment])?;
 
-        let span = Span::new(hash, self.buffer.len());
-        self.buffer = vec![];
+        let span = Span::new(hash, remainder.len());
         Ok(SpansInfo {
             spans: vec![span],
             measurements: WriteMeasurements::new(Duration::default(), hash_time),
         })
-    }
-
-    /// Returns own buffer after conducting work on storage.
-    /// Used for persisting remaining data among different writes,
-    /// as the object only lives during a single write operation and is destroyed afterward.
-    pub fn finish(self) -> Vec<u8> {
-        self.buffer
     }
 }

@@ -42,7 +42,6 @@ where
     measurements: WriteMeasurements,
     // maybe not pub(crate) but something else? cannot think of anything
     pub(crate) chunker: C,
-    pub(crate) write_buffer: Option<Vec<u8>>,
     hash_phantom: PhantomData<Hash>,
 }
 
@@ -66,7 +65,6 @@ where
             offset: 0,
             measurements: Default::default(),
             chunker,
-            write_buffer: Some(vec![]),
             hash_phantom: Default::default(),
         }
     }
