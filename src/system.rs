@@ -9,24 +9,28 @@ use crate::storage::{Chunker, Database, Hasher, Storage, StorageWriter};
 use crate::WriteMeasurements;
 
 /// A file system provided by chunkfs.
-pub struct FileSystem<B, Hash>
+pub struct FileSystem<B, H, Hash>
 where
     B: Database<Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     storage: Storage<B, Hash>,
+    hasher: H,
     file_layer: FileLayer<Hash>,
 }
 
-impl<B, Hash> FileSystem<B, Hash>
+impl<B, H, Hash> FileSystem<B, H, Hash>
 where
     B: Database<Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     /// Creates a file system with the given [`base`][Base].
-    pub fn new(base: B) -> Self {
+    pub fn new(base: B, hasher: H) -> Self {
         Self {
             storage: Storage::new(base),
+            hasher,
             file_layer: Default::default(),
         }
     }
@@ -38,36 +42,30 @@ where
 
     /// Tries to open a file with the given name and returns its `FileHandle` if it exists,
     /// or `None`, if it doesn't.
-    pub fn open_file<C: Chunker, H: Hasher>(
-        &self,
-        name: &str,
-        c: C,
-        h: H,
-    ) -> io::Result<FileHandle<C, H, Hash>> {
-        self.file_layer.open(name, c, h)
+    pub fn open_file<C: Chunker>(&self, name: &str, c: C) -> io::Result<FileHandle<C, Hash>> {
+        self.file_layer.open(name, c)
     }
 
     /// Creates a file with the given name and returns its `FileHandle`.
     /// Returns `ErrorKind::AlreadyExists`, if the file with the same name exists in the file system.
-    pub fn create_file<C: Chunker, H: Hasher>(
+    pub fn create_file<C: Chunker>(
         &mut self,
         name: String,
         c: C,
-        h: H,
         create_new: bool,
-    ) -> io::Result<FileHandle<C, H, Hash>> {
-        self.file_layer.create(name, c, h, create_new)
+    ) -> io::Result<FileHandle<C, Hash>> {
+        self.file_layer.create(name, c, create_new)
     }
 
     /// Writes given data to the file. Size of the slice must be exactly 1 MB.
-    pub fn write_to_file<C: Chunker, H: Hasher<Hash = Hash>>(
+    pub fn write_to_file<C: Chunker>(
         &mut self,
-        handle: &mut FileHandle<C, H, Hash>,
+        handle: &mut FileHandle<C, Hash>,
         data: &[u8],
     ) -> io::Result<()> {
         let mut writer = StorageWriter::new(
             &mut handle.chunker,
-            &mut handle.hasher,
+            &mut self.hasher,
             handle.write_buffer.take().unwrap(), // to reduce copying. unwrap should always be safe, because FileHandle is initialized with Some(vec)
         );
 
@@ -81,13 +79,13 @@ where
 
     /// Closes the file and ensures that all data that was written to it
     /// is stored. Returns [WriteMeasurements] containing chunking and hashing times.
-    pub fn close_file<C: Chunker, H: Hasher<Hash = Hash>>(
+    pub fn close_file<C: Chunker>(
         &mut self,
-        mut handle: FileHandle<C, H, Hash>,
+        mut handle: FileHandle<C, Hash>,
     ) -> io::Result<WriteMeasurements> {
         let mut writer = StorageWriter::new(
             &mut handle.chunker,
-            &mut handle.hasher,
+            &mut self.hasher,
             handle.write_buffer.take().unwrap(), // doesn't give anything back afterward, since FileHandle is dropped
         );
 
@@ -98,18 +96,18 @@ where
     }
 
     /// Reads all contents of the file from beginning to end and returns them.
-    pub fn read_file_complete<C: Chunker, H: Hasher>(
+    pub fn read_file_complete<C: Chunker>(
         &self,
-        handle: &FileHandle<C, H, Hash>,
+        handle: &FileHandle<C, Hash>,
     ) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read_complete(handle);
         Ok(self.storage.retrieve(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 
     /// Reads 1 MB of data from a file and returns it.
-    pub fn read_from_file<C: Chunker, H: Hasher>(
+    pub fn read_from_file<C: Chunker>(
         &mut self,
-        handle: &mut FileHandle<C, H, Hash>,
+        handle: &mut FileHandle<C, Hash>,
     ) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(hashes)?.concat())
@@ -118,14 +116,12 @@ where
 
 /// Used to open a file with the given chunker and hasher, with some other options.
 /// Chunker and hasher must be provided using [with_chunker][`Self::with_chunker`] and [with_hasher][`Self::with_hasher`].
-pub struct FileOpener<C, H, Hash>
+pub struct FileOpener<C, Hash>
 where
     C: Chunker,
-    H: Hasher,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     chunker: Option<C>,
-    hasher: Option<H>,
     create_new: bool,
     hash_phantom: PhantomData<Hash>,
 }
@@ -134,7 +130,6 @@ where
 #[derive(Debug)]
 pub enum OpenError {
     NoChunkerProvided,
-    NoHasherProvided,
     IoError(io::Error),
 }
 
@@ -145,10 +140,6 @@ impl Display for OpenError {
                 f,
                 "No chunker was provided. A chunker is necessary to write to the file."
             ),
-            OpenError::NoHasherProvided => write!(
-                f,
-                "No hasher was provided. A hasher is necessary to write to the file."
-            ),
             OpenError::IoError(io) => io.fmt(f),
         }
     }
@@ -158,7 +149,6 @@ impl Error for OpenError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             OpenError::NoChunkerProvided => None,
-            OpenError::NoHasherProvided => None,
             OpenError::IoError(io) => Some(io),
         }
     }
@@ -176,10 +166,9 @@ impl From<ErrorKind> for OpenError {
     }
 }
 
-impl<C, H, Hash> FileOpener<C, H, Hash>
+impl<C, Hash> FileOpener<C, Hash>
 where
     C: Chunker,
-    H: Hasher<Hash = Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     /// Initializes [FileOpener] with empty fields.
@@ -188,7 +177,6 @@ where
     pub fn new() -> Self {
         Self {
             chunker: None,
-            hasher: None,
             create_new: false,
             hash_phantom: Default::default(),
         }
@@ -200,12 +188,6 @@ where
         self
     }
 
-    /// Sets a [`hash`][Hasher] that will be used to hash written data.
-    pub fn with_hasher(mut self, hasher: H) -> Self {
-        self.hasher = Some(hasher);
-        self
-    }
-
     /// Sets a flag that indicates whether new file should be created, and if it exists, be overwritten.
     pub fn create_new(mut self, create_new: bool) -> Self {
         self.create_new = create_new;
@@ -214,28 +196,25 @@ where
 
     /// Opens a file in the given [FileSystem] and with the given name. Creates new file if the flag was set.
     /// Returns an [OpenError] if the `chunker` or `hasher` were not set.
-    pub fn open<B: Database<Hash>>(
+    pub fn open<B: Database<Hash>, H: Hasher<Hash = Hash>>(
         self,
-        fs: &mut FileSystem<B, Hash>,
+        fs: &mut FileSystem<B, H, Hash>,
         name: &str,
-    ) -> Result<FileHandle<C, H, Hash>, OpenError> {
+    ) -> Result<FileHandle<C, Hash>, OpenError> {
         let chunker = self.chunker.ok_or(OpenError::NoChunkerProvided)?;
-        let hasher = self.hasher.ok_or(OpenError::NoHasherProvided)?;
 
         if self.create_new {
-            fs.create_file(name.to_string(), chunker, hasher, self.create_new)
+            fs.create_file(name.to_string(), chunker, self.create_new)
                 .map_err(OpenError::IoError)
         } else {
-            fs.open_file(name, chunker, hasher)
-                .map_err(OpenError::IoError)
+            fs.open_file(name, chunker).map_err(OpenError::IoError)
         }
     }
 }
 
-impl<C, H, Hash> Default for FileOpener<C, H, Hash>
+impl<C, Hash> Default for FileOpener<C, Hash>
 where
     C: Chunker,
-    H: Hasher<Hash = Hash>,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     fn default() -> Self {

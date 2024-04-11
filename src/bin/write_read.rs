@@ -25,9 +25,9 @@ fn parametrized_write(
     println!("Current chunker: {:?}", chunker);
     println!("Current hasher: {:?}", hasher);
     let base = HashMapBase::default();
-    let mut fs = FileSystem::new(base);
+    let mut fs = FileSystem::new(base, hasher);
 
-    let mut handle = fs.create_file("file".to_string(), chunker, hasher, true)?;
+    let mut handle = fs.create_file("file".to_string(), chunker, true)?;
 
     const MB_COUNT: usize = 1024;
     let data = generate_data(1024);
@@ -49,7 +49,7 @@ fn parametrized_write(
         measurements.chunk_time().as_nanos(),
         speed
     );
-    let handle = fs.open_file("file", LeapChunker::default(), SimpleHasher)?;
+    let handle = fs.open_file("file", LeapChunker::default())?;
     let watch = Instant::now();
     let read = fs.read_file_complete(&handle)?;
     let read_time = watch.elapsed().as_secs_f64();

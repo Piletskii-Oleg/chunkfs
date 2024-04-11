@@ -60,17 +60,17 @@ where
     pub fn write<C: Chunker, H: Hasher<Hash = Hash>>(
         &mut self,
         data: &[u8],
-        worker: &mut StorageWriter<C, H, Hash>,
+        writer: &mut StorageWriter<C, H, Hash>,
     ) -> io::Result<SpansInfo<Hash>> {
-        worker.write(data, &mut self.base)
+        writer.write(data, &mut self.base)
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
     pub fn flush<C: Chunker, H: Hasher<Hash = Hash>>(
         &mut self,
-        worker: &mut StorageWriter<C, H, Hash>,
+        writer: &mut StorageWriter<C, H, Hash>,
     ) -> io::Result<SpansInfo<Hash>> {
-        worker.flush(&mut self.base)
+        writer.flush(&mut self.base)
     }
 
     /// Retrieves the data from the storage based on hashes of the data [`segments`][Segment],

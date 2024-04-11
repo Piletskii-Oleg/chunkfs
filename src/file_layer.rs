@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::{hash, io};
 
 use crate::chunker::Chunker;
-use crate::storage::{Hasher, SpansInfo};
+use crate::storage::SpansInfo;
 use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
@@ -29,10 +29,9 @@ pub struct FileLayer<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
 
 /// Handle for an open [`file`][File].
 #[derive(Debug)]
-pub struct FileHandle<C, H, Hash>
+pub struct FileHandle<C, Hash>
 where
     C: Chunker,
-    H: Hasher,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
     // can't make file_name a reference
@@ -43,7 +42,6 @@ where
     measurements: WriteMeasurements,
     // maybe not pub(crate) but something else? cannot think of anything
     pub(crate) chunker: C,
-    pub(crate) hasher: H,
     pub(crate) write_buffer: Option<Vec<u8>>,
     hash_phantom: PhantomData<Hash>,
 }
@@ -57,19 +55,17 @@ impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> File<Hash> {
     }
 }
 
-impl<C, H, Hash> FileHandle<C, H, Hash>
+impl<C, Hash> FileHandle<C, Hash>
 where
     C: Chunker,
-    H: Hasher,
     Hash: hash::Hash + Clone + Eq + PartialEq + Default,
 {
-    fn new(file: &File<Hash>, chunker: C, hasher: H) -> Self {
+    fn new(file: &File<Hash>, chunker: C) -> Self {
         FileHandle {
             file_name: file.name.clone(),
             offset: 0,
             measurements: Default::default(),
             chunker,
-            hasher,
             write_buffer: Some(vec![]),
             hash_phantom: Default::default(),
         }
@@ -88,13 +84,12 @@ where
 
 impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> FileLayer<Hash> {
     /// Creates a [`file`][File] and returns its [`FileHandle`]
-    pub fn create<C: Chunker, H: Hasher>(
+    pub fn create<C: Chunker>(
         &mut self,
         name: String,
         c: C,
-        h: H,
         create_new: bool,
-    ) -> io::Result<FileHandle<C, H, Hash>> {
+    ) -> io::Result<FileHandle<C, Hash>> {
         if !create_new && self.files.contains_key(&name) {
             return Err(ErrorKind::AlreadyExists.into());
         }
@@ -102,40 +97,29 @@ impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> FileLayer<Hash> {
         let file = File::new(name.clone());
         let _ = self.files.insert(name.clone(), file);
         let written_file = self.files.get(&name).unwrap();
-        Ok(FileHandle::new(written_file, c, h))
+        Ok(FileHandle::new(written_file, c))
     }
 
     /// Opens a [`file`][File] based on its name and returns its [`FileHandle`]
-    pub fn open<C: Chunker, H: Hasher>(
-        &self,
-        name: &str,
-        c: C,
-        h: H,
-    ) -> io::Result<FileHandle<C, H, Hash>> {
+    pub fn open<C: Chunker>(&self, name: &str, c: C) -> io::Result<FileHandle<C, Hash>> {
         self.files
             .get(name)
-            .map(|file| FileHandle::new(file, c, h))
+            .map(|file| FileHandle::new(file, c))
             .ok_or(ErrorKind::NotFound.into())
     }
 
     /// Returns reference to a file using [`FileHandle`] that corresponds to it.
-    fn find_file<C: Chunker, H: Hasher>(&self, handle: &FileHandle<C, H, Hash>) -> &File<Hash> {
+    fn find_file<C: Chunker>(&self, handle: &FileHandle<C, Hash>) -> &File<Hash> {
         self.files.get(&handle.file_name).unwrap()
     }
 
     /// Returns mutable reference to a file using [`FileHandle`] that corresponds to it.
-    fn find_file_mut<C: Chunker, H: Hasher>(
-        &mut self,
-        handle: &FileHandle<C, H, Hash>,
-    ) -> &mut File<Hash> {
+    fn find_file_mut<C: Chunker>(&mut self, handle: &FileHandle<C, Hash>) -> &mut File<Hash> {
         self.files.get_mut(&handle.file_name).unwrap()
     }
 
     /// Reads all hashes of the file, from beginning to end.
-    pub fn read_complete<C: Chunker, H: Hasher>(
-        &self,
-        handle: &FileHandle<C, H, Hash>,
-    ) -> Vec<Hash> {
+    pub fn read_complete<C: Chunker>(&self, handle: &FileHandle<C, Hash>) -> Vec<Hash> {
         let file = self.find_file(handle);
         file.spans
             .iter()
@@ -144,11 +128,7 @@ impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> FileLayer<Hash> {
     }
 
     /// Writes spans to the end of the file.
-    pub fn write<C: Chunker, H: Hasher>(
-        &mut self,
-        handle: &mut FileHandle<C, H, Hash>,
-        info: SpansInfo<Hash>,
-    ) {
+    pub fn write<C: Chunker>(&mut self, handle: &mut FileHandle<C, Hash>, info: SpansInfo<Hash>) {
         let file = self.find_file_mut(handle);
         for span in info.spans {
             file.spans.push(FileSpan {
@@ -163,7 +143,7 @@ impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> FileLayer<Hash> {
 
     /// Reads 1 MB of data from the open file and returns received hashes,
     /// starting point is based on the `FileHandle`'s offset.
-    pub fn read<C: Chunker, H: Hasher>(&self, handle: &mut FileHandle<C, H, Hash>) -> Vec<Hash> {
+    pub fn read<C: Chunker>(&self, handle: &mut FileHandle<C, Hash>) -> Vec<Hash> {
         let file = self.find_file(handle);
 
         let mut bytes_read = 0;
@@ -197,14 +177,12 @@ mod tests {
 
     use crate::chunker::FSChunker;
     use crate::file_layer::FileLayer;
-    use crate::hasher::SimpleHasher;
 
     #[test]
     fn file_layer_create_file() {
         let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
         let name = "hello".to_string();
-        fl.create(name.clone(), FSChunker::new(4096), SimpleHasher, true)
-            .unwrap();
+        fl.create(name.clone(), FSChunker::new(4096), true).unwrap();
 
         assert_eq!(fl.files.get(&name).unwrap().name, "hello");
         assert_eq!(fl.files.get(&name).unwrap().spans, vec![]);
@@ -213,20 +191,10 @@ mod tests {
     #[test]
     fn cant_create_two_files_with_same_name() {
         let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
-        fl.create(
-            "hello".to_string(),
-            FSChunker::new(4096),
-            SimpleHasher,
-            false,
-        )
-        .unwrap();
+        fl.create("hello".to_string(), FSChunker::new(4096), false)
+            .unwrap();
 
-        let result = fl.create(
-            "hello".to_string(),
-            FSChunker::new(4096),
-            SimpleHasher,
-            false,
-        );
+        let result = fl.create("hello".to_string(), FSChunker::new(4096), false);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind(), ErrorKind::AlreadyExists);
     }
