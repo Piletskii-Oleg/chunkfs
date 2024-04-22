@@ -1,9 +1,10 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::io;
 use std::io::ErrorKind;
-use std::{hash, io};
 
 use crate::file_layer::{FileHandle, FileLayer};
+use crate::hasher::ChunkHash;
 use crate::storage::{Chunker, Database, Hasher, Storage};
 use crate::WriteMeasurements;
 
@@ -12,7 +13,7 @@ pub struct FileSystem<B, H, Hash>
 where
     B: Database<Hash>,
     H: Hasher<Hash = Hash>,
-    Hash: hash::Hash + Clone + Eq + PartialEq + Default,
+    Hash: ChunkHash,
 {
     storage: Storage<B, H, Hash>,
     file_layer: FileLayer<Hash>,
@@ -22,7 +23,7 @@ impl<B, H, Hash> FileSystem<B, H, Hash>
 where
     B: Database<Hash>,
     H: Hasher<Hash = Hash>,
-    Hash: hash::Hash + Clone + Eq + PartialEq + Default,
+    Hash: ChunkHash,
 {
     /// Creates a file system with the given [`base`][Base].
     pub fn new(base: B, hasher: H) -> Self {
@@ -173,11 +174,7 @@ where
 
     /// Opens a file in the given [FileSystem] and with the given name. Creates new file if the flag was set.
     /// Returns an [OpenError] if the `chunker` or `hasher` were not set.
-    pub fn open<
-        B: Database<Hash>,
-        H: Hasher<Hash = Hash>,
-        Hash: hash::Hash + Clone + Eq + PartialEq + Default,
-    >(
+    pub fn open<B: Database<Hash>, H: Hasher<Hash = Hash>, Hash: ChunkHash>(
         self,
         fs: &mut FileSystem<B, H, Hash>,
         name: &str,

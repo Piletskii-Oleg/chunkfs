@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::io;
 use std::io::ErrorKind;
-use std::{hash, io};
+
+use crate::hasher::ChunkHash;
 
 /// Serves as base functionality for storing the actual data.
-pub trait Database<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
+pub trait Database<Hash: ChunkHash> {
     /// Saves given data to the underlying storage.
     fn save(&mut self, segments: Vec<Segment<Hash>>) -> io::Result<()>;
 
@@ -13,12 +15,12 @@ pub trait Database<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
 }
 
 /// A data segment with corresponding hash.
-pub struct Segment<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
+pub struct Segment<Hash: ChunkHash> {
     pub hash: Hash,
     pub data: Vec<u8>,
 }
 
-impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> Segment<Hash> {
+impl<Hash: ChunkHash> Segment<Hash> {
     pub fn new(hash: Hash, data: Vec<u8>) -> Self {
         Self { hash, data }
     }
@@ -26,11 +28,11 @@ impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> Segment<Hash> {
 
 /// Simple in-memory hashmap-based storage.
 #[derive(Default)]
-pub struct HashMapBase<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
+pub struct HashMapBase<Hash: ChunkHash> {
     segment_map: HashMap<Hash, Vec<u8>>, // hashmap<Hash, RefCell<Vec<u8>> for referencing
 }
 
-impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> Database<Hash> for HashMapBase<Hash> {
+impl<Hash: ChunkHash> Database<Hash> for HashMapBase<Hash> {
     fn save(&mut self, segments: Vec<Segment<Hash>>) -> io::Result<()> {
         for segment in segments {
             self.segment_map.entry(segment.hash).or_insert(segment.data);

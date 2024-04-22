@@ -1,28 +1,29 @@
 use std::collections::HashMap;
+use std::io;
 use std::io::ErrorKind;
-use std::{hash, io};
 
 use crate::chunker::Chunker;
+use crate::hasher::ChunkHash;
 use crate::storage::SpansInfo;
 use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
 #[derive(Debug, PartialEq, Eq, Default)]
-pub struct FileSpan<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
+pub struct FileSpan<Hash: ChunkHash> {
     hash: Hash,
     offset: usize,
 }
 
 /// A named file, doesn't store actual contents,
 /// but rather hashes for them.
-pub struct File<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
+pub struct File<Hash: ChunkHash> {
     name: String,
     spans: Vec<FileSpan<Hash>>,
 }
 
 /// Layer that contains all [`files`][File], accessed by their names.
 #[derive(Default)]
-pub struct FileLayer<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
+pub struct FileLayer<Hash: ChunkHash> {
     files: HashMap<String, File<Hash>>,
 }
 
@@ -42,7 +43,7 @@ where
     pub(crate) chunker: C,
 }
 
-impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> File<Hash> {
+impl<Hash: ChunkHash> File<Hash> {
     fn new(name: String) -> Self {
         File {
             name,
@@ -55,10 +56,7 @@ impl<C> FileHandle<C>
 where
     C: Chunker,
 {
-    fn new<Hash: hash::Hash + Clone + Eq + PartialEq + Default>(
-        file: &File<Hash>,
-        chunker: C,
-    ) -> Self {
+    fn new<Hash: ChunkHash>(file: &File<Hash>, chunker: C) -> Self {
         FileHandle {
             file_name: file.name.clone(),
             offset: 0,
@@ -78,7 +76,7 @@ where
     }
 }
 
-impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> FileLayer<Hash> {
+impl<Hash: ChunkHash> FileLayer<Hash> {
     /// Creates a [`file`][File] and returns its [`FileHandle`]
     pub fn create<C: Chunker>(
         &mut self,

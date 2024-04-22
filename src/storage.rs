@@ -1,7 +1,8 @@
+use std::io;
 use std::time::{Duration, Instant};
-use std::{hash, io};
 
 pub use crate::chunker::Chunker;
+use crate::hasher::ChunkHash;
 pub use crate::hasher::Hasher;
 pub use crate::storage::base::Database;
 use crate::storage::base::Segment;
@@ -11,19 +12,19 @@ pub mod base;
 
 /// Hashed span in a [`file`][crate::file_layer::File] with a certain length.
 #[derive(Debug)]
-pub struct Span<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
+pub struct Span<Hash: ChunkHash> {
     pub hash: Hash,
     pub length: usize,
 }
 
 /// Spans received after [Storage::write] or [Storage::flush], along with time measurements.
 #[derive(Debug)]
-pub struct SpansInfo<Hash: hash::Hash + Clone + Eq + PartialEq + Default> {
+pub struct SpansInfo<Hash: ChunkHash> {
     pub spans: Vec<Span<Hash>>,
     pub measurements: WriteMeasurements,
 }
 
-impl<Hash: hash::Hash + Clone + Eq + PartialEq + Default> Span<Hash> {
+impl<Hash: ChunkHash> Span<Hash> {
     pub fn new(hash: Hash, length: usize) -> Self {
         Self { hash, length }
     }
@@ -35,7 +36,7 @@ pub struct Storage<B, H, Hash>
 where
     B: Database<Hash>,
     H: Hasher<Hash = Hash>,
-    Hash: hash::Hash + Clone + Eq + PartialEq + Default,
+    Hash: ChunkHash,
 {
     base: B,
     hasher: H,
@@ -45,7 +46,7 @@ impl<B, H, Hash> Storage<B, H, Hash>
 where
     B: Database<Hash>,
     H: Hasher<Hash = Hash>,
-    Hash: hash::Hash + Clone + Eq + PartialEq + Default,
+    Hash: ChunkHash,
 {
     pub fn new(base: B, hasher: H) -> Self {
         Self { base, hasher }
