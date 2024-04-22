@@ -5,6 +5,8 @@ use chunkfs::chunker::{FSChunker, LeapChunker};
 use chunkfs::hasher::SimpleHasher;
 use chunkfs::{FileOpener, FileSystem};
 
+const MB: usize = 1024 * 1024;
+
 #[test]
 fn write_read_complete_test() {
     let mut fs = FileSystem::new(HashMapBase::default(), SimpleHasher);
@@ -12,8 +14,8 @@ fn write_read_complete_test() {
     let mut handle = fs
         .create_file("file".to_string(), LeapChunker::default(), true)
         .unwrap();
-    fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
-    fs.write_to_file(&mut handle, &[1; 1024 * 1024]).unwrap();
+    fs.write_to_file(&mut handle, &[1; MB]).unwrap();
+    fs.write_to_file(&mut handle, &[1; MB]).unwrap();
 
     let measurements = fs.close_file(handle).unwrap();
     println!("{:?}", measurements);
@@ -23,8 +25,8 @@ fn write_read_complete_test() {
         .open(&mut fs, "file")
         .unwrap();
     let read = fs.read_file_complete(&handle).unwrap();
-    assert_eq!(read.len(), 1024 * 1024 * 2);
-    assert_eq!(read, [1; 1024 * 1024 * 2]);
+    assert_eq!(read.len(), MB * 2);
+    assert_eq!(read, [1; MB * 2]);
 }
 
 #[test]
@@ -35,9 +37,9 @@ fn write_read_blocks_test() {
         .create_file("file".to_string(), FSChunker::new(4096), true)
         .unwrap();
 
-    let ones = vec![1; 1024 * 1024];
-    let twos = vec![2; 1024 * 1024];
-    let threes = vec![3; 1024 * 1024];
+    let ones = vec![1; MB];
+    let twos = vec![2; MB];
+    let threes = vec![3; MB];
     fs.write_to_file(&mut handle, &ones).unwrap();
     fs.write_to_file(&mut handle, &twos).unwrap();
     fs.write_to_file(&mut handle, &threes).unwrap();
@@ -57,6 +59,6 @@ fn two_file_handles_to_one_file() {
         .create_file("file".to_string(), LeapChunker::default(), true)
         .unwrap();
     let mut handle2 = fs.open_file("file", LeapChunker::default()).unwrap();
-    fs.write_to_file(&mut handle1, &[1; 1024 * 1024]).unwrap();
-    assert_eq!(fs.read_from_file(&mut handle2).unwrap().len(), 1024 * 1024)
+    fs.write_to_file(&mut handle1, &[1; MB]).unwrap();
+    assert_eq!(fs.read_from_file(&mut handle2).unwrap().len(), MB)
 }

@@ -18,6 +18,8 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
+const MB: usize = 1024 * 1024;
+
 fn parametrized_write(
     chunker: impl Chunker + Debug,
     hasher: impl Hasher + Debug,
@@ -30,10 +32,11 @@ fn parametrized_write(
     let mut handle = fs.create_file("file".to_string(), chunker, true)?;
 
     const MB_COUNT: usize = 1024;
-    let data = generate_data(1024);
+
+    let data = generate_data(MB_COUNT);
     let watch = Instant::now();
     for i in 0..MB_COUNT {
-        fs.write_to_file(&mut handle, &data[1024 * 1024 * i..1024 * 1024 * (i + 1)])?;
+        fs.write_to_file(&mut handle, &data[MB * i..MB * (i + 1)])?;
     }
     let write_time = watch.elapsed();
     let measurements = fs.close_file(handle)?;
@@ -59,13 +62,13 @@ fn parametrized_write(
         MB_COUNT as f64 / read_time
     );
 
-    assert_eq!(read.len(), 1024 * 1024 * MB_COUNT);
+    assert_eq!(read.len(), MB * MB_COUNT);
     assert_eq!(read, data);
 
     Ok(())
 }
 
-fn generate_data(size: usize) -> Vec<u8> {
-    let bytes = size * 1024 * 1024;
+fn generate_data(mb_size: usize) -> Vec<u8> {
+    let bytes = mb_size * MB;
     (0..bytes).map(|_| rand::random::<u8>()).collect()
 }
