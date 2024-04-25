@@ -37,7 +37,7 @@ pub trait Chunker {
     /// but had to be cut because no more data is available.
     ///
     /// Empty if the whole file was successfully chunked.
-    fn rest(&self) -> &[u8];
+    fn remainder(&self) -> &[u8];
 
     /// Returns an estimate amount of chunks that will be created once the algorithm runs through the whole
     /// data buffer. Used to pre-allocate the buffer with the required size so that allocation times are not counted
@@ -81,7 +81,7 @@ impl Chunker for FSChunker {
         chunks
     }
 
-    fn rest(&self) -> &[u8] {
+    fn remainder(&self) -> &[u8] {
         &self.rest
     }
 
@@ -107,7 +107,7 @@ impl Chunker for LeapChunker {
         chunks
     }
 
-    fn rest(&self) -> &[u8] {
+    fn remainder(&self) -> &[u8] {
         &self.rest
     }
 
