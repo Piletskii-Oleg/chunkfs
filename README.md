@@ -40,15 +40,15 @@ use chunkfs::hasher::SimpleHasher;
 
 fn main() -> io::Result<()> {
     let base = HashMapBase::default();
-    let mut fs = FileSystem::new(base);
+    let mut fs = FileSystem::new(base, SimpleHasher);
 
-    let mut file = fs.create_file("file".to_string(), LeapChunker::default(), SimpleHasher, true)?;
+    let mut file = fs.create_file("file".to_string(), LeapChunker::default(), true)?;
     let data = vec![10; 1024 * 1024];
     fs.write_to_file(&mut file, &data)?;
     let measurements = fs.close_file(file)?;
     println!("{:?}", measurements);
 
-    let mut file = fs.open_file("file", LeapChunker::default(), SimpleHasher)?;
+    let mut file = fs.open_file("file", LeapChunker::default())?;
     let read = fs.read_from_file(&mut file)?;
 
     assert_eq!(read.len(), 1024 * 1024);
