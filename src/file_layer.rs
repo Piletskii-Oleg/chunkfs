@@ -81,7 +81,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     pub fn create<C: Chunker>(
         &mut self,
         name: String,
-        c: C,
+        chunker: C,
         create_new: bool,
     ) -> io::Result<FileHandle<C>> {
         if !create_new && self.files.contains_key(&name) {
@@ -91,14 +91,14 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
         let file = File::new(name.clone());
         let _ = self.files.insert(name.clone(), file);
         let written_file = self.files.get(&name).unwrap();
-        Ok(FileHandle::new(written_file, c))
+        Ok(FileHandle::new(written_file, chunker))
     }
 
     /// Opens a [`file`][File] based on its name and returns its [`FileHandle`]
-    pub fn open<C: Chunker>(&self, name: &str, c: C) -> io::Result<FileHandle<C>> {
+    pub fn open<C: Chunker>(&self, name: &str, chunker: C) -> io::Result<FileHandle<C>> {
         self.files
             .get(name)
-            .map(|file| FileHandle::new(file, c))
+            .map(|file| FileHandle::new(file, chunker))
             .ok_or(ErrorKind::NotFound.into())
     }
 

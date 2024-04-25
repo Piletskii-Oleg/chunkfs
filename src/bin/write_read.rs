@@ -52,6 +52,7 @@ fn parametrized_write(
         measurements.chunk_time().as_nanos(),
         speed
     );
+
     let handle = fs.open_file("file", LeapChunker::default())?;
     let watch = Instant::now();
     let read = fs.read_file_complete(&handle)?;

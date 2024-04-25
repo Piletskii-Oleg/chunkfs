@@ -40,8 +40,8 @@ where
 
     /// Tries to open a file with the given name and returns its `FileHandle` if it exists,
     /// or `None`, if it doesn't.
-    pub fn open_file<C: Chunker>(&self, name: &str, c: C) -> io::Result<FileHandle<C>> {
-        self.file_layer.open(name, c)
+    pub fn open_file<C: Chunker>(&self, name: &str, chunker: C) -> io::Result<FileHandle<C>> {
+        self.file_layer.open(name, chunker)
     }
 
     /// Creates a file with the given name and returns its `FileHandle`.
@@ -49,10 +49,10 @@ where
     pub fn create_file<C: Chunker>(
         &mut self,
         name: String,
-        c: C,
+        chunker: C,
         create_new: bool,
     ) -> io::Result<FileHandle<C>> {
-        self.file_layer.create(name, c, create_new)
+        self.file_layer.create(name, chunker, create_new)
     }
 
     /// Writes given data to the file. Size of the slice must be exactly 1 MB.
