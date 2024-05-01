@@ -27,6 +27,13 @@ Add the following dependency to your `Cargo.toml`:
 chunkfs = { git = "https://github.com/Piletskii-Oleg/chunkfs.git" }
 ```
 
+To use provided chunkers and hashers, use the corresponding features:
+
+```toml
+[dependencies]
+chunkfs = { git = "https://github.com/Piletskii-Oleg/chunkfs.git", features = ["chunkers", "hashers"] }
+```
+
 ## Example
 
 ```rust
