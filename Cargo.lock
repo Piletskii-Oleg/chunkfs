@@ -35,7 +35,7 @@ dependencies = [
 [[package]]
 name = "chunking"
 version = "0.1.0"
-source = "git+https://github.com/Piletskii-Oleg/rust-chunking.git#6aab0fc0a3a002df99741fe69ad5e3bbb7930e1e"
+source = "git+https://github.com/Piletskii-Oleg/rust-chunking.git#95fe8a758c8cfdab5f980d540c801696ada634ec"
 dependencies = [
  "rand",
  "rand_distr",

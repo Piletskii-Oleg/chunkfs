@@ -5,18 +5,19 @@ use std::io;
 use std::time::Instant;
 
 use chunkfs::base::HashMapBase;
-use chunkfs::chunkers::{FSChunker, LeapChunker};
-use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
+use chunkfs::chunkers::{LeapChunker, SuperChunker};
+use chunkfs::hashers::Sha256Hasher;
 use chunkfs::Chunker;
 use chunkfs::FileSystem;
 use chunkfs::Hasher;
 
 fn main() -> io::Result<()> {
-    parametrized_write(FSChunker::new(16384), SimpleHasher)?;
-    parametrized_write(FSChunker::new(16384), Sha256Hasher::default())?;
+    //parametrized_write(FSChunker::new(16384), SimpleHasher)?;
+    //parametrized_write(FSChunker::new(16384), Sha256Hasher::default())?;
     println!();
-    parametrized_write(LeapChunker::default(), SimpleHasher)?;
-    parametrized_write(LeapChunker::default(), Sha256Hasher::default())?;
+    //parametrized_write(LeapChunker::default(), SimpleHasher)?;
+    //parametrized_write(LeapChunker::default(), Sha256Hasher::default())?;
+    parametrized_write(SuperChunker::new(), Sha256Hasher::default())?;
     Ok(())
 }
 
