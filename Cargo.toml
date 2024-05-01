@@ -18,3 +18,6 @@ sha2 = { version = "0.10", optional = true }
 [features]
 chunkers = ["chunking"]
 hashers = ["sha2"]
+
+[dev-dependencies]
+chunkfs = { path = ".", features = ["chunkers", "hashers"] }
