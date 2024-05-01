@@ -5,7 +5,7 @@ use std::io;
 use std::time::Instant;
 
 use chunkfs::base::HashMapBase;
-use chunkfs::chunkers::{LeapChunker, SuperChunker};
+use chunkfs::chunkers::{LeapChunker, RabinChunker};
 use chunkfs::hashers::Sha256Hasher;
 use chunkfs::Chunker;
 use chunkfs::FileSystem;
@@ -17,7 +17,7 @@ fn main() -> io::Result<()> {
     println!();
     //parametrized_write(LeapChunker::default(), SimpleHasher)?;
     //parametrized_write(LeapChunker::default(), Sha256Hasher::default())?;
-    parametrized_write(SuperChunker::new(), Sha256Hasher::default())?;
+    parametrized_write(RabinChunker::new(), Sha256Hasher::default())?;
     Ok(())
 }
 
