@@ -4,9 +4,10 @@ use std::io;
 use std::io::ErrorKind;
 
 use crate::file_layer::{FileHandle, FileLayer};
-use crate::hasher::ChunkHash;
-use crate::storage::{Chunker, Database, Hasher, Storage};
+use crate::storage::Storage;
+use crate::ChunkHash;
 use crate::WriteMeasurements;
+use crate::{Chunker, Database, Hasher};
 
 /// A file system provided by chunkfs.
 pub struct FileSystem<B, H, Hash>

@@ -5,9 +5,11 @@ use std::io;
 use std::time::Instant;
 
 use chunkfs::base::HashMapBase;
-use chunkfs::chunker::{Chunker, FSChunker, LeapChunker};
-use chunkfs::hasher::{Hasher, Sha256Hasher, SimpleHasher};
+use chunkfs::chunkers::{FSChunker, LeapChunker};
+use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
+use chunkfs::Chunker;
 use chunkfs::FileSystem;
+use chunkfs::Hasher;
 
 fn main() -> io::Result<()> {
     parametrized_write(FSChunker::new(16384), SimpleHasher)?;

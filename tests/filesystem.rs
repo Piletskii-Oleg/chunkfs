@@ -1,8 +1,8 @@
 extern crate chunkfs;
 
 use chunkfs::base::HashMapBase;
-use chunkfs::chunker::{FSChunker, LeapChunker};
-use chunkfs::hasher::SimpleHasher;
+use chunkfs::chunkers::{FSChunker, LeapChunker};
+use chunkfs::hashers::SimpleHasher;
 use chunkfs::{FileOpener, FileSystem};
 
 const MB: usize = 1024 * 1024;

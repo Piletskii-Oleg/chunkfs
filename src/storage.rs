@@ -1,14 +1,12 @@
 use std::io;
 use std::time::{Duration, Instant};
 
-pub use crate::chunker::Chunker;
-use crate::hasher::ChunkHash;
-pub use crate::hasher::Hasher;
-pub use crate::storage::base::Database;
-use crate::storage::base::Segment;
+use crate::ChunkHash;
+pub use crate::Chunker;
+pub use crate::Database;
+pub use crate::Hasher;
+use crate::Segment;
 use crate::{WriteMeasurements, SEG_SIZE};
-
-pub mod base;
 
 /// Hashed span in a [`file`][crate::file_layer::File] with a certain length.
 #[derive(Debug)]

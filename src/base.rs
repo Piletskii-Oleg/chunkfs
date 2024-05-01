@@ -2,29 +2,7 @@ use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
 
-use crate::hasher::ChunkHash;
-
-/// Serves as base functionality for storing the actual data.
-pub trait Database<Hash: ChunkHash> {
-    /// Saves given data to the underlying storage.
-    fn save(&mut self, segments: Vec<Segment<Hash>>) -> io::Result<()>;
-
-    /// Clones and returns the data corresponding to the given hashes, or returns Error(NotFound),
-    /// if some of the hashes were not found.
-    fn retrieve(&self, request: Vec<Hash>) -> io::Result<Vec<Vec<u8>>>;
-}
-
-/// A data segment with corresponding hash.
-pub struct Segment<Hash: ChunkHash> {
-    pub hash: Hash,
-    pub data: Vec<u8>,
-}
-
-impl<Hash: ChunkHash> Segment<Hash> {
-    pub fn new(hash: Hash, data: Vec<u8>) -> Self {
-        Self { hash, data }
-    }
-}
+use crate::{ChunkHash, Database, Segment};
 
 /// Simple in-memory hashmap-based storage.
 #[derive(Default)]

@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
 
-use crate::chunker::Chunker;
-use crate::hasher::ChunkHash;
 use crate::storage::SpansInfo;
+use crate::ChunkHash;
+use crate::Chunker;
 use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
@@ -169,7 +169,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
 mod tests {
     use std::io::ErrorKind;
 
-    use crate::chunker::FSChunker;
+    use crate::chunkers::FSChunker;
     use crate::file_layer::FileLayer;
 
     #[test]

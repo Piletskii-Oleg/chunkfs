@@ -16,7 +16,7 @@ pub trait Chunker {
 }
 ``` 
 
-Comments for each method are provided in [chunker.rs](src/chunker.rs).
+Comments for each method are provided in [lib.rs](src/lib.rs).
 
 ## Usage
 
