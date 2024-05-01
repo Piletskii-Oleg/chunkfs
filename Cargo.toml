@@ -1,15 +1,20 @@
+[workspace]
+members = ["runner"]
+resolver = "2"
+
 [package]
 name = "chunkfs"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-chunking = { git = "https://github.com/Piletskii-Oleg/rust-chunking.git" }
-rand = "0.8.5"
-sha2 = "0.10"
-
 [profile.release-deb]
 inherits = "release"
 debug = true
+
+[dependencies]
+chunking = { git = "https://github.com/Piletskii-Oleg/rust-chunking.git", optional = true }
+sha2 = { version = "0.10", optional = true }
+
+[features]
+chunkers = ["chunking"]
+hashers = ["sha2"]
