@@ -13,8 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build
-        run: cargo build --verbose
+        run: cargo build --features chunkers,hashers --verbose
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test --features chunkers,hashers --verbose
       - name: Run binary
-        run: cargo run --verbose --release
+        run: cargo run -p runner --verbose --release
