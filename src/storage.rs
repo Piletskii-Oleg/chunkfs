@@ -6,7 +6,7 @@ pub use crate::Chunker;
 pub use crate::Database;
 pub use crate::Hasher;
 use crate::Segment;
-use crate::{WriteMeasurements, SEG_SIZE};
+use crate::WriteMeasurements;
 
 /// Hashed span in a [`file`][crate::file_layer::File] with a certain length.
 #[derive(Debug)]
@@ -107,7 +107,7 @@ where
         data: &[u8],
         base: &mut B,
     ) -> io::Result<SpansInfo<H::Hash>> {
-        debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
+        //debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
         let mut buffer = self.chunker.remainder().to_vec();
         buffer.extend_from_slice(data);

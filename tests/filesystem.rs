@@ -52,6 +52,42 @@ fn write_read_blocks_test() {
     assert_eq!(fs.read_from_file(&mut handle).unwrap(), threes);
 }
 
+#[test]
+fn read_file_with_size_less_than_1mb() {
+    let mut fs = FileSystem::new(HashMapBase::default(), SimpleHasher);
+
+    let mut handle = fs
+        .create_file("file".to_string(), FSChunker::new(4096), true)
+        .unwrap();
+
+    let ones = vec![1; 10];
+    fs.write_to_file(&mut handle, &ones).unwrap();
+    let measurements = fs.close_file(handle).unwrap();
+    println!("{:?}", measurements);
+
+    let mut handle = fs.open_file("file", LeapChunker::default()).unwrap();
+    assert_eq!(fs.read_from_file(&mut handle).unwrap(), ones);
+}
+
+#[test]
+fn write_read_big_file_at_once() {
+    let mut fs = FileSystem::new(HashMapBase::default(), SimpleHasher);
+
+    let mut handle = fs
+        .create_file("file".to_string(), FSChunker::new(4096), true)
+        .unwrap();
+
+    let data = vec![1; 3 * MB + 50];
+    fs.write_to_file(&mut handle, &data).unwrap();
+    fs.close_file(handle).unwrap();
+
+    let mut handle = fs.open_file("file", LeapChunker::default()).unwrap();
+    assert_eq!(
+        fs.read_file_complete(&mut handle).unwrap().len(),
+        data.len()
+    );
+}
+
 //#[test]
 fn two_file_handles_to_one_file() {
     let mut fs = FileSystem::new(HashMapBase::default(), SimpleHasher);

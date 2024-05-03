@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io;
@@ -56,15 +57,29 @@ where
         self.file_layer.create(name, chunker, create_new)
     }
 
-    /// Writes given data to the file. Size of the slice must be exactly 1 MB.
+    /// Writes given data to the file.
     pub fn write_to_file<C: Chunker>(
         &mut self,
         handle: &mut FileHandle<C>,
         data: &[u8],
     ) -> io::Result<()> {
-        let spans = self.storage.write(data, &mut handle.chunker)?;
+        let mut current = 0;
+        let mut all_spans = vec![];
+        while current < data.len() {
+            let remaining = data.len() - current;
+            let to_process = min(1024 * 1024, remaining);
 
-        self.file_layer.write(handle, spans);
+            let spans = self
+                .storage
+                .write(&data[current..current + to_process], &mut handle.chunker)?;
+            all_spans.push(spans);
+
+            current += to_process;
+        }
+
+        for spans in all_spans {
+            self.file_layer.write(handle, spans);
+        }
 
         Ok(())
     }

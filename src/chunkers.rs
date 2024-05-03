@@ -65,10 +65,11 @@ impl Chunker for FSChunker {
             offset += self.chunk_size;
         }
 
-        let last_chunk = chunks.last().unwrap();
+        let last_chunk = chunks.pop().unwrap();
         if last_chunk.length() < self.chunk_size {
             self.rest = data[last_chunk.range()].to_vec();
         } else {
+            chunks.push(last_chunk);
             self.rest = vec![];
         }
         chunks
