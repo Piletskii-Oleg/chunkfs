@@ -6,8 +6,8 @@ use std::io::ErrorKind;
 
 use crate::file_layer::{FileHandle, FileLayer};
 use crate::storage::Storage;
-use crate::ChunkHash;
 use crate::WriteMeasurements;
+use crate::{ChunkHash, SEG_SIZE};
 use crate::{Chunker, Database, Hasher};
 
 /// A file system provided by chunkfs.
@@ -67,7 +67,7 @@ where
         let mut all_spans = vec![];
         while current < data.len() {
             let remaining = data.len() - current;
-            let to_process = min(1024 * 1024, remaining);
+            let to_process = min(SEG_SIZE, remaining);
 
             let spans = self
                 .storage

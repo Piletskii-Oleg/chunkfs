@@ -20,8 +20,6 @@ impl<Hash: ChunkHash> Database<Hash> for HashMapBase<Hash> {
 
     // vec<result>?
     fn retrieve(&self, request: Vec<Hash>) -> io::Result<Vec<Vec<u8>>> {
-        // cloning stored data instead of passing reference.
-        // is it how it is supposed to be or should we give a reference to underlying data?
         request
             .into_iter()
             .map(|hash| {

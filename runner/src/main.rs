@@ -17,8 +17,7 @@ fn main() -> io::Result<()> {
     println!();
     //parametrized_write(LeapChunker::default(), SimpleHasher)?;
     //parametrized_write(LeapChunker::default(), Sha256Hasher::default())?;
-    parametrized_write(RabinChunker::new(), Sha256Hasher::default())?;
-    Ok(())
+    parametrized_write(RabinChunker::new(), Sha256Hasher::default())
 }
 
 const MB: usize = 1024 * 1024;
@@ -36,12 +35,12 @@ fn parametrized_write(
 
     const MB_COUNT: usize = 1024;
 
-    let data = generate_data(MB_COUNT);
+    let data = std::fs::read("../rust-chunking/ubuntu.iso").unwrap();
+
     let watch = Instant::now();
-    for i in 0..MB_COUNT {
-        fs.write_to_file(&mut handle, &data[MB * i..MB * (i + 1)])?;
-    }
+    fs.write_to_file(&mut handle, &data)?;
     let write_time = watch.elapsed();
+
     let measurements = fs.close_file(handle)?;
     println!(
         "Written {MB_COUNT} MB in {:.3} seconds => write speed is {:.3} MB/s",
@@ -66,7 +65,7 @@ fn parametrized_write(
         MB_COUNT as f64 / read_time
     );
 
-    assert_eq!(read.len(), MB * MB_COUNT);
+    assert_eq!(read.len(), data.len());
     assert_eq!(read, data);
 
     Ok(())
