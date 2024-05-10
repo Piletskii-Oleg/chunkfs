@@ -1,6 +1,6 @@
+use std::{hash, io};
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
-use std::{hash, io};
 
 pub use system::{FileOpener, FileSystem, OpenError};
 
@@ -84,6 +84,18 @@ pub trait Hasher {
     fn hash(&mut self, data: &[u8]) -> Self::Hash;
 }
 
+/// A data segment with corresponding hash.
+pub struct Segment<Hash: ChunkHash> {
+    pub hash: Hash,
+    pub data: Vec<u8>,
+}
+
+pub enum SegmentData<FBCKey, SBCKey> {
+    Chunk(Vec<u8>),
+    FBChunk(Vec<FBCKey>),
+    SBChunk(Vec<SBCKey>),
+}
+
 /// Serves as base functionality for storing the actual data.
 pub trait Database<Hash: ChunkHash> {
     /// Saves given data to the underlying storage.
@@ -92,12 +104,6 @@ pub trait Database<Hash: ChunkHash> {
     /// Clones and returns the data corresponding to the given hashes, or returns Error(NotFound),
     /// if some of the hashes were not found.
     fn retrieve(&self, request: Vec<Hash>) -> io::Result<Vec<Vec<u8>>>;
-}
-
-/// A data segment with corresponding hash.
-pub struct Segment<Hash: ChunkHash> {
-    pub hash: Hash,
-    pub data: Vec<u8>,
 }
 
 impl<Hash: ChunkHash> Segment<Hash> {
