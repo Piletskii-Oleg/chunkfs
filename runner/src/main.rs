@@ -35,8 +35,7 @@ fn parametrized_write(
 
     const MB_COUNT: usize = 1024;
 
-    let data = std::fs::read("../rust-chunking/ubuntu.iso").unwrap();
-
+    let data = generate_data(MB_COUNT);
     let watch = Instant::now();
     fs.write_to_file(&mut handle, &data)?;
     let write_time = watch.elapsed();
