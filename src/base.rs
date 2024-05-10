@@ -3,6 +3,7 @@ use std::io;
 use std::io::ErrorKind;
 
 use crate::{ChunkHash, Database, Segment};
+use crate::map::Map;
 
 /// Simple in-memory hashmap-based storage.
 #[derive(Default)]
@@ -29,5 +30,19 @@ impl<Hash: ChunkHash> Database<Hash> for HashMapBase<Hash> {
                     .ok_or(ErrorKind::NotFound.into())
             })
             .collect()
+    }
+}
+
+impl<Hash: ChunkHash> Map<Hash, Vec<u8>> for HashMapBase<Hash> {
+    fn add(&mut self, key: Hash, value: Vec<u8>) {
+        self.segment_map.insert(key, value);
+    }
+
+    fn retrieve(&self, key: Hash) -> Option<Vec<u8>> {
+        self.segment_map.get(&key).cloned()
+    }
+
+    fn remove(&mut self, key: Hash) {
+        self.segment_map.remove(&key);
     }
 }
