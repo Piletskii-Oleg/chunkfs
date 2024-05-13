@@ -34,15 +34,16 @@ impl<Hash: ChunkHash> Database<Hash> for HashMapBase<Hash> {
 }
 
 impl<Hash: ChunkHash> Map<Hash, Vec<u8>> for HashMapBase<Hash> {
-    fn add(&mut self, key: Hash, value: Vec<u8>) {
+    fn insert(&mut self, key: Hash, value: Vec<u8>) -> io::Result<()> {
         self.segment_map.insert(key, value);
+        Ok(())
     }
 
-    fn retrieve(&self, key: Hash) -> Option<Vec<u8>> {
-        self.segment_map.get(&key).cloned()
+    fn get(&self, key: &Hash) -> Option<Vec<u8>> {
+        self.segment_map.get(key).cloned()
     }
 
-    fn remove(&mut self, key: Hash) {
-        self.segment_map.remove(&key);
+    fn remove(&mut self, key: &Hash) {
+        self.segment_map.remove(key);
     }
 }
