@@ -7,11 +7,11 @@ use crate::map::Map;
 
 /// Simple in-memory hashmap-based storage.
 #[derive(Default)]
-pub struct HashMapBase<Hash: ChunkHash> {
-    segment_map: HashMap<Hash, Vec<u8>>, // hashmap<Hash, RefCell<Vec<u8>> for referencing
+pub struct HashMapBase<Hash: ChunkHash, V> {
+    segment_map: HashMap<Hash, V>, // hashmap<Hash, RefCell<Vec<u8>> for referencing
 }
 
-impl<Hash: ChunkHash> Database<Hash> for HashMapBase<Hash> {
+impl<Hash: ChunkHash> Database<Hash> for HashMapBase<Hash, Vec<u8>> {
     fn save(&mut self, segments: Vec<Segment<Hash>>) -> io::Result<()> {
         for segment in segments {
             self.segment_map.entry(segment.hash).or_insert(segment.data);
@@ -33,17 +33,25 @@ impl<Hash: ChunkHash> Database<Hash> for HashMapBase<Hash> {
     }
 }
 
-impl<Hash: ChunkHash> Map<Hash, Vec<u8>> for HashMapBase<Hash> {
-    fn insert(&mut self, key: Hash, value: Vec<u8>) -> io::Result<()> {
+impl<Hash: ChunkHash, V: Clone> Map<Hash, V> for HashMapBase<Hash, V> {
+    fn insert(&mut self, key: Hash, value: V) -> io::Result<()> {
         self.segment_map.insert(key, value);
         Ok(())
     }
 
-    fn get(&self, key: &Hash) -> Option<Vec<u8>> {
-        self.segment_map.get(key).cloned()
+    fn get(&self, key: &Hash) -> io::Result<V> {
+        self.segment_map.get(key).cloned().ok_or(ErrorKind::NotFound.into())
     }
 
     fn remove(&mut self, key: &Hash) {
         self.segment_map.remove(key);
+    }
+}
+
+impl<Hash: ChunkHash, V> Iterator for HashMapBase<Hash, V> {
+    type Item = V;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
     }
 }
