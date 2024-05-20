@@ -1,6 +1,6 @@
-use std::{hash, io};
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
+use std::{hash, io};
 
 pub use system::{FileOpener, FileSystem, OpenError};
 
@@ -10,8 +10,8 @@ pub mod chunkers;
 pub mod hashers;
 
 pub mod base;
-mod map;
 mod file_layer;
+mod map;
 mod storage;
 mod system;
 

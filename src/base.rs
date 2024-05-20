@@ -1,9 +1,10 @@
+use std::collections::hash_map::IterMut;
 use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
 
+use crate::map::{Data, Map};
 use crate::{ChunkHash, Database, Segment};
-use crate::map::Map;
 
 /// Simple in-memory hashmap-based storage.
 #[derive(Default)]
@@ -55,7 +56,10 @@ impl<Hash: ChunkHash, V: Clone> Map<Hash, V> for HashMapBase<Hash, V> {
     }
 
     fn get(&self, key: &Hash) -> io::Result<V> {
-        self.segment_map.get(key).cloned().ok_or(ErrorKind::NotFound.into())
+        self.segment_map
+            .get(key)
+            .cloned()
+            .ok_or(ErrorKind::NotFound.into())
     }
 
     fn remove(&mut self, key: &Hash) {

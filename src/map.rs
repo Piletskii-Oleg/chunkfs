@@ -39,8 +39,9 @@ pub struct ScrubMeasurements {
     data_left: usize,
 }
 
-pub trait Scrub<Hash: ChunkHash, CDC: Map<Hash, Data> + Iterator<Item = Data> + ?Sized> {
-    fn scrub(&mut self, cdc_map: &mut CDC, target_map: &mut ChunkMap<Hash>) -> ScrubMeasurements;
+pub trait Scrub<Hash: ChunkHash> {
+
+    fn scrub(&mut self, cdc_map: &mut dyn Iterator<Item = (&Hash, &mut Data)>, target_map: &mut ChunkMap<Hash>) -> ScrubMeasurements;
 }
 
 enum MapType {
@@ -48,15 +49,18 @@ enum MapType {
     Target
 }
 
-pub struct ChunkStorage<Hash: ChunkHash, CDC: Map<Hash, Data> + Iterator<Item = Data> + ?Sized> {
-    cdc_map: Box<CDC>,
-    scrubber: Box<dyn Scrub<Hash, CDC>>,
+pub struct ChunkStorage<Hash: ChunkHash, CDC: Map<Hash, Data>> {
+    cdc_map: CDC,
+    scrubber: Box<dyn Scrub<Hash>>,
     target_map: ChunkMap<Hash>,
     correspondence_map: HashMap<Hash, MapType>
 }
 
-impl<Hash: ChunkHash, CDC: Map<Hash, Data> + Iterator<Item = Data>> ChunkStorage<Hash, CDC> {
-    pub fn new(cdc_map: Box<CDC>, target_map: ChunkMap<Hash>, scrubber: Box<dyn Scrub<Hash, CDC>>) -> Self {
+impl<Hash: ChunkHash, CDC> ChunkStorage<Hash, CDC>
+where
+    CDC: Map<Hash, Data>
+{
+    pub fn new(cdc_map: CDC, target_map: ChunkMap<Hash>, scrubber: Box<dyn Scrub<Hash>>) -> Self {
         Self {
             cdc_map,
             scrubber,
@@ -77,14 +81,14 @@ mod tests {
     use std::collections::HashMap;
     use crate::base::HashMapBase;
     use crate::ChunkHash;
-    use crate::map::{CDCMap, ChunkMap, ChunkStorage, Data, Map, Scrub, ScrubMeasurements};
+    use crate::map::{ChunkMap, ChunkStorage, Data, Scrub, ScrubMeasurements};
 
     struct DumbScrubber;
 
-    impl<Hash: ChunkHash, CDC: Map<Hash, Data> + Iterator<Item = Data> + ?Sized> Scrub<Hash, CDC> for DumbScrubber {
-        fn scrub(&mut self, cdc: &mut CDC, target: &mut ChunkMap<Hash>) -> ScrubMeasurements {
-            for chunk in cdc {
-                println!("1");
+    impl<Hash: ChunkHash> Scrub<Hash> for DumbScrubber {
+        fn scrub(&mut self, cdc: &mut dyn Iterator<Item = (&Hash, &mut Data)>, target: &mut ChunkMap<Hash>) -> ScrubMeasurements {
+            for (hash, chunk) in cdc {
+
             }
             ScrubMeasurements::default()
         }
@@ -93,13 +97,13 @@ mod tests {
     #[test]
     fn hashmap_works_as_cdc_map() {
         let mut chunk_storage: ChunkStorage<i32, _> = ChunkStorage {
-            cdc_map: Box::new(HashMap::default()),
+            cdc_map: HashMap::default(),
             scrubber: Box::new(DumbScrubber),
             target_map: Box::new(HashMapBase::default()),
             correspondence_map: HashMap::new()
         };
 
-        let measurements = chunk_storage.scrubber.scrub(&mut chunk_storage.cdc_map, &mut chunk_storage.target_map);
+        let measurements = chunk_storage.scrubber.scrub(&mut Box::new(&mut chunk_storage.cdc_map.iter_mut()), &mut chunk_storage.target_map);
         assert_eq!(measurements, ScrubMeasurements::default())
     }
 }
