@@ -1,9 +1,8 @@
-use std::collections::hash_map::IterMut;
 use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
 
-use crate::map::{Data, Map};
+use crate::map::Map;
 use crate::{ChunkHash, Database, Segment};
 
 /// Simple in-memory hashmap-based storage.
