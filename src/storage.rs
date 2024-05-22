@@ -40,10 +40,10 @@ impl<Hash: ChunkHash> Span<Hash> {
 
 pub struct ChunkStorage<H, Hash, CDC, K>
 where
-    H: Hasher,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    CDC: Database<H::Hash, DataContainer<K>>,
-    for<'a> &'a mut CDC: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>,
+    CDC: Database<Hash, DataContainer<K>>,
+    for<'a> &'a mut CDC: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
     cdc_map: CDC,
     scrubber: Box<dyn Scrub<Hash, K, CDC>>,
@@ -56,7 +56,7 @@ where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     CDC: Database<H::Hash, DataContainer<K>>,
-    for<'a> &'a mut CDC: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>,
+    for<'a> &'a mut CDC: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
     pub fn new(
         cdc_map: CDC,

@@ -16,7 +16,7 @@ where
     B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
     storage: ChunkStorage<H, Hash, B, K>,
     file_layer: FileLayer<Hash>,
@@ -27,7 +27,7 @@ where
     B: Database<Hash, DataContainer<i32>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<i32>)>,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<i32>)>,
 {
     pub fn new_cdc_only(base: B, hasher: H) -> Self {
         Self {
@@ -47,7 +47,7 @@ where
     B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
     /// Creates a file system with the given [`base`][Base].
     pub fn new(
