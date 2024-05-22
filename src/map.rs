@@ -42,12 +42,15 @@ pub struct ScrubMeasurements {
     data_left: usize,
 }
 
-pub trait Scrub<Hash: ChunkHash, K> {
-    fn scrub(
+pub trait Scrub<Hash: ChunkHash, K, CDC>
+where
+    CDC: Map<Hash, DataContainer<K>>,
+    for<'a> &'a mut CDC: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,{
+    fn scrub<'a>(
         &mut self,
-        cdc_map: &mut dyn Iterator<Item = (&Hash, &mut DataContainer<K>)>,
+        cdc_map: <&'a mut CDC as IntoIterator>::IntoIter,
         target_map: &mut TargetMap<K>,
-    ) -> ScrubMeasurements;
+    ) -> ScrubMeasurements where Hash: 'a, K: 'a;
 }
 
 pub struct ChunkStorage<H, Hash, CDC, K>
@@ -55,20 +58,23 @@ where
     H: Hasher,
     Hash: ChunkHash,
     CDC: Map<H::Hash, DataContainer<K>>,
+    for<'a> &'a mut CDC: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>
 {
     cdc_map: CDC,
-    scrubber: Box<dyn Scrub<Hash, K>>,
+    scrubber: Box<dyn Scrub<Hash, K, CDC>>,
     target_map: Box<dyn Map<K, Vec<u8>>>,
     hasher: H
 }
 
 impl<H, Hash, CDC, K> ChunkStorage<H, Hash, CDC, K>
 where
-    H: Hasher,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     CDC: Map<H::Hash, DataContainer<K>>,
+    for<'a> &'a mut CDC: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>,
+
 {
-    pub fn new(cdc_map: CDC, target_map: TargetMap<K>, scrubber: Box<dyn Scrub<Hash, K>>, hasher: H) -> Self {
+    pub fn new(cdc_map: CDC, target_map: TargetMap<K>, scrubber: Box<dyn Scrub<Hash, K, CDC>>, hasher: H) -> Self {
         Self {
             cdc_map,
             scrubber,
@@ -78,7 +84,7 @@ where
     }
 
     pub fn scrub(&mut self) -> ScrubMeasurements {
-        todo!()
+        self.scrubber.scrub((&mut self.cdc_map).into_iter(), &mut self.target_map)
     }
 
     /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
@@ -228,12 +234,16 @@ impl<K> Default for Data<K> {
 
 pub struct DumbScrubber;
 
-impl<Hash: ChunkHash, K> Scrub<Hash, K> for DumbScrubber {
-    fn scrub(
+impl<Hash: ChunkHash, K, B> Scrub<Hash, K, B> for DumbScrubber
+where
+    B: Map<Hash, DataContainer<K>>,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>
+{
+    fn scrub<'a>(
         &mut self,
-        cdc: &mut dyn Iterator<Item = (&Hash, &mut DataContainer<K>)>,
+        cdc: <&'a mut B as IntoIterator>::IntoIter,
         _target: &mut TargetMap<K>,
-    ) -> ScrubMeasurements {
+    ) -> ScrubMeasurements where Hash: 'a, K: 'a {
         for (_, data) in cdc {
             data.make_target(vec![]);
         }
@@ -246,7 +256,7 @@ impl<Hash: ChunkHash, K> Scrub<Hash, K> for DumbScrubber {
 mod tests {
     use crate::map::DumbScrubber;
 use crate::base::HashMapBase;
-    use crate::map::{ChunkStorage, Data, DataContainer, Scrub, ScrubMeasurements, TargetMap};
+    use crate::map::{ChunkStorage, Data, DataContainer, Scrub, ScrubMeasurements};
     use std::collections::HashMap;
     use crate::hashers::SimpleHasher;
 
@@ -263,7 +273,7 @@ use crate::base::HashMapBase;
         };
 
         let measurements = chunk_storage.scrubber.scrub(
-            &mut chunk_storage.cdc_map.iter_mut(),
+            chunk_storage.cdc_map.iter_mut(),
             &mut chunk_storage.target_map,
         );
         assert_eq!(measurements, ScrubMeasurements::default());

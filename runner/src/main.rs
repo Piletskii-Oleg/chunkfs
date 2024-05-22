@@ -1,5 +1,6 @@
 extern crate chunkfs;
 
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io;
 use std::time::Instant;
@@ -28,7 +29,7 @@ fn parametrized_write(
 ) -> io::Result<()> {
     println!("Current chunker: {:?}", chunker);
     println!("Current hasher: {:?}", hasher);
-    let base = HashMapBase::default();
+    let mut base = HashMap::default();
     let mut fs = FileSystem::new_cdc_only(base, hasher);
 
     let mut handle = fs.create_file("file".to_string(), chunker, true)?;

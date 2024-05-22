@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io;
@@ -17,6 +18,7 @@ where
     B: Map<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>
 {
     storage: ChunkStorage<H, Hash, B, K>,
     file_layer: FileLayer<Hash>,
@@ -27,10 +29,11 @@ impl<B, H, Hash> FileSystem<B, H, Hash, i32>
         B: Map<Hash, DataContainer<i32>>,
         H: Hasher<Hash = Hash>,
         Hash: ChunkHash,
+        for<'a> &'a mut B: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<i32>)>
 {
-    pub fn new_cdc_only(base: B, hasher: H) -> Self {
+    pub fn new_cdc_only(mut base: B, hasher: H) -> Self {
         Self {
-            storage: ChunkStorage::new(base, Box::new(HashMapBase::<i32, Vec<u8>>::default()), Box::new(DumbScrubber), hasher),
+            storage: ChunkStorage::new(base, Box::new(HashMap::<i32, Vec<u8>>::default()), Box::new(DumbScrubber), hasher),
             file_layer: Default::default(),
         }
     }
@@ -41,9 +44,10 @@ where
     B: Map<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>
 {
     /// Creates a file system with the given [`base`][Base].
-    pub fn new(base: B, target_map: TargetMap<K>, scrubber: Box<dyn Scrub<Hash, K>>, hasher: H) -> Self {
+    pub fn new(base: B, target_map: TargetMap<K>, scrubber: Box<dyn Scrub<Hash, K, B>>, hasher: H) -> Self {
         Self {
             storage: ChunkStorage::new(base, target_map, scrubber, hasher),
             file_layer: Default::default(),

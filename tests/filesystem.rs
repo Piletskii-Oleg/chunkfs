@@ -1,6 +1,6 @@
 extern crate chunkfs;
 
-use chunkfs::base::HashMapBase;
+use std::collections::HashMap;
 use chunkfs::chunkers::{FSChunker, LeapChunker};
 use chunkfs::hashers::SimpleHasher;
 use chunkfs::{FileSystem};
@@ -9,7 +9,7 @@ const MB: usize = 1024 * 1024;
 
 #[test]
 fn write_read_complete_test() {
-    let mut fs = FileSystem::new_cdc_only(HashMapBase::default(), SimpleHasher);
+    let mut fs = FileSystem::new_cdc_only(HashMap::default(), SimpleHasher);
 
     let mut handle = fs
         .create_file("file".to_string(), LeapChunker::default(), true)
@@ -28,7 +28,7 @@ fn write_read_complete_test() {
 
 #[test]
 fn write_read_blocks_test() {
-    let mut fs = FileSystem::new_cdc_only(HashMapBase::default(), SimpleHasher);
+    let mut fs = FileSystem::new_cdc_only(HashMap::default(), SimpleHasher);
 
     let mut handle = fs
         .create_file("file".to_string(), FSChunker::new(4096), true)
@@ -51,7 +51,7 @@ fn write_read_blocks_test() {
 
 #[test]
 fn read_file_with_size_less_than_1mb() {
-    let mut fs = FileSystem::new_cdc_only(HashMapBase::default(), SimpleHasher);
+    let mut fs = FileSystem::new_cdc_only(HashMap::default(), SimpleHasher);
 
     let mut handle = fs
         .create_file("file".to_string(), FSChunker::new(4096), true)
@@ -68,7 +68,7 @@ fn read_file_with_size_less_than_1mb() {
 
 #[test]
 fn write_read_big_file_at_once() {
-    let mut fs = FileSystem::new_cdc_only(HashMapBase::default(), SimpleHasher);
+    let mut fs = FileSystem::new_cdc_only(HashMap::default(), SimpleHasher);
 
     let mut handle = fs
         .create_file("file".to_string(), FSChunker::new(4096), true)
@@ -85,9 +85,15 @@ fn write_read_big_file_at_once() {
     );
 }
 
+#[test]
+fn scrub_compiles_on_cdc_map() {
+    let mut fs = FileSystem::new_cdc_only(HashMap::default(), SimpleHasher);
+    fs.scrub();
+}
+
 //#[test]
 fn two_file_handles_to_one_file() {
-    let mut fs = FileSystem::new_cdc_only(HashMapBase::default(), SimpleHasher);
+    let mut fs = FileSystem::new_cdc_only(HashMap::default(), SimpleHasher);
     let mut handle1 = fs
         .create_file("file".to_string(), LeapChunker::default(), true)
         .unwrap();
