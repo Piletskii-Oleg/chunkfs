@@ -1,8 +1,9 @@
+use std::collections::HashMap;
 use std::io;
+use std::io::ErrorKind;
+use crate::ChunkHash;
 
-pub type TargetMap<K> = Box<dyn Map<K, Vec<u8>>>;
-
-pub trait Map<K, V> {
+pub trait Database<K, V> {
     fn insert(&mut self, key: K, value: V) -> io::Result<()>;
 
     fn get(&self, key: &K) -> io::Result<V>;
@@ -18,5 +19,20 @@ pub trait Map<K, V> {
 
     fn retrieve(&self, keys: &[K]) -> io::Result<Vec<V>> {
         keys.iter().map(|key| self.get(key)).collect()
+    }
+}
+
+impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
+    fn insert(&mut self, key: Hash, value: V) -> io::Result<()> {
+        self.insert(key, value);
+        Ok(())
+    }
+
+    fn get(&self, key: &Hash) -> io::Result<V> {
+        self.get(key).cloned().ok_or(ErrorKind::NotFound.into())
+    }
+
+    fn remove(&mut self, key: &Hash) {
+        self.remove(key);
     }
 }

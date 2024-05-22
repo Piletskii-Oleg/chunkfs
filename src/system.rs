@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::io;
 
 use crate::file_layer::{FileHandle, FileLayer};
-use crate::map::{Map, TargetMap};
+use crate::map::{Database};
 use crate::scrub::{DumbScrubber, Scrub, ScrubMeasurements};
 use crate::storage::{ChunkStorage, DataContainer};
 use crate::WriteMeasurements;
@@ -13,7 +13,7 @@ use crate::{Chunker, Hasher};
 /// A file system provided by chunkfs.
 pub struct FileSystem<B, H, Hash, K>
 where
-    B: Map<Hash, DataContainer<K>>,
+    B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     for<'a> &'a mut B: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>,
@@ -24,7 +24,7 @@ where
 
 impl<B, H, Hash> FileSystem<B, H, Hash, i32>
 where
-    B: Map<Hash, DataContainer<i32>>,
+    B: Database<Hash, DataContainer<i32>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     for<'a> &'a mut B: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<i32>)>,
@@ -44,7 +44,7 @@ where
 
 impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
 where
-    B: Map<Hash, DataContainer<K>>,
+    B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     for<'a> &'a mut B: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>,
@@ -52,7 +52,7 @@ where
     /// Creates a file system with the given [`base`][Base].
     pub fn new(
         base: B,
-        target_map: TargetMap<K>,
+        target_map: Box<dyn Database<K, Vec<u8>>>,
         scrubber: Box<dyn Scrub<Hash, K, B>>,
         hasher: H,
     ) -> Self {

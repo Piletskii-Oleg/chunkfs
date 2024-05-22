@@ -2,7 +2,7 @@ use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
 
-use crate::map::{Map, TargetMap};
+use crate::map::{Database};
 use crate::scrub::{Scrub, ScrubMeasurements};
 use crate::ChunkHash;
 pub use crate::Chunker;
@@ -42,12 +42,12 @@ pub struct ChunkStorage<H, Hash, CDC, K>
 where
     H: Hasher,
     Hash: ChunkHash,
-    CDC: Map<H::Hash, DataContainer<K>>,
+    CDC: Database<H::Hash, DataContainer<K>>,
     for<'a> &'a mut CDC: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>,
 {
     cdc_map: CDC,
     scrubber: Box<dyn Scrub<Hash, K, CDC>>,
-    target_map: Box<dyn Map<K, Vec<u8>>>,
+    target_map: Box<dyn Database<K, Vec<u8>>>,
     hasher: H,
 }
 
@@ -55,12 +55,12 @@ impl<H, Hash, CDC, K> ChunkStorage<H, Hash, CDC, K>
 where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    CDC: Map<H::Hash, DataContainer<K>>,
+    CDC: Database<H::Hash, DataContainer<K>>,
     for<'a> &'a mut CDC: IntoIterator<Item = (&'a H::Hash, &'a mut DataContainer<K>)>,
 {
     pub fn new(
         cdc_map: CDC,
-        target_map: TargetMap<K>,
+        target_map: Box<dyn Database<K, Vec<u8>>>,
         scrubber: Box<dyn Scrub<Hash, K, CDC>>,
         hasher: H,
     ) -> Self {
@@ -137,7 +137,7 @@ where
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    fn write<K, B: Map<H::Hash, DataContainer<K>>>(
+    fn write<K, B: Database<H::Hash, DataContainer<K>>>(
         &mut self,
         data: &[u8],
         base: &mut B,
@@ -185,7 +185,7 @@ where
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
-    fn flush<K, B: Map<H::Hash, DataContainer<K>>>(
+    fn flush<K, B: Database<H::Hash, DataContainer<K>>>(
         &mut self,
         base: &mut B,
     ) -> io::Result<SpansInfo<H::Hash>> {
