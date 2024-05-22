@@ -99,13 +99,13 @@ where
     /// Retrieves the data from the storage based on hashes of the data [`segments`][Segment],
     /// or Error(NotFound) if some of the hashes were not present in the base.
     pub fn retrieve(&self, request: &[H::Hash]) -> io::Result<Vec<Vec<u8>>> {
-        let retrieved = self.cdc_map.retrieve(request)?;
+        let retrieved = self.cdc_map.get_multi(request)?;
 
         retrieved
             .into_iter()
             .map(|container| match container.0 {
                 Data::Chunk(chunk) => Ok(chunk),
-                Data::TargetChunk(keys) => Ok(self.target_map.retrieve(&keys)?.concat()),
+                Data::TargetChunk(keys) => Ok(self.target_map.get_multi(&keys)?.concat()),
             })
             .collect()
     }
@@ -176,7 +176,7 @@ where
             .into_iter()
             .map(|chunk| DataContainer(Data::Chunk(chunk)))
             .collect();
-        base.save(hashes, converted_chunks)?;
+        base.insert_multi(hashes, converted_chunks)?;
 
         Ok(SpansInfo {
             spans,

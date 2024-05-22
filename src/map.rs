@@ -10,14 +10,14 @@ pub trait Database<K, V> {
 
     fn remove(&mut self, key: &K);
 
-    fn save(&mut self, keys: Vec<K>, values: Vec<V>) -> io::Result<()> {
+    fn insert_multi(&mut self, keys: Vec<K>, values: Vec<V>) -> io::Result<()> {
         for (key, value) in keys.into_iter().zip(values) {
             self.insert(key, value)?;
         }
         Ok(())
     }
 
-    fn retrieve(&self, keys: &[K]) -> io::Result<Vec<V>> {
+    fn get_multi(&self, keys: &[K]) -> io::Result<Vec<V>> {
         keys.iter().map(|key| self.get(key)).collect()
     }
 }
