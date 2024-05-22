@@ -29,7 +29,7 @@ fn parametrized_write(
     println!("Current chunker: {:?}", chunker);
     println!("Current hasher: {:?}", hasher);
     let base = HashMapBase::default();
-    let mut fs = FileSystem::new(base, hasher);
+    let mut fs = FileSystem::new_cdc_only(base, hasher);
 
     let mut handle = fs.create_file("file".to_string(), chunker, true)?;
 

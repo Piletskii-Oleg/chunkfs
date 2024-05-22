@@ -8,7 +8,8 @@ use crate::file_layer::{FileHandle, FileLayer};
 use crate::WriteMeasurements;
 use crate::{ChunkHash, SEG_SIZE};
 use crate::{Chunker, Database, Hasher};
-use crate::map::{ChunkStorage, DataContainer, Map, Scrub, TargetMap};
+use crate::base::HashMapBase;
+use crate::map::{ChunkStorage, DataContainer, DumbScrubber, Map, Scrub, ScrubMeasurements, TargetMap};
 
 /// A file system provided by chunkfs.
 pub struct FileSystem<B, H, Hash, K>
@@ -19,6 +20,20 @@ where
 {
     storage: ChunkStorage<H, Hash, B, K>,
     file_layer: FileLayer<Hash>,
+}
+
+impl<B, H, Hash> FileSystem<B, H, Hash, i32>
+    where
+        B: Map<Hash, DataContainer<i32>>,
+        H: Hasher<Hash = Hash>,
+        Hash: ChunkHash,
+{
+    pub fn new_cdc_only(base: B, hasher: H) -> Self {
+        Self {
+            storage: ChunkStorage::new(base, Box::new(HashMapBase::<i32, Vec<u8>>::default()), Box::new(DumbScrubber), hasher),
+            file_layer: Default::default(),
+        }
+    }
 }
 
 impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
@@ -109,6 +124,10 @@ where
     ) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(&hashes)?.concat())
+    }
+
+    pub fn scrub(&mut self) -> ScrubMeasurements {
+        self.storage.scrub()
     }
 }
 

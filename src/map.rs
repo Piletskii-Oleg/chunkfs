@@ -2,10 +2,10 @@ use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
 
-use crate::{Chunker, ChunkHash, Database, Hasher, Segment, WriteMeasurements};
+use crate::{Chunker, ChunkHash, Database, Hasher, WriteMeasurements};
 use crate::storage::{Span, SpansInfo, Storage};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct DataContainer<K>(Data<K>);
 
 #[derive(Clone)]
@@ -58,7 +58,7 @@ where
 {
     cdc_map: CDC,
     scrubber: Box<dyn Scrub<Hash, K>>,
-    target_map: TargetMap<K>,
+    target_map: Box<dyn Map<K, Vec<u8>>>,
     hasher: H
 }
 
@@ -75,6 +75,10 @@ where
             target_map,
             hasher
         }
+    }
+
+    pub fn scrub(&mut self) -> ScrubMeasurements {
+        todo!()
     }
 
     /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
@@ -216,29 +220,35 @@ impl<K> std::fmt::Debug for Data<K> {
     }
 }
 
+impl<K> Default for Data<K> {
+    fn default() -> Self {
+        Self::Chunk(vec![])
+    }
+}
+
+pub struct DumbScrubber;
+
+impl<Hash: ChunkHash, K> Scrub<Hash, K> for DumbScrubber {
+    fn scrub(
+        &mut self,
+        cdc: &mut dyn Iterator<Item = (&Hash, &mut DataContainer<K>)>,
+        _target: &mut TargetMap<K>,
+    ) -> ScrubMeasurements {
+        for (_, data) in cdc {
+            data.make_target(vec![]);
+        }
+
+        ScrubMeasurements::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::base::HashMapBase;
+    use crate::map::DumbScrubber;
+use crate::base::HashMapBase;
     use crate::map::{ChunkStorage, Data, DataContainer, Scrub, ScrubMeasurements, TargetMap};
-    use crate::ChunkHash;
     use std::collections::HashMap;
     use crate::hashers::SimpleHasher;
-
-    struct DumbScrubber;
-
-    impl<Hash: ChunkHash, K> Scrub<Hash, K> for DumbScrubber {
-        fn scrub(
-            &mut self,
-            cdc: &mut dyn Iterator<Item = (&Hash, &mut DataContainer<K>)>,
-            _target: &mut TargetMap<K>,
-        ) -> ScrubMeasurements {
-            for (_, data) in cdc {
-                data.make_target(vec![]);
-            }
-
-            ScrubMeasurements::default()
-        }
-    }
 
     #[test]
     fn hashmap_works_as_cdc_map() {
