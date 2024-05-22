@@ -6,7 +6,7 @@ use crate::{Chunker, ChunkHash, Database, Hasher, Segment, WriteMeasurements};
 use crate::storage::{Span, SpansInfo, Storage};
 
 #[derive(Clone, Debug)]
-struct DataContainer<K>(Data<K>);
+pub struct DataContainer<K>(Data<K>);
 
 #[derive(Clone)]
 pub enum Data<K> {

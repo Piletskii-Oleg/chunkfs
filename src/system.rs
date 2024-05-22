@@ -5,32 +5,32 @@ use std::io;
 use std::io::ErrorKind;
 
 use crate::file_layer::{FileHandle, FileLayer};
-use crate::storage::Storage;
 use crate::WriteMeasurements;
 use crate::{ChunkHash, SEG_SIZE};
 use crate::{Chunker, Database, Hasher};
+use crate::map::{ChunkStorage, DataContainer, Map, Scrub, TargetMap};
 
 /// A file system provided by chunkfs.
-pub struct FileSystem<B, H, Hash>
+pub struct FileSystem<B, H, Hash, K>
 where
-    B: Database<Hash>,
+    B: Map<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
-    storage: Storage<B, H, Hash>,
+    storage: ChunkStorage<H, Hash, B, K>,
     file_layer: FileLayer<Hash>,
 }
 
-impl<B, H, Hash> FileSystem<B, H, Hash>
+impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
 where
-    B: Database<Hash>,
+    B: Map<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
     /// Creates a file system with the given [`base`][Base].
-    pub fn new(base: B, hasher: H) -> Self {
+    pub fn new(base: B, target_map: TargetMap<K>, scrubber: Box<dyn Scrub<Hash, K>>, hasher: H) -> Self {
         Self {
-            storage: Storage::new(base, hasher),
+            storage: ChunkStorage::new(base, target_map, scrubber, hasher),
             file_layer: Default::default(),
         }
     }
@@ -99,7 +99,7 @@ where
     /// Reads all contents of the file from beginning to end and returns them.
     pub fn read_file_complete<C: Chunker>(&self, handle: &FileHandle<C>) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read_complete(handle);
-        Ok(self.storage.retrieve(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
+        Ok(self.storage.retrieve(&hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 
     /// Reads 1 MB of data from a file and returns it.
@@ -108,7 +108,7 @@ where
         handle: &mut FileHandle<C>,
     ) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
-        Ok(self.storage.retrieve(hashes)?.concat())
+        Ok(self.storage.retrieve(&hashes)?.concat())
     }
 }
 
@@ -162,55 +162,55 @@ impl From<ErrorKind> for OpenError {
     }
 }
 
-impl<C> FileOpener<C>
-where
-    C: Chunker,
-{
-    /// Initializes [FileOpener] with empty fields.
-    /// `chunker` and `hasher` must be explicitly given using [with_chunker][`Self::with_chunker`]
-    /// and [with_hasher][`Self::with_hasher`].
-    pub fn new() -> Self {
-        Self {
-            chunker: None,
-            create_new: false,
-        }
-    }
+// impl<C> FileOpener<C>
+// where
+//     C: Chunker,
+// {
+//     /// Initializes [FileOpener] with empty fields.
+//     /// `chunker` and `hasher` must be explicitly given using [with_chunker][`Self::with_chunker`]
+//     /// and [with_hasher][`Self::with_hasher`].
+//     pub fn new() -> Self {
+//         Self {
+//             chunker: None,
+//             create_new: false,
+//         }
+//     }
+//
+//     /// Sets a [`chunker`][Chunker] that will be used to split the written data into chunks.
+//     pub fn with_chunker(mut self, chunker: C) -> Self {
+//         self.chunker = Some(chunker);
+//         self
+//     }
+//
+//     /// Sets a flag that indicates whether new file should be created, and if it exists, be overwritten.
+//     pub fn create_new(mut self, create_new: bool) -> Self {
+//         self.create_new = create_new;
+//         self
+//     }
+//
+//     /// Opens a file in the given [FileSystem] and with the given name. Creates new file if the flag was set.
+//     /// Returns an [OpenError] if the `chunker` or `hasher` were not set.
+//     pub fn open<K, B: Database<Hash>, H: Hasher<Hash = Hash>, Hash: ChunkHash>(
+//         self,
+//         fs: &mut FileSystem<B, H, Hash, K>,
+//         name: &str,
+//     ) -> Result<FileHandle<C>, OpenError> {
+//         let chunker = self.chunker.ok_or(OpenError::NoChunkerProvided)?;
+//
+//         if self.create_new {
+//             fs.create_file(name.to_string(), chunker, self.create_new)
+//                 .map_err(OpenError::IoError)
+//         } else {
+//             fs.open_file(name, chunker).map_err(OpenError::IoError)
+//         }
+//     }
+// }
 
-    /// Sets a [`chunker`][Chunker] that will be used to split the written data into chunks.
-    pub fn with_chunker(mut self, chunker: C) -> Self {
-        self.chunker = Some(chunker);
-        self
-    }
-
-    /// Sets a flag that indicates whether new file should be created, and if it exists, be overwritten.
-    pub fn create_new(mut self, create_new: bool) -> Self {
-        self.create_new = create_new;
-        self
-    }
-
-    /// Opens a file in the given [FileSystem] and with the given name. Creates new file if the flag was set.
-    /// Returns an [OpenError] if the `chunker` or `hasher` were not set.
-    pub fn open<B: Database<Hash>, H: Hasher<Hash = Hash>, Hash: ChunkHash>(
-        self,
-        fs: &mut FileSystem<B, H, Hash>,
-        name: &str,
-    ) -> Result<FileHandle<C>, OpenError> {
-        let chunker = self.chunker.ok_or(OpenError::NoChunkerProvided)?;
-
-        if self.create_new {
-            fs.create_file(name.to_string(), chunker, self.create_new)
-                .map_err(OpenError::IoError)
-        } else {
-            fs.open_file(name, chunker).map_err(OpenError::IoError)
-        }
-    }
-}
-
-impl<C> Default for FileOpener<C>
-where
-    C: Chunker,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// impl<C> Default for FileOpener<C>
+// where
+//     C: Chunker,
+// {
+//     fn default() -> Self {
+//         Self::new()
+//     }
+// }
