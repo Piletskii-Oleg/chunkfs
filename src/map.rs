@@ -100,7 +100,11 @@ where
     /// or Error(NotFound) if some of the hashes were not present in the base.
     pub fn retrieve(&self, request: &[H::Hash]) -> io::Result<Vec<Vec<u8>>> {
         let retrieved = self.cdc_map.retrieve(request)?;
-        todo!()
+
+        retrieved.into_iter().map(|container| match container.0 {
+            Data::Chunk(chunk) => Ok(chunk),
+            Data::TargetChunk(keys) => Ok(self.target_map.retrieve(&keys)?.concat())
+        }).collect()
     }
 }
 
