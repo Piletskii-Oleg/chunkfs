@@ -1,17 +1,17 @@
+use std::hash;
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
-use std::{hash, io};
 
-pub use system::{FileOpener, FileSystem, OpenError};
+pub use system::{FileSystem};
 
 #[cfg(feature = "chunkers")]
 pub mod chunkers;
 #[cfg(feature = "hashers")]
 pub mod hashers;
 
-pub mod base;
 mod file_layer;
 mod map;
+mod scrub;
 mod storage;
 mod system;
 
@@ -83,34 +83,6 @@ pub trait Hasher {
 
     /// Takes some `data` and returns its `hash`.
     fn hash(&mut self, data: &[u8]) -> Self::Hash;
-}
-
-/// A data segment with corresponding hash.
-pub struct Segment<Hash: ChunkHash> {
-    pub hash: Hash,
-    pub data: Vec<u8>,
-}
-
-pub enum SegmentData<FBCKey, SBCKey> {
-    Chunk(Vec<u8>),
-    FBChunk(Vec<FBCKey>),
-    SBChunk(Vec<SBCKey>),
-}
-
-/// Serves as base functionality for storing the actual data.
-pub trait Database<Hash: ChunkHash> {
-    /// Saves given data to the underlying storage.
-    fn save(&mut self, segments: Vec<Segment<Hash>>) -> io::Result<()>;
-
-    /// Clones and returns the data corresponding to the given hashes, or returns Error(NotFound),
-    /// if some of the hashes were not found.
-    fn retrieve(&self, request: Vec<Hash>) -> io::Result<Vec<Vec<u8>>>;
-}
-
-impl<Hash: ChunkHash> Segment<Hash> {
-    pub fn new(hash: Hash, data: Vec<u8>) -> Self {
-        Self { hash, data }
-    }
 }
 
 /// Measurements that are received after writing data to a file.

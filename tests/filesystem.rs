@@ -1,9 +1,9 @@
 extern crate chunkfs;
 
-use std::collections::HashMap;
 use chunkfs::chunkers::{FSChunker, LeapChunker};
 use chunkfs::hashers::SimpleHasher;
-use chunkfs::{FileSystem};
+use chunkfs::FileSystem;
+use std::collections::HashMap;
 
 const MB: usize = 1024 * 1024;
 
