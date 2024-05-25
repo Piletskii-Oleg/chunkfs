@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::io;
 
 use crate::file_layer::{FileHandle, FileLayer};
-use crate::map::{Database};
+use crate::map::Database;
 use crate::scrub::{DumbScrubber, Scrub, ScrubMeasurements};
 use crate::storage::{ChunkStorage, DataContainer};
 use crate::WriteMeasurements;

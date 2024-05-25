@@ -1,4 +1,4 @@
-use crate::map::{Database};
+use crate::map::Database;
 use crate::storage::DataContainer;
 use crate::ChunkHash;
 use std::time::Duration;
@@ -30,9 +30,9 @@ use std::time::Duration;
 /// such that it would be possible to get the initial chunk simply by iterating over the stored `Vec<Key>`, retrieving the corresponding data chunks
 /// and concatenating them.
 pub trait Scrub<Hash: ChunkHash, B, Key>
-    where
-        B: Database<Hash, DataContainer<Key>>,
-        for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<Key>)>,
+where
+    B: Database<Hash, DataContainer<Key>>,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<Key>)>,
 {
     /// # How to implement
     /// To iterate over the underlying chunks, `database.into_iter()` should be used.
@@ -67,9 +67,9 @@ pub trait Scrub<Hash: ChunkHash, B, Key>
         database: &mut B,
         target_map: &mut Box<dyn Database<Key, Vec<u8>>>,
     ) -> ScrubMeasurements
-        where
-            Hash: 'a,
-            Key: 'a;
+    where
+        Hash: 'a,
+        Key: 'a;
 }
 
 /// Measurements made by the scrubber.

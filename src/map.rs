@@ -1,7 +1,7 @@
+use crate::ChunkHash;
 use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
-use crate::ChunkHash;
 
 /// Serves as base functionality for storing the actual data.
 pub trait Database<K, V> {

@@ -2,10 +2,10 @@ use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
 
-use crate::map::{Database};
+use crate::map::Database;
 use crate::scrub::{Scrub, ScrubMeasurements};
-use crate::{Chunker, ChunkHash, Hasher};
 use crate::WriteMeasurements;
+use crate::{ChunkHash, Chunker, Hasher};
 
 /// Container for storage data.
 #[derive(Clone, Debug, Default)]
@@ -74,7 +74,8 @@ where
     }
 
     pub fn scrub(&mut self) -> ScrubMeasurements {
-        self.scrubber.scrub(&mut self.database, &mut self.target_map)
+        self.scrubber
+            .scrub(&mut self.database, &mut self.target_map)
     }
 
     /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
@@ -278,10 +279,9 @@ mod tests {
             hasher: SimpleHasher,
         };
 
-        let measurements = chunk_storage.scrubber.scrub(
-            &mut chunk_storage.database,
-            &mut chunk_storage.target_map,
-        );
+        let measurements = chunk_storage
+            .scrubber
+            .scrub(&mut chunk_storage.database, &mut chunk_storage.target_map);
         assert_eq!(measurements, ScrubMeasurements::default());
 
         println!("{:?}", chunk_storage.database)
