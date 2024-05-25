@@ -47,7 +47,7 @@ where
     for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
     database: B,
-    scrubber: Box<dyn Scrub<Hash, K, B>>,
+    scrubber: Box<dyn Scrub<Hash, B, K>>,
     target_map: Box<dyn Database<K, Vec<u8>>>,
     hasher: H,
 }
@@ -62,7 +62,7 @@ where
     pub fn new(
         database: B,
         target_map: Box<dyn Database<K, Vec<u8>>>,
-        scrubber: Box<dyn Scrub<Hash, K, B>>,
+        scrubber: Box<dyn Scrub<Hash, B, K>>,
         hasher: H,
     ) -> Self {
         Self {

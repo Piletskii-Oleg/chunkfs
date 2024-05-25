@@ -10,10 +10,10 @@ use std::time::Duration;
 /// or a collection of target keys, using which the original chunk could be restored.
 ///
 /// The basic idea behind the scrubber is that it takes chunks from `database` via an iterator and
-/// processes them, e.g., splits, or simply transfers them to the `target_map`, leaving only a collection of `K` in the initial [DataContainer].
+/// processes them, e.g., splits, or simply transfers them to the `target_map`, leaving only a collection of `Keys` in the initial [DataContainer].
 ///
 /// After moving the data from `database` to `target_map`, we should be able to have access to it via the `database`.
-/// Therefore, after moving, we should leave a `Vec<K>` in place of the source chunk. It is done via [DataContainer::make_target] method.
+/// Therefore, after moving, we should leave a `Vec<Key>` in place of the source chunk. It is done via [DataContainer::make_target] method.
 /// Not using it will lead to either not getting any benefits from the algorithm, or to being unable to access the initial chunk anymore, if it was deleted.
 ///
 /// # Arguments
@@ -21,18 +21,18 @@ use std::time::Duration;
 /// 1. A CDC [Database], which contains `Hash`-[`DataContainer`] pairs. To access the underlying data in the container,
 /// [DataContainer::extract] or [DataContainer::extract_mut] should be used.
 ///
-/// 2. A target map, which contains `K`-`Vec<u8>` pairs, where `K` is a generic value determined by the implementation.
+/// 2. A target map, which contains `Key`-`Vec<u8>` pairs, where `Key` is a generic value determined by the implementation.
 /// The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
 /// the target map implements [Database] trait.
 ///
 /// # Guarantees
 /// It is guaranteed that after a chunk has been processed by the scrubber, the keys, stored in the [DataContainer], will be in the linear order,
-/// such that it would be possible to get the initial chunk simply by iterating over the stored `Vec<K>`, retrieving the corresponding data chunks
+/// such that it would be possible to get the initial chunk simply by iterating over the stored `Vec<Key>`, retrieving the corresponding data chunks
 /// and concatenating them.
-pub trait Scrub<Hash: ChunkHash, K, B>
+pub trait Scrub<Hash: ChunkHash, B, Key>
     where
-        B: Database<Hash, DataContainer<K>>,
-        for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
+        B: Database<Hash, DataContainer<Key>>,
+        for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<Key>)>,
 {
     /// # CDC Database
     /// We should be able to iterate over the `database` to process all chunks we had stored before.
@@ -44,7 +44,7 @@ pub trait Scrub<Hash: ChunkHash, K, B>
     /// 1. A CDC [Database], which contains `Hash`-[`DataContainer`] pairs. The [DataContainer] stores either a CDC chunk, that is, a `Vec<u8>`,
     /// or a collection of target keys, using which the original chunk could be restored.
     ///
-    /// 2. A target map, which contains `K`-`Vec<u8>` pairs, where `K` is a generic key determined by the map implementation.
+    /// 2. A target map, which contains `Key`-`Vec<u8>` pairs, where `Key` is a generic key determined by the map implementation.
     /// The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
     /// the target map implements [Database] trait.
     ///
@@ -60,16 +60,16 @@ pub trait Scrub<Hash: ChunkHash, K, B>
     ///
     /// # Guarantees
     /// It is guaranteed that after a chunk has been processed by the scrubber, the keys, stored in the [DataContainer], will be in the linear order,
-    /// such that it would be possible to get the initial chunk simply by iterating over the stored `Vec<K>`, retrieving the corresponding data chunks
+    /// such that it would be possible to get the initial chunk simply by iterating over the stored `Vec<Key>`, retrieving the corresponding data chunks
     /// and concatenating them.
     fn scrub<'a>(
         &mut self,
         database: &mut B,
-        target_map: &mut Box<dyn Database<K, Vec<u8>>>,
+        target_map: &mut Box<dyn Database<Key, Vec<u8>>>,
     ) -> ScrubMeasurements
         where
             Hash: 'a,
-            K: 'a;
+            Key: 'a;
 }
 
 /// Measurements made by the scrubber.
@@ -89,19 +89,19 @@ pub struct ScrubMeasurements {
 
 pub struct DumbScrubber;
 
-impl<Hash: ChunkHash, K, B> Scrub<Hash, K, B> for DumbScrubber
+impl<Hash: ChunkHash, B, Key> Scrub<Hash, B, Key> for DumbScrubber
 where
-    B: Database<Hash, DataContainer<K>>,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
+    B: Database<Hash, DataContainer<Key>>,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<Key>)>,
 {
     fn scrub<'a>(
         &mut self,
         _database: &mut B,
-        _target: &mut Box<dyn Database<K, Vec<u8>>>,
+        _target: &mut Box<dyn Database<Key, Vec<u8>>>,
     ) -> ScrubMeasurements
     where
         Hash: 'a,
-        K: 'a,
+        Key: 'a,
     {
         ScrubMeasurements::default()
     }

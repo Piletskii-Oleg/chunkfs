@@ -53,7 +53,7 @@ where
     pub fn new(
         database: B,
         target_map: Box<dyn Database<K, Vec<u8>>>,
-        scrubber: Box<dyn Scrub<Hash, K, B>>,
+        scrubber: Box<dyn Scrub<Hash, B, K>>,
         hasher: H,
     ) -> Self {
         Self {
