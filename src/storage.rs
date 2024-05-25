@@ -4,9 +4,7 @@ use std::time::{Duration, Instant};
 
 use crate::map::{Database};
 use crate::scrub::{Scrub, ScrubMeasurements};
-use crate::ChunkHash;
-pub use crate::Chunker;
-pub use crate::Hasher;
+use crate::{Chunker, ChunkHash, Hasher};
 use crate::WriteMeasurements;
 
 #[derive(Clone, Debug, Default)]
