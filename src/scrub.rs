@@ -26,7 +26,7 @@ use std::time::Duration;
 /// the target map implements [Database] trait.
 ///
 /// # Guarantees
-/// It is guaranteed that after a chunk has been processed by the scrubber, the keys, stored in the [DataContainer], will be in the linear order,
+/// It is guaranteed that after a chunk has been processed by the scrubber, the keys stored in the [DataContainer], will be in the linear order,
 /// such that it would be possible to get the initial chunk simply by iterating over the stored `Vec<Key>`, retrieving the corresponding data chunks
 /// and concatenating them.
 pub trait Scrub<Hash: ChunkHash, B, Key>
@@ -34,10 +34,15 @@ pub trait Scrub<Hash: ChunkHash, B, Key>
         B: Database<Hash, DataContainer<Key>>,
         for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<Key>)>,
 {
-    /// # CDC Database
-    /// We should be able to iterate over the `database` to process all chunks we had stored before.
-    /// The [IntoIterator] trait should be implemented for `database`, but it should not be a big concern, because the structures that are to be implemented
-    /// for the algorithm are some `target_map` database and the scrubber itself. `database` should be considered a given entity.
+    /// # How to implement
+    /// To iterate over the underlying chunks, `database.into_iter()` should be used.
+    /// It will automatically yield pairs, which consist of `&mut Hash` and `&mut DataContainer`. To access the underlying data in the container,
+    /// [DataContainer::extract] or [DataContainer::extract_mut] should be used.
+    ///
+    /// If the chunk is suitable for being transferred to the `target_map`, it should NOT be deleted, but instead be replaced by the `target_map`'s keys,
+    /// using which the original chunk can be restored. This is accomplished by the [DataContainer::make_target] method.
+    ///
+    /// It should also gather information to return the [measurements][ScrubMeasurements].
     ///
     /// # Arguments
     /// The method, besides `&mut self`, takes two other arguments:
@@ -48,18 +53,13 @@ pub trait Scrub<Hash: ChunkHash, B, Key>
     /// The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
     /// the target map implements [Database] trait.
     ///
-    /// # How to implement
-    /// To iterate over the underlying chunks, [database.into_iter()][IntoIterator::into_iter] should be used.
-    /// It will automatically yield pairs, which consist of `&mut Hash` and `&mut DataContainer`. To access the underlying data in the container,
-    /// [DataContainer::extract] or [DataContainer::extract_mut] should be used.
-    ///
-    /// If the chunk is suitable for being transferred to the `target_map`, it should NOT be deleted, but instead be replaced by the `target_map`'s keys,
-    /// using which the original chunk can be restored. This is accomplished by the [DataContainer::make_target] method.
-    ///
-    /// It should also gather information to return the [measurements][ScrubMeasurements].
+    /// # CDC Database
+    /// We should be able to iterate over the `database` to process all chunks we had stored before.
+    /// The [IntoIterator] trait should be implemented for `database`, but it should not be a big concern, because the structures that are to be implemented
+    /// for the algorithm are some `target_map` database and the scrubber itself. `database` should be considered a given entity.
     ///
     /// # Guarantees
-    /// It is guaranteed that after a chunk has been processed by the scrubber, the keys, stored in the [DataContainer], will be in the linear order,
+    /// It is guaranteed that after a chunk has been processed by the scrubber, the keys stored in the [DataContainer], will be in the linear order,
     /// such that it would be possible to get the initial chunk simply by iterating over the stored `Vec<Key>`, retrieving the corresponding data chunks
     /// and concatenating them.
     fn scrub<'a>(
