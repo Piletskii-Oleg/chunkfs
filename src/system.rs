@@ -51,13 +51,13 @@ where
 {
     /// Creates a file system with the given [`base`][Base].
     pub fn new(
-        base: B,
+        database: B,
         target_map: Box<dyn Database<K, Vec<u8>>>,
         scrubber: Box<dyn Scrub<Hash, K, B>>,
         hasher: H,
     ) -> Self {
         Self {
-            storage: ChunkStorage::new(base, target_map, scrubber, hasher),
+            storage: ChunkStorage::new(database, target_map, scrubber, hasher),
             file_layer: Default::default(),
         }
     }

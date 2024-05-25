@@ -7,9 +7,11 @@ use crate::scrub::{Scrub, ScrubMeasurements};
 use crate::{Chunker, ChunkHash, Hasher};
 use crate::WriteMeasurements;
 
+/// Container for storage data.
 #[derive(Clone, Debug, Default)]
 pub struct DataContainer<K>(Data<K>);
 
+/// Contains either a chunk produced by [Chunker], or a vector of target keys, using which the initial chunk can be restored.
 #[derive(Clone)]
 pub enum Data<K> {
     Chunk(Vec<u8>),
@@ -36,34 +38,35 @@ impl<Hash: ChunkHash> Span<Hash> {
     }
 }
 
-pub struct ChunkStorage<H, Hash, CDC, K>
+/// Underlying storage for the actual stored data.
+pub struct ChunkStorage<H, Hash, B, K>
 where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    CDC: Database<Hash, DataContainer<K>>,
-    for<'a> &'a mut CDC: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
+    B: Database<Hash, DataContainer<K>>,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
-    cdc_map: CDC,
-    scrubber: Box<dyn Scrub<Hash, K, CDC>>,
+    database: B,
+    scrubber: Box<dyn Scrub<Hash, K, B>>,
     target_map: Box<dyn Database<K, Vec<u8>>>,
     hasher: H,
 }
 
-impl<H, Hash, CDC, K> ChunkStorage<H, Hash, CDC, K>
+impl<H, Hash, B, K> ChunkStorage<H, Hash, B, K>
 where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    CDC: Database<H::Hash, DataContainer<K>>,
-    for<'a> &'a mut CDC: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
+    B: Database<H::Hash, DataContainer<K>>,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
     pub fn new(
-        cdc_map: CDC,
+        database: B,
         target_map: Box<dyn Database<K, Vec<u8>>>,
-        scrubber: Box<dyn Scrub<Hash, K, CDC>>,
+        scrubber: Box<dyn Scrub<Hash, K, B>>,
         hasher: H,
     ) -> Self {
         Self {
-            cdc_map,
+            database,
             scrubber,
             target_map,
             hasher,
@@ -71,8 +74,7 @@ where
     }
 
     pub fn scrub(&mut self) -> ScrubMeasurements {
-        self.scrubber
-            .scrub((&mut self.cdc_map).into_iter(), &mut self.target_map)
+        self.scrubber.scrub(&mut self.database, &mut self.target_map)
     }
 
     /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
@@ -85,19 +87,19 @@ where
         chunker: &mut C,
     ) -> io::Result<SpansInfo<H::Hash>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
-        writer.write(data, &mut self.cdc_map)
+        writer.write(data, &mut self.database)
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
     pub fn flush<C: Chunker>(&mut self, chunker: &mut C) -> io::Result<SpansInfo<H::Hash>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
-        writer.flush(&mut self.cdc_map)
+        writer.flush(&mut self.database)
     }
 
     /// Retrieves the data from the storage based on hashes of the data [`segments`][Segment],
     /// or Error(NotFound) if some of the hashes were not present in the base.
     pub fn retrieve(&self, request: &[H::Hash]) -> io::Result<Vec<Vec<u8>>> {
-        let retrieved = self.cdc_map.get_multi(request)?;
+        let retrieved = self.database.get_multi(request)?;
 
         retrieved
             .into_iter()
@@ -172,9 +174,10 @@ where
 
         let converted_chunks = chunks
             .into_iter()
-            .map(|chunk| DataContainer(Data::Chunk(chunk)))
-            .collect();
-        base.insert_multi(hashes, converted_chunks)?;
+            .map(|chunk| DataContainer(Data::Chunk(chunk)));
+
+        let pairs = hashes.into_iter().zip(converted_chunks).collect(); // we allocate memory for (K, V) pairs, which is not really required
+        base.insert_multi(pairs)?;
 
         Ok(SpansInfo {
             spans,
@@ -212,14 +215,22 @@ where
 }
 
 impl<K> DataContainer<K> {
+    /// Replaces stored data with the vector of target map keys, using which the chunk can be restored.
+    ///
+    /// # Guarantees
+    /// It is guaranteed that the keys will be in the linear order,
+    /// such that it would be possible to get the initial chunk simply by iterating over the stored `Vec<K>`, retrieving the corresponding data chunks
+    /// and concatenating them.
     pub fn make_target(&mut self, keys: Vec<K>) {
         self.0 = Data::TargetChunk(keys);
     }
 
+    /// Gets the reference to the data stored in the container.
     pub fn extract(&self) -> &Data<K> {
         &self.0
     }
 
+    /// Gets the mutable reference to the data stored in the container.
     pub fn extract_mut(&mut self) -> &mut Data<K> {
         &mut self.0
     }
@@ -261,18 +272,18 @@ mod tests {
         map.insert(vec![1], DataContainer::from(vec![]));
         map.insert(vec![2], DataContainer::from(vec![]));
         let mut chunk_storage = ChunkStorage {
-            cdc_map: map,
+            database: map,
             scrubber: Box::new(DumbScrubber),
             target_map: Box::new(HashMap::default()),
             hasher: SimpleHasher,
         };
 
         let measurements = chunk_storage.scrubber.scrub(
-            chunk_storage.cdc_map.iter_mut(),
+            &mut chunk_storage.database,
             &mut chunk_storage.target_map,
         );
         assert_eq!(measurements, ScrubMeasurements::default());
 
-        println!("{:?}", chunk_storage.cdc_map)
+        println!("{:?}", chunk_storage.database)
     }
 }

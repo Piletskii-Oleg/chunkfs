@@ -18,6 +18,9 @@ mod scrub;
 mod storage;
 mod system;
 
+/// Trait for a CDC hash, combining several other traits: [hash::Hash], [Clone], [Eq], [PartialEq], [Default].
+///
+/// Auto-implemented for those structures that implement all the listed traits.
 pub trait ChunkHash: hash::Hash + Clone + Eq + PartialEq + Default {}
 
 impl<T: hash::Hash + Clone + Eq + PartialEq + Default> ChunkHash for T {}
@@ -82,6 +85,7 @@ pub trait Chunker {
 
 /// Functionality for an object that hashes the input.
 pub trait Hasher {
+    /// Hash type that would be returned by the hasher.
     type Hash: ChunkHash;
 
     /// Takes some `data` and returns its `hash`.
