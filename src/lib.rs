@@ -3,6 +3,8 @@ use std::ops::{Add, AddAssign};
 use std::time::Duration;
 
 pub use system::{FileSystem};
+pub use map::Database;
+pub use scrub::{Scrub, ScrubMeasurements};
 
 #[cfg(feature = "chunkers")]
 pub mod chunkers;
