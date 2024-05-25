@@ -217,6 +217,14 @@ impl<K> DataContainer<K> {
     pub fn make_target(&mut self, keys: Vec<K>) {
         self.0 = Data::TargetChunk(keys);
     }
+
+    pub fn extract(&self) -> &Data<K> {
+        &self.0
+    }
+
+    pub fn extract_mut(&mut self) -> &mut Data<K> {
+        &mut self.0
+    }
 }
 
 impl<K> From<Vec<u8>> for DataContainer<K> {
