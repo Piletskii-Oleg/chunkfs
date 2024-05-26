@@ -1,9 +1,10 @@
 extern crate chunkfs;
 
+use std::collections::HashMap;
+
 use chunkfs::chunkers::{FSChunker, LeapChunker};
 use chunkfs::hashers::SimpleHasher;
 use chunkfs::FileSystem;
-use std::collections::HashMap;
 
 const MB: usize = 1024 * 1024;
 
@@ -88,7 +89,7 @@ fn write_read_big_file_at_once() {
 #[test]
 fn scrub_compiles_on_cdc_map() {
     let mut fs = FileSystem::new_cdc_only(HashMap::default(), SimpleHasher);
-    fs.scrub();
+    let _ = fs.scrub();
 }
 
 //#[test]

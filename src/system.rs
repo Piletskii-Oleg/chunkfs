@@ -138,7 +138,7 @@ where
         Ok(self.storage.retrieve(&hashes)?.concat())
     }
 
-    pub fn scrub(&mut self) -> ScrubMeasurements {
+    pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
         self.storage.scrub()
     }
 }

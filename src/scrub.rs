@@ -1,7 +1,9 @@
+use std::io;
+use std::time::Duration;
+
 use crate::map::Database;
 use crate::storage::DataContainer;
 use crate::ChunkHash;
-use std::time::Duration;
 
 /// Basic functionality for implementing algorithms which process chunks provided by the [Chunker][crate::Chunker].
 ///
@@ -66,7 +68,7 @@ where
         &mut self,
         database: &mut B,
         target_map: &mut Box<dyn Database<Key, Vec<u8>>>,
-    ) -> ScrubMeasurements
+    ) -> io::Result<ScrubMeasurements>
     where
         Hash: 'a,
         Key: 'a;
@@ -98,11 +100,11 @@ where
         &mut self,
         _database: &mut B,
         _target: &mut Box<dyn Database<Key, Vec<u8>>>,
-    ) -> ScrubMeasurements
+    ) -> io::Result<ScrubMeasurements>
     where
         Hash: 'a,
         Key: 'a,
     {
-        ScrubMeasurements::default()
+        Ok(ScrubMeasurements::default())
     }
 }

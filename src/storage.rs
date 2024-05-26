@@ -73,7 +73,7 @@ where
         }
     }
 
-    pub fn scrub(&mut self) -> ScrubMeasurements {
+    pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
         self.scrubber
             .scrub(&mut self.database, &mut self.target_map)
     }
@@ -260,12 +260,13 @@ impl<K> Default for Data<K> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::hashers::SimpleHasher;
     use crate::scrub::DumbScrubber;
     use crate::storage::ChunkStorage;
     use crate::storage::DataContainer;
     use crate::storage::ScrubMeasurements;
-    use std::collections::HashMap;
 
     #[test]
     fn hashmap_works_as_cdc_map() {
@@ -281,7 +282,8 @@ mod tests {
 
         let measurements = chunk_storage
             .scrubber
-            .scrub(&mut chunk_storage.database, &mut chunk_storage.target_map);
+            .scrub(&mut chunk_storage.database, &mut chunk_storage.target_map)
+            .unwrap();
         assert_eq!(measurements, ScrubMeasurements::default());
 
         println!("{:?}", chunk_storage.database)
