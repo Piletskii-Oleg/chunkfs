@@ -104,9 +104,15 @@ where
 
         retrieved
             .into_iter()
-            .map(|container| match container.0 {
-                Data::Chunk(chunk) => Ok(chunk),
-                Data::TargetChunk(keys) => Ok(self.target_map.get_multi(&keys)?.concat()),
+            .map(|container| match &container.0 {
+                Data::Chunk(chunk) => Ok(chunk.clone()),
+                Data::TargetChunk(keys) => Ok(self
+                    .target_map
+                    .get_multi(&keys)?
+                    .into_iter()
+                    .cloned()
+                    .flatten()
+                    .collect()),
             })
             .collect()
     }

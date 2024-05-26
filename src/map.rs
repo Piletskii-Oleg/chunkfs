@@ -1,7 +1,8 @@
-use crate::ChunkHash;
 use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
+
+use crate::ChunkHash;
 
 /// Serves as base functionality for storing the actual data.
 pub trait Database<K, V> {
@@ -13,7 +14,7 @@ pub trait Database<K, V> {
     /// # Errors
     /// Should return [ErrorKind::NotFound], if the key-value pair
     /// was not found in the storage.
-    fn get(&self, key: &K) -> io::Result<V>;
+    fn get(&self, key: &K) -> io::Result<&V>;
 
     /// Removes a key-value pair from the storage, given the key.
     fn remove(&mut self, key: &K);
@@ -27,7 +28,7 @@ pub trait Database<K, V> {
     }
 
     /// Retrieves a multitude of values, corresponding to the keys, in the correct order.
-    fn get_multi(&self, keys: &[K]) -> io::Result<Vec<V>> {
+    fn get_multi(&self, keys: &[K]) -> io::Result<Vec<&V>> {
         keys.iter().map(|key| self.get(key)).collect()
     }
 }
@@ -38,8 +39,8 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
         Ok(())
     }
 
-    fn get(&self, key: &Hash) -> io::Result<V> {
-        self.get(key).cloned().ok_or(ErrorKind::NotFound.into())
+    fn get(&self, key: &Hash) -> io::Result<&V> {
+        self.get(key).ok_or(ErrorKind::NotFound.into())
     }
 
     fn remove(&mut self, key: &Hash) {
