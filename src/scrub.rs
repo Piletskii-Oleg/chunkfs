@@ -5,7 +5,8 @@ use crate::map::Database;
 use crate::storage::DataContainer;
 use crate::ChunkHash;
 
-/// Basic functionality for implementing algorithms which process chunks provided by the [Chunker][crate::Chunker].
+/// Basic functionality for implementing algorithms which process chunks provided by the [Chunker][crate::Chunker]. The implementations should encapsulate
+/// all algorithm logic inside themselves and not delegate it to `database` or `target_map`.
 ///
 /// # Method of use
 /// The `database` stores [DataContainers][DataContainer], which are either a CDC chunk, that is, a `Vec<u8>`,
@@ -25,7 +26,7 @@ use crate::ChunkHash;
 ///
 /// 2. A target map, which contains `Key`-`Vec<u8>` pairs, where `Key` is a generic value determined by the implementation.
 /// The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
-/// the target map implements [Database] trait.
+/// the target map implements [Database] trait. It should only be used for storage purposes and not contain any algorithm logic.
 ///
 /// # Guarantees
 /// It is guaranteed that after a chunk has been processed by the scrubber, the keys stored in the [DataContainer], will be in the linear order,
@@ -53,12 +54,12 @@ where
     ///
     /// 2. A target map, which contains `Key`-`Vec<u8>` pairs, where `Key` is a generic key determined by the map implementation.
     /// The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
-    /// the target map implements [Database] trait.
+    /// the target map implements [Database] trait. It should only be used for storage purposes and not contain any algorithm logic.
     ///
     /// # CDC Database
     /// We should be able to iterate over the `database` to process all chunks we had stored before.
-    /// The [IntoIterator] trait should be implemented for `database`, but it should not be a big concern, because the structures that are to be implemented
-    /// for the algorithm are some `target_map` database and the scrubber itself. `database` should be considered a given entity.
+    /// The [IntoIterator] trait should be implemented for `database`, but it should not be a big concern, because the only structure that should be implemented
+    /// for the algorithm is the scrubber itself. `database` should be considered a given entity, along with the `target_map`.
     ///
     /// # Guarantees
     /// It is guaranteed that after a chunk has been processed by the scrubber, the keys stored in the [DataContainer], will be in the linear order,
