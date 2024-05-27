@@ -31,6 +31,9 @@ pub trait Database<K, V> {
     fn get_multi(&self, keys: &[K]) -> io::Result<Vec<&V>> {
         keys.iter().map(|key| self.get(key)).collect()
     }
+
+    /// Returns `true` if the database contains a value for the specified key.
+    fn contains(&self, key: &K) -> bool;
 }
 
 impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
@@ -45,5 +48,9 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
 
     fn remove(&mut self, key: &Hash) {
         self.remove(key);
+    }
+
+    fn contains(&self, key: &Hash) -> bool {
+        self.contains_key(key)
     }
 }
