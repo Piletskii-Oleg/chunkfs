@@ -110,7 +110,6 @@ where
                     .target_map
                     .get_multi(&keys)?
                     .into_iter()
-                    .cloned()
                     .flatten()
                     .collect()),
             })

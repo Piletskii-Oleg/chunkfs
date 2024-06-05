@@ -28,7 +28,7 @@ pub trait Database<K, V> {
     }
 
     /// Retrieves a multitude of values, corresponding to the keys, in the correct order.
-    fn get_multi(&self, keys: &[K]) -> io::Result<Vec<&V>> {
+    fn get_multi(&self, keys: &[K]) -> io::Result<Vec<V>> {
         keys.iter().map(|key| self.get(key)).collect()
     }
 
@@ -42,8 +42,8 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
         Ok(())
     }
 
-    fn get(&self, key: &Hash) -> io::Result<&V> {
-        self.get(key).ok_or(ErrorKind::NotFound.into())
+    fn get(&self, key: &Hash) -> io::Result<V> {
+        self.get(key).ok_or(ErrorKind::NotFound.into()).cloned()
     }
 
     fn remove(&mut self, key: &Hash) {
