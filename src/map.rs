@@ -9,12 +9,12 @@ pub trait Database<K, V> {
     /// Inserts a key-value pair into the storage.
     fn insert(&mut self, key: K, value: V) -> io::Result<()>;
 
-    /// Retrieves a value by a given key.
+    /// Retrieves a value by a given key. Note that it returns a value, not a reference.
     ///
     /// # Errors
     /// Should return [ErrorKind::NotFound], if the key-value pair
     /// was not found in the storage.
-    fn get(&self, key: &K) -> io::Result<&V>;
+    fn get(&self, key: &K) -> io::Result<V>;
 
     /// Removes a key-value pair from the storage, given the key.
     fn remove(&mut self, key: &K);

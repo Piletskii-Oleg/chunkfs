@@ -223,11 +223,6 @@ where
 
 impl<K> DataContainer<K> {
     /// Replaces stored data with the vector of target map keys, using which the chunk can be restored.
-    ///
-    /// # Guarantees
-    /// It is guaranteed that the keys will be in the linear order,
-    /// such that it would be possible to get the initial chunk simply by iterating over the stored `Vec<K>`, retrieving the corresponding data chunks
-    /// and concatenating them.
     pub fn make_target(&mut self, keys: Vec<K>) {
         self.0 = Data::TargetChunk(keys);
     }
