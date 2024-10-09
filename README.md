@@ -14,9 +14,11 @@ pub trait Chunker {
     fn rest(&self) -> &[u8];
     fn estimate_chunk_count(&self, data: &[u8]) -> usize;
 }
-``` 
-
+```
 Comments for each method are provided in [lib.rs](src/lib.rs).
+
+## Chunking optimization methods (SBC, FBC)
+To implement algorithms that optimize 
 
 ## Usage
 
@@ -34,20 +36,21 @@ To use provided chunkers and hashers, use the corresponding features:
 chunkfs = { git = "https://github.com/Piletskii-Oleg/chunkfs.git", features = ["chunkers", "hashers"] }
 ```
 
-## Example
+## Examples
 
+Getting chunker measurements:
 ```rust
 extern crate chunkfs;
 
 use std::io;
 use chunkfs::base::HashMapBase;
-use chunkfs::chunker::LeapChunker;
+use chunkfs::chunkers::LeapChunker;
 use chunkfs::FileSystem;
-use chunkfs::hasher::SimpleHasher;
+use chunkfs::hashers::SimpleHasher;
 
 fn main() -> io::Result<()> {
     let base = HashMapBase::default();
-    let mut fs = FileSystem::new(base, SimpleHasher);
+    let mut fs = FileSystem::new_cdc_only(base, SimpleHasher);
 
     let mut file = fs.create_file("file".to_string(), LeapChunker::default(), true)?;
     let data = vec![10; 1024 * 1024];
@@ -61,6 +64,25 @@ fn main() -> io::Result<()> {
     assert_eq!(read.len(), 1024 * 1024);
     assert_eq!(read, data);
 
+    Ok(())
+}
+```
+Getting Scrubber measurements:
+```rust
+fn main() -> io::Result<()> {
+    let mut fs = FileSystem::new(HashMap::default(), Box::new(SBCMap::new()), Box::new(SBCScrubber::new()), Sha256Hasher::default());
+
+    let mut handle = fs.create_file("file".to_string(), SuperChunker::new(), true)?;
+    let data = vec![10; 1024 * 1024 * 10];
+    fs.write_to_file(&mut handle, &data)?;
+    fs.close_file(handle)?;
+
+    let scrub_measurements = fs.scrub().unwrap();
+    println!("{scrub_measurements:?}");
+
+    let mut handle = fs.open_file("file", SuperChunker::new())?;
+    let read = fs.read_file_complete(&mut handle)?;
+    assert_eq!(read, data);
     Ok(())
 }
 ```

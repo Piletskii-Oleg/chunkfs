@@ -21,3 +21,9 @@ hashers = ["sha2"]
 
 [dev-dependencies]
 chunkfs = { path = ".", features = ["chunkers", "hashers"] }
+criterion = "0.5"
+sha3 = "0.10"
+
+[[bench]]
+name = "write_read"
+harness = false

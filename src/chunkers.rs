@@ -193,3 +193,42 @@ impl Debug for UltraChunker {
         write!(f, "UltraCDC")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use chunking::ultra;
+    use sha3::{Sha3_256, Digest};
+    use crate::Chunker;
+    use crate::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker};
+
+    #[test]
+    #[ignore]
+    fn dedup_ratio() {
+        let mut chunker = RabinChunker::new();
+
+        let data = std::fs::read("linux.tar").unwrap();
+
+        let chunks = chunker.chunk_data(&data, vec![]);
+
+        let chunks_len = chunks.len();
+        let chunks_map: HashMap<_, usize> = HashMap::from_iter(chunks.into_iter().map(|chunk| {
+            let hash = Sha3_256::digest(&data[chunk.offset..chunk.offset + chunk.length]);
+            let mut res = vec![0u8; hash.len()];
+            res.copy_from_slice(&hash);
+            (res, chunk.length)
+        }));
+        println!(
+            "Chunk ratio (unique / all): {} / {} = {:.3}",
+            chunks_map.len(),
+            chunks_len,
+            chunks_map.len() as f64 / chunks_len as f64
+        );
+        println!(
+            "Data size ratio: {} / {} = {:.3}",
+            chunks_map.iter().map(|(_, &b)| b).sum::<usize>(),
+            data.len(),
+            chunks_map.iter().map(|(_, &b)| b).sum::<usize>() as f64 / data.len() as f64
+        );
+    }
+}
