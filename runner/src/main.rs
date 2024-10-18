@@ -1,18 +1,18 @@
 extern crate chunkfs;
 
-use sbc_algorithm::SBCScrubber;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::io;
-use std::ops::{Add, AddAssign};
+use std::ops::AddAssign;
 use std::time::{Duration, Instant};
-use sbc_algorithm::SBCMap;
 
-use chunkfs::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker};
+use chunkfs::chunkers::{LeapChunker, SuperChunker};
 use chunkfs::hashers::Sha256Hasher;
 use chunkfs::Chunker;
 use chunkfs::FileSystem;
 use chunkfs::Hasher;
+use sbc_algorithm::SBCMap;
+use sbc_algorithm::SBCScrubber;
 
 #[derive(Default)]
 struct Measurements {
@@ -23,7 +23,12 @@ struct Measurements {
 }
 
 fn main() -> io::Result<()> {
-    let mut fs = FileSystem::new(HashMap::default(), Box::new(SBCMap::new()), Box::new(SBCScrubber::new()), Sha256Hasher::default());
+    let mut fs = FileSystem::new(
+        HashMap::default(),
+        Box::new(SBCMap::new()),
+        Box::new(SBCScrubber::new()),
+        Sha256Hasher::default(),
+    );
 
     let mut handle = fs.create_file("file".to_string(), SuperChunker::new(), true)?;
     let data = generate_data(10);
