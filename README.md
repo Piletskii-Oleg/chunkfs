@@ -18,7 +18,10 @@ pub trait Chunker {
 Comments for each method are provided in [lib.rs](src/lib.rs).
 
 ## Chunking optimization methods (SBC, FBC)
-To implement algorithms that optimize 
+
+To implement algorithms that optimize how chunks are stored and use them with the file system, the must
+implement ``Scrub`` trait.
+Details are provided in [scrub.rs](src/scrub.rs).
 
 ## Usage
 
@@ -77,12 +80,8 @@ fn main() -> io::Result<()> {
     fs.write_to_file(&mut handle, &data)?;
     fs.close_file(handle)?;
 
-    let scrub_measurements = fs.scrub().unwrap();
+    let scrub_measurements = fs.scrub()?;
     println!("{scrub_measurements:?}");
-
-    let mut handle = fs.open_file("file", SuperChunker::new())?;
-    let read = fs.read_file_complete(&mut handle)?;
-    assert_eq!(read, data);
     Ok(())
 }
 ```
