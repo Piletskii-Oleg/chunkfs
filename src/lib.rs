@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign};
 use std::time::Duration;
 
 pub use map::Database;
-pub use scrub::{Scrub, ScrubMeasurements};
+pub use scrub::{CopyScrubber, Scrub, ScrubMeasurements};
 pub use storage::{Data, DataContainer};
 pub use system::FileSystem;
 
