@@ -52,11 +52,11 @@ where
     hasher: H,
 }
 
-impl<H, Hash, B> ChunkStorage<H, Hash, B, ()>
+impl<H, Hash, B, K> ChunkStorage<H, Hash, B, K>
 where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    B: Database<H::Hash, DataContainer<()>>,
+    B: Database<H::Hash, DataContainer<K>>,
 {
     pub fn new(database: B, hasher: H) -> Self {
         Self {

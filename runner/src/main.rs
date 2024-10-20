@@ -7,12 +7,10 @@ use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
 use chunkfs::chunkers::{LeapChunker, SuperChunker};
-use chunkfs::hashers::Sha256Hasher;
-use chunkfs::Chunker;
+use chunkfs::hashers::SimpleHasher;
 use chunkfs::FileSystem;
 use chunkfs::Hasher;
-use sbc_algorithm::SBCMap;
-use sbc_algorithm::SBCScrubber;
+use chunkfs::{Chunker, DataContainer};
 
 #[derive(Default)]
 struct Measurements {
@@ -23,11 +21,11 @@ struct Measurements {
 }
 
 fn main() -> io::Result<()> {
-    let mut fs = FileSystem::new(
+    let mut fs = FileSystem::new_with_scrubber(
         HashMap::default(),
-        Box::new(SBCMap::new()),
-        Box::new(SBCScrubber::new()),
-        Sha256Hasher::default(),
+        Box::new(HashMap::default()),
+        Box::new(chunkfs::CopyScrubber),
+        SimpleHasher,
     );
 
     let mut handle = fs.create_file("file".to_string(), SuperChunker::new(), true)?;
@@ -53,7 +51,7 @@ fn parametrized_write(
     println!("Current chunker: {:?}", chunker);
     println!("Current hasher: {:?}", hasher);
 
-    let base = HashMap::default();
+    let base: HashMap<_, DataContainer<()>> = HashMap::default();
     let mut fs = FileSystem::new_cdc_only(base, hasher);
 
     let mut handle = fs.create_file("file".to_string(), chunker, true)?;
