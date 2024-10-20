@@ -1,10 +1,9 @@
 use std::cmp::min;
-use std::collections::HashMap;
 use std::io;
 
 use crate::file_layer::{FileHandle, FileLayer};
 use crate::map::Database;
-use crate::scrub::{DumbScrubber, Scrub, ScrubMeasurements};
+use crate::scrub::{Scrub, ScrubMeasurements};
 use crate::storage::{ChunkStorage, DataContainer};
 use crate::WriteMeasurements;
 use crate::{ChunkHash, SEG_SIZE};
@@ -16,7 +15,6 @@ where
     B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
     storage: ChunkStorage<H, Hash, B, K>,
     file_layer: FileLayer<Hash>,
@@ -27,37 +25,12 @@ where
     B: Database<Hash, DataContainer<i32>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<i32>)>,
 {
+    /// Creates a file system with the given [`hasher`][Hasher] and [`base`][Base]. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
+    /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
     pub fn new_cdc_only(base: B, hasher: H) -> Self {
         Self {
-            storage: ChunkStorage::new(
-                base,
-                Box::<HashMap<i32, Vec<u8>>>::default(),
-                Box::new(DumbScrubber),
-                hasher,
-            ),
-            file_layer: Default::default(),
-        }
-    }
-}
-
-impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
-where
-    B: Database<Hash, DataContainer<K>>,
-    H: Hasher<Hash = Hash>,
-    Hash: ChunkHash,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
-{
-    /// Creates a file system with the given [`base`][Base].
-    pub fn new(
-        database: B,
-        target_map: Box<dyn Database<K, Vec<u8>>>,
-        scrubber: Box<dyn Scrub<Hash, B, K>>,
-        hasher: H,
-    ) -> Self {
-        Self {
-            storage: ChunkStorage::new(database, target_map, scrubber, hasher),
+            storage: ChunkStorage::new(base, hasher),
             file_layer: Default::default(),
         }
     }
@@ -137,7 +110,32 @@ where
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(&hashes)?.concat())
     }
+}
 
+impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
+where
+    B: Database<Hash, DataContainer<K>>,
+    H: Hasher<Hash = Hash>,
+    Hash: ChunkHash,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
+{
+    /// Creates a file system with the given [`hasher`][Hasher], original [`base`][Base] and target map, and a [`scrubber`][Scrub].
+    ///
+    /// Provided `database` must implement [IntoIterator].
+    pub fn new_with_scrubber(
+        database: B,
+        target_map: Box<dyn Database<K, Vec<u8>>>,
+        scrubber: Box<dyn Scrub<Hash, B, K>>,
+        hasher: H,
+    ) -> Self {
+        Self {
+            storage: ChunkStorage::new_with_scrubber(database, target_map, scrubber, hasher),
+            file_layer: Default::default(),
+        }
+    }
+
+    /// Scrubs the data in the database. Must be used with filesystems created using [`new_with_scrubber`][Self::new_with_scrubber],
+    /// otherwise it returns [`ErrorKind::InvalidInput`][io::ErrorKind::InvalidInput].
     pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
         self.storage.scrub()
     }

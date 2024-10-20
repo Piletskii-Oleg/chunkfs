@@ -1,10 +1,11 @@
 extern crate chunkfs;
 
 use std::collections::HashMap;
+use std::io::ErrorKind;
 
 use chunkfs::chunkers::{FSChunker, LeapChunker};
 use chunkfs::hashers::SimpleHasher;
-use chunkfs::FileSystem;
+use chunkfs::{DataContainer, Database, FileSystem};
 
 const MB: usize = 1024 * 1024;
 
@@ -80,16 +81,15 @@ fn write_read_big_file_at_once() {
     fs.close_file(handle).unwrap();
 
     let mut handle = fs.open_file("file", LeapChunker::default()).unwrap();
-    assert_eq!(
-        fs.read_file_complete(&mut handle).unwrap().len(),
-        data.len()
-    );
+    assert_eq!(fs.read_file_complete(&handle).unwrap().len(), data.len());
 }
 
 #[test]
-fn scrub_compiles_on_cdc_map() {
+fn scrub_compiles_on_cdc_map_but_returns_error() {
     let mut fs = FileSystem::new_cdc_only(HashMap::default(), SimpleHasher);
-    let _ = fs.scrub();
+    let result = fs.scrub();
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err().kind(), ErrorKind::InvalidInput)
 }
 
 //#[test]
@@ -101,4 +101,29 @@ fn two_file_handles_to_one_file() {
     let mut handle2 = fs.open_file("file", LeapChunker::default()).unwrap();
     fs.write_to_file(&mut handle1, &[1; MB]).unwrap();
     assert_eq!(fs.read_from_file(&mut handle2).unwrap().len(), MB)
+}
+
+#[test]
+fn non_iterable_database_can_be_used_with_fs() {
+    struct EmptyDatabase;
+
+    impl Database<Vec<u8>, DataContainer<i32>> for EmptyDatabase {
+        fn insert(&mut self, _key: Vec<u8>, _value: DataContainer<i32>) -> std::io::Result<()> {
+            unimplemented!()
+        }
+
+        fn get(&self, _key: &Vec<u8>) -> std::io::Result<DataContainer<i32>> {
+            unimplemented!()
+        }
+
+        fn remove(&mut self, _key: &Vec<u8>) {
+            unimplemented!()
+        }
+
+        fn contains(&self, _key: &Vec<u8>) -> bool {
+            unimplemented!()
+        }
+    }
+
+    let _ = FileSystem::new_cdc_only(EmptyDatabase, SimpleHasher);
 }

@@ -1,5 +1,6 @@
 use std::fmt::Formatter;
 use std::io;
+use std::io::ErrorKind;
 use std::time::{Duration, Instant};
 
 use crate::map::Database;
@@ -44,38 +45,26 @@ where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: Database<Hash, DataContainer<K>>,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
     database: B,
-    scrubber: Box<dyn Scrub<Hash, B, K>>,
-    target_map: Box<dyn Database<K, Vec<u8>>>,
+    scrubber: Option<Box<dyn Scrub<Hash, B, K>>>,
+    target_map: Option<Box<dyn Database<K, Vec<u8>>>>,
     hasher: H,
 }
 
-impl<H, Hash, B, K> ChunkStorage<H, Hash, B, K>
+impl<H, Hash, B> ChunkStorage<H, Hash, B, i32>
 where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    B: Database<H::Hash, DataContainer<K>>,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
+    B: Database<H::Hash, DataContainer<i32>>,
 {
-    pub fn new(
-        database: B,
-        target_map: Box<dyn Database<K, Vec<u8>>>,
-        scrubber: Box<dyn Scrub<Hash, B, K>>,
-        hasher: H,
-    ) -> Self {
+    pub fn new(database: B, hasher: H) -> Self {
         Self {
             database,
-            scrubber,
-            target_map,
+            scrubber: None,
+            target_map: None,
             hasher,
         }
-    }
-
-    pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
-        self.scrubber
-            .scrub(&mut self.database, &mut self.target_map)
     }
 
     /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
@@ -108,12 +97,44 @@ where
                 Data::Chunk(chunk) => Ok(chunk.clone()),
                 Data::TargetChunk(keys) => Ok(self
                     .target_map
-                    .get_multi(&keys)?
+                    .as_ref()
+                    .unwrap()
+                    .get_multi(keys)?
                     .into_iter()
                     .flatten()
                     .collect()),
             })
             .collect()
+    }
+}
+
+impl<H, Hash, B, K> ChunkStorage<H, Hash, B, K>
+where
+    H: Hasher<Hash = Hash>,
+    Hash: ChunkHash,
+    B: Database<H::Hash, DataContainer<K>>,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
+{
+    pub fn new_with_scrubber(
+        database: B,
+        target_map: Box<dyn Database<K, Vec<u8>>>,
+        scrubber: Box<dyn Scrub<Hash, B, K>>,
+        hasher: H,
+    ) -> Self {
+        Self {
+            database,
+            scrubber: Some(scrubber),
+            target_map: Some(target_map),
+            hasher,
+        }
+    }
+
+    pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
+        let target_map = self.target_map.as_mut().ok_or(ErrorKind::InvalidInput)?;
+        self.scrubber
+            .as_mut()
+            .unwrap()
+            .scrub(&mut self.database, target_map)
     }
 }
 
@@ -275,14 +296,19 @@ mod tests {
         map.insert(vec![2], DataContainer::from(vec![]));
         let mut chunk_storage = ChunkStorage {
             database: map,
-            scrubber: Box::new(DumbScrubber),
-            target_map: Box::new(HashMap::default()),
+            scrubber: Some(Box::new(DumbScrubber)),
+            target_map: Some(Box::new(HashMap::default())),
             hasher: SimpleHasher,
         };
 
         let measurements = chunk_storage
             .scrubber
-            .scrub(&mut chunk_storage.database, &mut chunk_storage.target_map)
+            .as_mut()
+            .unwrap()
+            .scrub(
+                &mut chunk_storage.database,
+                chunk_storage.target_map.as_mut().unwrap(),
+            )
             .unwrap();
         assert_eq!(measurements, ScrubMeasurements::default());
 
