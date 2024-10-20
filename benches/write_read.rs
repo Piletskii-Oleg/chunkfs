@@ -49,7 +49,7 @@ fn bench_write(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &[
                 let mut fs = FileSystem::new_with_key(base, Sha256Hasher::default(), 0);
 
                 let chunker = UltraChunker::default();
-                let handle = fs.create_file("file".to_string(), chunker, true).unwrap();
+                let handle = fs.create_file("file", chunker, true).unwrap();
 
                 (fs, handle)
             },
@@ -70,7 +70,7 @@ fn bench_read(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &[u
                 let mut fs = FileSystem::new_with_key(base, Sha256Hasher::default(), 0);
 
                 let chunker = UltraChunker::default();
-                let mut handle = fs.create_file("file".to_string(), chunker, true).unwrap();
+                let mut handle = fs.create_file("file", chunker, true).unwrap();
                 fs.write_to_file(&mut handle, data).unwrap();
                 fs.close_file(handle).unwrap();
 

@@ -64,7 +64,7 @@ where
     /// Returns `ErrorKind::AlreadyExists`, if the file with the same name exists in the file system.
     pub fn create_file<C: Chunker>(
         &mut self,
-        name: String,
+        name: impl Into<String>,
         chunker: C,
         create_new: bool,
     ) -> io::Result<FileHandle<C>> {
