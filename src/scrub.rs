@@ -1,9 +1,9 @@
 use std::io;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::map::Database;
 use crate::storage::DataContainer;
-use crate::ChunkHash;
+use crate::{ChunkHash, Data};
 
 /// Basic functionality for implementing algorithms which process chunks provided by the [Chunker][crate::Chunker]. The implementations should encapsulate
 /// algorithm logic (write part) inside themselves and not delegate it to `database`. The read part of the algorithm should be encapsulated in `target_map`.
@@ -80,7 +80,43 @@ pub struct ScrubMeasurements {
     pub data_left: usize,
 }
 
+pub struct CopyScrubber;
+
 pub struct DumbScrubber;
+
+impl<Hash: ChunkHash, B> Scrub<Hash, B, Hash> for CopyScrubber
+where
+    B: Database<Hash, DataContainer<Hash>>,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<Hash>)>,
+{
+    fn scrub<'a>(
+        &mut self,
+        database: &mut B,
+        target: &mut Box<dyn Database<Hash, Vec<u8>>>,
+    ) -> io::Result<ScrubMeasurements>
+    where
+        Hash: 'a,
+    {
+        let now = Instant::now();
+        let mut processed_data = 0;
+        for (hash, container) in database.into_iter() {
+            match container.extract() {
+                Data::Chunk(chunk) => {
+                    target.insert(hash.clone(), chunk.clone())?;
+                    processed_data += chunk.len();
+                }
+                Data::TargetChunk(_) => (),
+            }
+            container.make_target(vec![hash.clone()]);
+        }
+        let running_time = now.elapsed();
+        Ok(ScrubMeasurements {
+            processed_data,
+            running_time,
+            data_left: 0,
+        })
+    }
+}
 
 impl<Hash: ChunkHash, B, Key> Scrub<Hash, B, Key> for DumbScrubber
 where
