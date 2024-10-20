@@ -108,12 +108,12 @@ fn two_file_handles_to_one_file() {
 fn non_iterable_database_can_be_used_with_fs() {
     struct EmptyDatabase;
 
-    impl Database<Vec<u8>, DataContainer<i32>> for EmptyDatabase {
-        fn insert(&mut self, _key: Vec<u8>, _value: DataContainer<i32>) -> std::io::Result<()> {
+    impl Database<Vec<u8>, DataContainer<()>> for EmptyDatabase {
+        fn insert(&mut self, _key: Vec<u8>, _value: DataContainer<()>) -> std::io::Result<()> {
             unimplemented!()
         }
 
-        fn get(&self, _key: &Vec<u8>) -> std::io::Result<DataContainer<i32>> {
+        fn get(&self, _key: &Vec<u8>) -> std::io::Result<DataContainer<()>> {
             unimplemented!()
         }
 

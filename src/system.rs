@@ -20,9 +20,9 @@ where
     file_layer: FileLayer<Hash>,
 }
 
-impl<B, H, Hash> FileSystem<B, H, Hash, i32>
+impl<B, H, Hash> FileSystem<B, H, Hash, ()>
 where
-    B: Database<Hash, DataContainer<i32>>,
+    B: Database<Hash, DataContainer<()>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {

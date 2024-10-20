@@ -52,11 +52,11 @@ where
     hasher: H,
 }
 
-impl<H, Hash, B> ChunkStorage<H, Hash, B, i32>
+impl<H, Hash, B> ChunkStorage<H, Hash, B, ()>
 where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    B: Database<H::Hash, DataContainer<i32>>,
+    B: Database<H::Hash, DataContainer<()>>,
 {
     pub fn new(database: B, hasher: H) -> Self {
         Self {
@@ -291,7 +291,7 @@ mod tests {
 
     #[test]
     fn hashmap_works_as_cdc_map() {
-        let mut map: HashMap<Vec<u8>, DataContainer<i32>> = HashMap::new();
+        let mut map: HashMap<Vec<u8>, DataContainer<()>> = HashMap::new();
         map.insert(vec![1], DataContainer::from(vec![]));
         map.insert(vec![2], DataContainer::from(vec![]));
         let mut chunk_storage = ChunkStorage {
