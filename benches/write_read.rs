@@ -22,8 +22,6 @@ impl<'a> Dataset<'a> {
     }
 }
 
-const MB_COUNT: usize = 1024;
-
 pub fn criterion_benchmark(c: &mut Criterion) {
     let datasets = vec![
         Dataset::new("linux.tar", "linux"),
@@ -43,56 +41,50 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     }
 }
 
-fn bench_write(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &Vec<u8>) {
-    group.bench_function(
-        BenchmarkId::new("write", format!("{}", dataset.name)),
-        |b| {
-            b.iter_batched(
-                || {
-                    let base = HashMap::default();
-                    let mut fs = FileSystem::new_cdc_only(base, Sha256Hasher::default());
+fn bench_write(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &[u8]) {
+    group.bench_function(BenchmarkId::new("write", dataset.name), |b| {
+        b.iter_batched(
+            || {
+                let base = HashMap::default();
+                let mut fs = FileSystem::new_cdc_only(base, Sha256Hasher::default());
 
-                    let chunker = UltraChunker::default();
-                    let mut handle = fs.create_file("file".to_string(), chunker, true).unwrap();
+                let chunker = UltraChunker::default();
+                let handle = fs.create_file("file".to_string(), chunker, true).unwrap();
 
-                    (fs, handle)
-                },
-                |(mut fs, mut handle)| {
-                    fs.write_to_file(&mut handle, &data).unwrap();
-                    fs.close_file(handle).unwrap();
-                },
-                BatchSize::PerIteration,
-            )
-        },
-    );
+                (fs, handle)
+            },
+            |(mut fs, mut handle)| {
+                fs.write_to_file(&mut handle, data).unwrap();
+                fs.close_file(handle).unwrap();
+            },
+            BatchSize::PerIteration,
+        )
+    });
 }
 
-fn bench_read(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &Vec<u8>) {
-    group.bench_function(
-        BenchmarkId::new("read-ultra", format!("{}", dataset.name)),
-        |b| {
-            b.iter_batched(
-                || {
-                    let base = HashMap::default();
-                    let mut fs = FileSystem::new_cdc_only(base, Sha256Hasher::default());
+fn bench_read(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &[u8]) {
+    group.bench_function(BenchmarkId::new("read-ultra", dataset.name), |b| {
+        b.iter_batched(
+            || {
+                let base = HashMap::default();
+                let mut fs = FileSystem::new_cdc_only(base, Sha256Hasher::default());
 
-                    let chunker = UltraChunker::default();
-                    let mut handle = fs.create_file("file".to_string(), chunker, true).unwrap();
-                    fs.write_to_file(&mut handle, &data).unwrap();
-                    fs.close_file(handle).unwrap();
+                let chunker = UltraChunker::default();
+                let mut handle = fs.create_file("file".to_string(), chunker, true).unwrap();
+                fs.write_to_file(&mut handle, data).unwrap();
+                fs.close_file(handle).unwrap();
 
-                    let chunker = UltraChunker::default();
-                    let handle = fs.open_file("file", chunker).unwrap();
+                let chunker = UltraChunker::default();
+                let handle = fs.open_file("file", chunker).unwrap();
 
-                    (fs, handle)
-                },
-                |(mut fs, mut handle)| {
-                    fs.read_file_complete(&mut handle).unwrap();
-                },
-                BatchSize::PerIteration,
-            )
-        },
-    );
+                (fs, handle)
+            },
+            |(fs, handle)| {
+                fs.read_file_complete(&handle).unwrap();
+            },
+            BatchSize::PerIteration,
+        )
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);

@@ -42,6 +42,12 @@ impl RabinChunker {
     }
 }
 
+impl Default for RabinChunker {
+    fn default() -> Self {
+        RabinChunker::new()
+    }
+}
+
 impl FSChunker {
     pub fn new(chunk_size: usize) -> Self {
         Self {
@@ -57,6 +63,12 @@ impl SuperChunker {
             rest: vec![],
             records: Some(HashMap::new()),
         }
+    }
+}
+
+impl Default for SuperChunker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -197,10 +209,11 @@ impl Debug for UltraChunker {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use chunking::ultra;
-    use sha3::{Sha3_256, Digest};
+
+    use sha3::{Digest, Sha3_256};
+
+    use crate::chunkers::RabinChunker;
     use crate::Chunker;
-    use crate::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker};
 
     #[test]
     #[ignore]

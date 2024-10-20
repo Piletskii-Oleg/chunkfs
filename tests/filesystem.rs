@@ -80,7 +80,7 @@ fn write_read_big_file_at_once() {
     fs.write_to_file(&mut handle, &data).unwrap();
     fs.close_file(handle).unwrap();
 
-    let mut handle = fs.open_file("file", LeapChunker::default()).unwrap();
+    let handle = fs.open_file("file", LeapChunker::default()).unwrap();
     assert_eq!(fs.read_file_complete(&handle).unwrap().len(), data.len());
 }
 
@@ -92,7 +92,7 @@ fn scrub_compiles_on_cdc_map_but_returns_error() {
     assert_eq!(result.unwrap_err().kind(), ErrorKind::InvalidInput)
 }
 
-//#[test]
+#[test]
 fn two_file_handles_to_one_file() {
     let mut fs = FileSystem::new_cdc_only(HashMap::default(), SimpleHasher);
     let mut handle1 = fs
@@ -100,6 +100,7 @@ fn two_file_handles_to_one_file() {
         .unwrap();
     let mut handle2 = fs.open_file("file", LeapChunker::default()).unwrap();
     fs.write_to_file(&mut handle1, &[1; MB]).unwrap();
+    fs.close_file(handle1).unwrap();
     assert_eq!(fs.read_from_file(&mut handle2).unwrap().len(), MB)
 }
 
