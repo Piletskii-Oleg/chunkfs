@@ -26,9 +26,23 @@ where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
+    /// Functionally the same as [`Self::new`], but it also takes a key example as a parameter so that rust compiler knows
+    /// which type it is.
+    ///
+    /// Any value can be passed as a `_key` as it is not used anywhere, e.g. 0.
+    pub fn new_with_key(base: B, hasher: H, _key: K) -> Self {
+        Self {
+            storage: ChunkStorage::new(base, hasher),
+            file_layer: Default::default(),
+        }
+    }
+
     /// Creates a file system with the given [`hasher`][Hasher] and [`base`][Base]. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
     /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
-    pub fn new_cdc_only(base: B, hasher: H) -> Self {
+    ///
+    /// Use [`Self::new_with_key`] if this method throws a long compile-time error message that says something about
+    /// giving filesystem an explicit type, where the type for type parameter 'K' is specified.
+    pub fn new(base: B, hasher: H) -> Self {
         Self {
             storage: ChunkStorage::new(base, hasher),
             file_layer: Default::default(),
