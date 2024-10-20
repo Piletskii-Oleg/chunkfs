@@ -6,7 +6,7 @@ use std::io;
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
-use chunkfs::chunkers::{LeapChunker, SuperChunker};
+use chunkfs::chunkers::LeapChunker;
 use chunkfs::hashers::SimpleHasher;
 use chunkfs::Chunker;
 use chunkfs::FileSystem;
@@ -21,26 +21,45 @@ struct Measurements {
 }
 
 fn main() -> io::Result<()> {
-    let mut fs = FileSystem::new_with_scrubber(
-        HashMap::default(),
-        Box::new(HashMap::default()),
-        Box::new(chunkfs::CopyScrubber),
-        SimpleHasher,
-    );
+    let base = HashMap::default();
+    let mut fs = FileSystem::new_with_key(base, SimpleHasher, 0);
 
-    let mut handle = fs.create_file("file".to_string(), SuperChunker::new(), true)?;
-    let data = generate_data(10);
-    fs.write_to_file(&mut handle, &data)?;
-    fs.close_file(handle)?;
+    let mut file = fs.create_file("file".to_string(), LeapChunker::default(), true)?;
+    let data = vec![10; 1024 * 1024];
+    fs.write_to_file(&mut file, &data)?;
+    let measurements = fs.close_file(file)?;
+    println!("{:?}", measurements);
 
-    let res = fs.scrub().unwrap();
-    println!("{res:?}");
+    let mut file = fs.open_file("file", LeapChunker::default())?;
+    let read = fs.read_from_file(&mut file)?;
 
-    let mut handle = fs.open_file("file", SuperChunker::new())?;
-    let read = fs.read_file_complete(&mut handle)?;
-    assert_eq!(read.len(), data.len());
+    assert_eq!(read.len(), 1024 * 1024);
+    assert_eq!(read, data);
+
     Ok(())
 }
+
+// fn main() -> io::Result<()> {
+//     let mut fs = FileSystem::new_with_scrubber(
+//         HashMap::default(),
+//         Box::new(HashMap::default()),
+//         Box::new(chunkfs::CopyScrubber),
+//         SimpleHasher,
+//     );
+//
+//     let mut handle = fs.create_file("file".to_string(), SuperChunker::new(), true)?;
+//     let data = generate_data(10);
+//     fs.write_to_file(&mut handle, &data)?;
+//     fs.close_file(handle)?;
+//
+//     let res = fs.scrub().unwrap();
+//     println!("{res:?}");
+//
+//     let mut handle = fs.open_file("file", SuperChunker::new())?;
+//     let read = fs.read_file_complete(&mut handle)?;
+//     assert_eq!(read.len(), data.len());
+//     Ok(())
+// }
 
 const MB: usize = 1024 * 1024;
 

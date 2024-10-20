@@ -77,10 +77,6 @@ dependencies = [
 name = "chunkfs"
 version = "0.1.0"
 source = "git+https://github.com/Piletskii-Oleg/chunkfs.git?branch=SBC-FBC-support#85ada5b0a165330b02b933da1ef00c556e47c9dd"
-dependencies = [
- "chunking",
- "sha2",
-]
 
 [[package]]
 name = "chunking"
@@ -521,7 +517,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 name = "runner"
 version = "0.1.0"
 dependencies = [
- "chunkfs 0.1.0 (git+https://github.com/Piletskii-Oleg/chunkfs.git?branch=SBC-FBC-support)",
+ "chunkfs 0.1.0",
  "rand",
  "sbc_algorithm",
 ]

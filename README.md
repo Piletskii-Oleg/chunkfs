@@ -46,14 +46,14 @@ Getting chunker measurements:
 extern crate chunkfs;
 
 use std::io;
-use chunkfs::base::HashMapBase;
+use std::collections::HashMap;
 use chunkfs::chunkers::LeapChunker;
 use chunkfs::FileSystem;
 use chunkfs::hashers::SimpleHasher;
 
 fn main() -> io::Result<()> {
-    let base = HashMapBase::default();
-    let mut fs = FileSystem::new_cdc_only(base, SimpleHasher);
+    let base = HashMap::default();
+    let mut fs = FileSystem::new_with_key(base, SimpleHasher, 0);
 
     let mut file = fs.create_file("file".to_string(), LeapChunker::default(), true)?;
     let data = vec![10; 1024 * 1024];
@@ -73,7 +73,12 @@ fn main() -> io::Result<()> {
 Getting Scrubber measurements:
 ```rust
 fn main() -> io::Result<()> {
-    let mut fs = FileSystem::new(HashMap::default(), Box::new(SBCMap::new()), Box::new(SBCScrubber::new()), Sha256Hasher::default());
+    let mut fs = FileSystem::new_with_scrubber(
+        HashMap::default(),
+        Box::new(SBCMap::new()),
+        Box::new(SBCScrubber::new()),
+        Sha256Hasher::default()
+    );
 
     let mut handle = fs.create_file("file".to_string(), SuperChunker::new(), true)?;
     let data = vec![10; 1024 * 1024 * 10];
