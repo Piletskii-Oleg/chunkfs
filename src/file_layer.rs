@@ -80,10 +80,11 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     /// Creates a [`file`][File] and returns its [`FileHandle`]
     pub fn create<C: Chunker>(
         &mut self,
-        name: String,
+        name: impl Into<String>,
         chunker: C,
         create_new: bool,
     ) -> io::Result<FileHandle<C>> {
+        let name = name.into();
         if !create_new && self.files.contains_key(&name) {
             return Err(ErrorKind::AlreadyExists.into());
         }
@@ -175,11 +176,11 @@ mod tests {
     #[test]
     fn file_layer_create_file() {
         let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
-        let name = "hello".to_string();
-        fl.create(name.clone(), FSChunker::new(4096), true).unwrap();
+        let name = "hello";
+        fl.create(name, FSChunker::new(4096), true).unwrap();
 
-        assert_eq!(fl.files.get(&name).unwrap().name, "hello");
-        assert_eq!(fl.files.get(&name).unwrap().spans, vec![]);
+        assert_eq!(fl.files.get(name).unwrap().name, "hello");
+        assert_eq!(fl.files.get(name).unwrap().spans, vec![]);
     }
 
     #[test]

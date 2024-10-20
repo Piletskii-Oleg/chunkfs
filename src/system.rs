@@ -1,36 +1,50 @@
 use std::cmp::min;
-use std::error::Error;
-use std::fmt::{Display, Formatter};
 use std::io;
-use std::io::ErrorKind;
 
 use crate::file_layer::{FileHandle, FileLayer};
-use crate::storage::Storage;
+use crate::map::Database;
+use crate::scrub::{Scrub, ScrubMeasurements};
+use crate::storage::{ChunkStorage, DataContainer};
 use crate::WriteMeasurements;
 use crate::{ChunkHash, SEG_SIZE};
-use crate::{Chunker, Database, Hasher};
+use crate::{Chunker, Hasher};
 
 /// A file system provided by chunkfs.
-pub struct FileSystem<B, H, Hash>
+pub struct FileSystem<B, H, Hash, K>
 where
-    B: Database<Hash>,
+    B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
-    storage: Storage<B, H, Hash>,
+    storage: ChunkStorage<H, Hash, B, K>,
     file_layer: FileLayer<Hash>,
 }
 
-impl<B, H, Hash> FileSystem<B, H, Hash>
+impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
 where
-    B: Database<Hash>,
+    B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
-    /// Creates a file system with the given [`base`][Base].
+    /// Functionally the same as [`Self::new`], but it also takes a key example as a parameter so that rust compiler knows
+    /// which type it is.
+    ///
+    /// Any value can be passed as a `_key` as it is not used anywhere, e.g. 0.
+    pub fn new_with_key(base: B, hasher: H, _key: K) -> Self {
+        Self {
+            storage: ChunkStorage::new(base, hasher),
+            file_layer: Default::default(),
+        }
+    }
+
+    /// Creates a file system with the given [`hasher`][Hasher] and [`base`][Base]. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
+    /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
+    ///
+    /// Use [`Self::new_with_key`] if this method throws a long compile-time error message that says something about
+    /// giving filesystem an explicit type, where the type for type parameter 'K' is specified.
     pub fn new(base: B, hasher: H) -> Self {
         Self {
-            storage: Storage::new(base, hasher),
+            storage: ChunkStorage::new(base, hasher),
             file_layer: Default::default(),
         }
     }
@@ -50,7 +64,7 @@ where
     /// Returns `ErrorKind::AlreadyExists`, if the file with the same name exists in the file system.
     pub fn create_file<C: Chunker>(
         &mut self,
-        name: String,
+        name: impl Into<String>,
         chunker: C,
         create_new: bool,
     ) -> io::Result<FileHandle<C>> {
@@ -99,7 +113,7 @@ where
     /// Reads all contents of the file from beginning to end and returns them.
     pub fn read_file_complete<C: Chunker>(&self, handle: &FileHandle<C>) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read_complete(handle);
-        Ok(self.storage.retrieve(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
+        Ok(self.storage.retrieve(&hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 
     /// Reads 1 MB of data from a file and returns it.
@@ -108,109 +122,37 @@ where
         handle: &mut FileHandle<C>,
     ) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
-        Ok(self.storage.retrieve(hashes)?.concat())
+        Ok(self.storage.retrieve(&hashes)?.concat())
     }
 }
 
-/// Used to open a file with the given chunker and hasher, with some other options.
-/// Chunker and hasher must be provided using [with_chunker][`Self::with_chunker`] and [with_hasher][`Self::with_hasher`].
-pub struct FileOpener<C>
+impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
 where
-    C: Chunker,
+    B: Database<Hash, DataContainer<K>>,
+    H: Hasher<Hash = Hash>,
+    Hash: ChunkHash,
+    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
-    chunker: Option<C>,
-    create_new: bool,
-}
-
-/// Error that may happen when opening a file using [FileOpener].
-#[derive(Debug)]
-pub enum OpenError {
-    NoChunkerProvided,
-    IoError(io::Error),
-}
-
-impl Display for OpenError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OpenError::NoChunkerProvided => write!(
-                f,
-                "No chunker was provided. A chunker is necessary to write to the file."
-            ),
-            OpenError::IoError(io) => io.fmt(f),
-        }
-    }
-}
-
-impl Error for OpenError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            OpenError::NoChunkerProvided => None,
-            OpenError::IoError(io) => Some(io),
-        }
-    }
-}
-
-impl From<io::Error> for OpenError {
-    fn from(value: io::Error) -> Self {
-        Self::IoError(value)
-    }
-}
-
-impl From<ErrorKind> for OpenError {
-    fn from(value: ErrorKind) -> Self {
-        Self::IoError(value.into())
-    }
-}
-
-impl<C> FileOpener<C>
-where
-    C: Chunker,
-{
-    /// Initializes [FileOpener] with empty fields.
-    /// `chunker` and `hasher` must be explicitly given using [with_chunker][`Self::with_chunker`]
-    /// and [with_hasher][`Self::with_hasher`].
-    pub fn new() -> Self {
+    /// Creates a file system with the given [`hasher`][Hasher], original [`base`][Base] and target map, and a [`scrubber`][Scrub].
+    ///
+    /// Provided `database` must implement [IntoIterator].
+    pub fn new_with_scrubber(
+        database: B,
+        target_map: Box<dyn Database<K, Vec<u8>>>,
+        scrubber: Box<dyn Scrub<Hash, B, K>>,
+        hasher: H,
+    ) -> Self {
         Self {
-            chunker: None,
-            create_new: false,
+            storage: ChunkStorage::new_with_scrubber(database, target_map, scrubber, hasher),
+            file_layer: Default::default(),
         }
     }
 
-    /// Sets a [`chunker`][Chunker] that will be used to split the written data into chunks.
-    pub fn with_chunker(mut self, chunker: C) -> Self {
-        self.chunker = Some(chunker);
-        self
-    }
-
-    /// Sets a flag that indicates whether new file should be created, and if it exists, be overwritten.
-    pub fn create_new(mut self, create_new: bool) -> Self {
-        self.create_new = create_new;
-        self
-    }
-
-    /// Opens a file in the given [FileSystem] and with the given name. Creates new file if the flag was set.
-    /// Returns an [OpenError] if the `chunker` or `hasher` were not set.
-    pub fn open<B: Database<Hash>, H: Hasher<Hash = Hash>, Hash: ChunkHash>(
-        self,
-        fs: &mut FileSystem<B, H, Hash>,
-        name: &str,
-    ) -> Result<FileHandle<C>, OpenError> {
-        let chunker = self.chunker.ok_or(OpenError::NoChunkerProvided)?;
-
-        if self.create_new {
-            fs.create_file(name.to_string(), chunker, self.create_new)
-                .map_err(OpenError::IoError)
-        } else {
-            fs.open_file(name, chunker).map_err(OpenError::IoError)
-        }
-    }
-}
-
-impl<C> Default for FileOpener<C>
-where
-    C: Chunker,
-{
-    fn default() -> Self {
-        Self::new()
+    /// Scrubs the data in the database. Must be used with filesystems created using [`new_with_scrubber`][Self::new_with_scrubber],
+    /// otherwise it returns [`ErrorKind::InvalidInput`][io::ErrorKind::InvalidInput].
+    ///
+    /// For more info check [`Scrub`][Scrub] trait and its [`scrub`][Scrub::scrub] method.
+    pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
+        self.storage.scrub()
     }
 }

@@ -28,12 +28,23 @@ pub struct RabinChunker {
     params: Option<chunking::rabin::ChunkerParams>,
 }
 
+#[derive(Default)]
+pub struct UltraChunker {
+    rest: Vec<u8>,
+}
+
 impl RabinChunker {
     pub fn new() -> Self {
         Self {
             rest: vec![],
             params: Some(chunking::rabin::ChunkerParams::new()),
         }
+    }
+}
+
+impl Default for RabinChunker {
+    fn default() -> Self {
+        RabinChunker::new()
     }
 }
 
@@ -52,6 +63,12 @@ impl SuperChunker {
             rest: vec![],
             records: Some(HashMap::new()),
         }
+    }
+}
+
+impl Default for SuperChunker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -81,6 +98,27 @@ impl Chunker for FSChunker {
 
     fn estimate_chunk_count(&self, data: &[u8]) -> usize {
         data.len() / self.chunk_size + 1
+    }
+}
+
+impl Chunker for UltraChunker {
+    fn chunk_data(&mut self, data: &[u8], empty: Vec<Chunk>) -> Vec<Chunk> {
+        let chunker = chunking::ultra::Chunker::new(data);
+        let mut chunks = empty;
+        for chunk in chunker {
+            chunks.push(Chunk::new(chunk.pos, chunk.len));
+        }
+
+        self.rest = data[chunks.pop().unwrap().range()].to_vec();
+        chunks
+    }
+
+    fn remainder(&self) -> &[u8] {
+        &self.rest
+    }
+
+    fn estimate_chunk_count(&self, data: &[u8]) -> usize {
+        data.len() / 4096
     }
 }
 
@@ -159,5 +197,51 @@ impl Chunker for RabinChunker {
 impl Debug for RabinChunker {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "RabinCDC")
+    }
+}
+
+impl Debug for UltraChunker {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UltraCDC")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use sha3::{Digest, Sha3_256};
+
+    use crate::chunkers::RabinChunker;
+    use crate::Chunker;
+
+    #[test]
+    #[ignore]
+    fn dedup_ratio() {
+        let mut chunker = RabinChunker::new();
+
+        let data = std::fs::read("linux.tar").unwrap();
+
+        let chunks = chunker.chunk_data(&data, vec![]);
+
+        let chunks_len = chunks.len();
+        let chunks_map: HashMap<_, usize> = HashMap::from_iter(chunks.into_iter().map(|chunk| {
+            let hash = Sha3_256::digest(&data[chunk.offset..chunk.offset + chunk.length]);
+            let mut res = vec![0u8; hash.len()];
+            res.copy_from_slice(&hash);
+            (res, chunk.length)
+        }));
+        println!(
+            "Chunk ratio (unique / all): {} / {} = {:.3}",
+            chunks_map.len(),
+            chunks_len,
+            chunks_map.len() as f64 / chunks_len as f64
+        );
+        println!(
+            "Data size ratio: {} / {} = {:.3}",
+            chunks_map.iter().map(|(_, &b)| b).sum::<usize>(),
+            data.len(),
+            chunks_map.iter().map(|(_, &b)| b).sum::<usize>() as f64 / data.len() as f64
+        );
     }
 }
