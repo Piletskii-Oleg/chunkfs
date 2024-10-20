@@ -136,6 +136,8 @@ where
 
     /// Scrubs the data in the database. Must be used with filesystems created using [`new_with_scrubber`][Self::new_with_scrubber],
     /// otherwise it returns [`ErrorKind::InvalidInput`][io::ErrorKind::InvalidInput].
+    ///
+    /// For more info check [`Scrub`][Scrub] trait and its [`scrub`][Scrub::scrub] method.
     pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
         self.storage.scrub()
     }
