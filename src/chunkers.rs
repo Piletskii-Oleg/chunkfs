@@ -38,16 +38,18 @@ mod tests {
             (res, chunk.length)
         }));
         println!(
-            "Chunk ratio (unique / all): {} / {} = {:.3}",
-            chunks_map.len(),
+            "Chunk ratio (all / unique): {} / {} = {:.3}",
             chunks_len,
-            chunks_map.len() as f64 / chunks_len as f64
+            chunks_map.len(),
+            chunks_len as f64 / chunks_map.len() as f64
         );
+
+        let total_chunk_size = chunks_map.iter().map(|(_, &b)| b).sum::<usize>();
         println!(
-            "Data size ratio: {} / {} = {:.3}",
-            chunks_map.iter().map(|(_, &b)| b).sum::<usize>(),
+            "Data size ratio (all / unique): {} / {} = {:.3}",
             data.len(),
-            chunks_map.iter().map(|(_, &b)| b).sum::<usize>() as f64 / data.len() as f64
+            chunks_map.iter().map(|(_, &b)| b).sum::<usize>(),
+            data.len() as f64 / total_chunk_size as f64
         );
     }
 }
