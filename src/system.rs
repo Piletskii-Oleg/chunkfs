@@ -155,4 +155,9 @@ where
     pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
         self.storage.scrub()
     }
+
+    /// Calculates deduplication ratio of the storage, not accounting for chunks processed with scrubber.
+    pub fn cdc_dedup_ratio(&mut self) -> f64 {
+        self.storage.cdc_dedup_ratio()
+    }
 }

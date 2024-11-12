@@ -30,6 +30,8 @@ fn main() -> io::Result<()> {
     let measurements = fs.close_file(file)?;
     println!("{:?}", measurements);
 
+    println!("{}", fs.cdc_dedup_ratio());
+
     let mut file = fs.open_file("file", LeapChunker::default())?;
     let read = fs.read_from_file(&mut file)?;
 

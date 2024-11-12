@@ -5,7 +5,8 @@ use crate::{Chunk, Chunker};
 
 /// Chunker that utilizes Fixed Sized Chunking (FSC) algorithm,
 /// splitting file into even-sized chunks.
-#[derive(Default)]
+///
+/// Default chunk size is 4096 bytes.
 pub struct FSChunker {
     chunk_size: usize,
     rest: Vec<u8>,
@@ -23,6 +24,12 @@ impl FSChunker {
 impl Debug for FSChunker {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Fixed size chunking, chunk size: {}", self.chunk_size)
+    }
+}
+
+impl Default for FSChunker {
+    fn default() -> Self {
+        Self::new(4096)
     }
 }
 

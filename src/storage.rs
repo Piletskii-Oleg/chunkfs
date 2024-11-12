@@ -31,6 +31,7 @@ pub struct Span<Hash: ChunkHash> {
 pub struct SpansInfo<Hash: ChunkHash> {
     pub spans: Vec<Span<Hash>>,
     pub measurements: WriteMeasurements,
+    total_length: usize,
 }
 
 impl<Hash: ChunkHash> Span<Hash> {
@@ -50,6 +51,7 @@ where
     scrubber: Option<Box<dyn Scrub<Hash, B, K>>>,
     target_map: Option<Box<dyn Database<K, Vec<u8>>>>,
     hasher: H,
+    size_written: usize,
 }
 
 impl<H, Hash, B, K> ChunkStorage<H, Hash, B, K>
@@ -64,6 +66,7 @@ where
             scrubber: None,
             target_map: None,
             hasher,
+            size_written: 0,
         }
     }
 
@@ -77,13 +80,21 @@ where
         chunker: &mut C,
     ) -> io::Result<SpansInfo<H::Hash>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
-        writer.write(data, &mut self.database)
+        let spans_info = writer.write(data, &mut self.database)?;
+
+        self.size_written += spans_info.total_length;
+
+        Ok(spans_info)
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
     pub fn flush<C: Chunker>(&mut self, chunker: &mut C) -> io::Result<SpansInfo<H::Hash>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
-        writer.flush(&mut self.database)
+        let spans_info = writer.flush(&mut self.database)?;
+
+        self.size_written += spans_info.total_length;
+
+        Ok(spans_info)
     }
 
     /// Retrieves the data from the storage based on hashes of the data [`segments`][Segment],
@@ -126,6 +137,7 @@ where
             scrubber: Some(scrubber),
             target_map: Some(target_map),
             hasher,
+            size_written: 0,
         }
     }
 
@@ -135,6 +147,21 @@ where
             .as_mut()
             .unwrap()
             .scrub(&mut self.database, target_map)
+    }
+
+    /// Returns size of CDC chunks in the storage. Doesn't count for chunks processed with SBC or FBC.
+    fn total_cdc_size(&mut self) -> usize {
+        self.database
+            .into_iter()
+            .fold(0, |total_size, (_, container)| match container.extract() {
+                Data::Chunk(chunk) => total_size + chunk.len(),
+                Data::TargetChunk(_) => total_size,
+            })
+    }
+
+    /// Calculates deduplication ratio of the storage, not accounting for chunks processed with scrubber.
+    pub fn cdc_dedup_ratio(&mut self) -> f64 {
+        (self.size_written as f64) / (self.total_cdc_size() as f64)
     }
 }
 
@@ -192,6 +219,8 @@ where
             .map(|chunk| buffer[chunk.range()].to_vec())
             .collect::<Vec<_>>();
 
+        let total_length = chunks.iter().map(|chunk| chunk.len()).sum::<usize>();
+
         // have to copy hashes? or do something else?
         let spans = hashes
             .iter()
@@ -209,6 +238,7 @@ where
         Ok(SpansInfo {
             spans,
             measurements: WriteMeasurements::new(chunk_time, hash_time),
+            total_length,
         })
     }
 
@@ -222,6 +252,7 @@ where
             return Ok(SpansInfo {
                 spans: vec![],
                 measurements: Default::default(),
+                total_length: 0,
             });
         }
 
@@ -237,6 +268,7 @@ where
         Ok(SpansInfo {
             spans: vec![span],
             measurements: WriteMeasurements::new(Duration::default(), hash_time),
+            total_length: remainder_length,
         })
     }
 }
@@ -283,6 +315,7 @@ impl<K> Default for Data<K> {
 mod tests {
     use std::collections::HashMap;
 
+    use crate::chunkers::{FSChunker, SuperChunker};
     use crate::hashers::SimpleHasher;
     use crate::scrub::DumbScrubber;
     use crate::storage::ChunkStorage;
@@ -299,6 +332,7 @@ mod tests {
             scrubber: Some(Box::new(DumbScrubber)),
             target_map: Some(Box::new(HashMap::default())),
             hasher: SimpleHasher,
+            size_written: 0,
         };
 
         let measurements = chunk_storage
@@ -313,5 +347,40 @@ mod tests {
         assert_eq!(measurements, ScrubMeasurements::default());
 
         println!("{:?}", chunk_storage.database)
+    }
+
+    #[test]
+    fn total_cdc_size_is_calculated_correctly_for_fixed_size_chunker_on_simple_data() {
+        let mut chunk_storage =
+            ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher);
+
+        let data = vec![10; 1024 * 1024];
+        let mut chunker = FSChunker::new(4096);
+
+        chunk_storage.write(&data, &mut chunker).unwrap();
+        chunk_storage.flush(&mut chunker).unwrap();
+
+        assert_eq!(chunk_storage.total_cdc_size(), 4096)
+    }
+
+    #[test]
+    fn size_written_is_calculated_correctly() {
+        let mut chunk_storage =
+            ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher);
+
+        let data = vec![
+            vec![4; 1024 * 256],
+            vec![8; 1024 * 256],
+            vec![16; 1024 * 256],
+            vec![32; 1024 * 256],
+        ]
+        .concat();
+        let mut chunker = SuperChunker::default();
+
+        chunk_storage.write(&data, &mut chunker).unwrap();
+        chunk_storage.write(&data, &mut chunker).unwrap();
+        chunk_storage.flush(&mut chunker).unwrap();
+
+        assert_eq!(chunk_storage.size_written, 1024 * 1024 * 2);
     }
 }

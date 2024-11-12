@@ -3,6 +3,8 @@ extern crate chunkfs;
 use std::collections::HashMap;
 use std::io::ErrorKind;
 
+use approx::assert_relative_eq;
+
 use chunkfs::chunkers::{FSChunker, LeapChunker};
 use chunkfs::hashers::SimpleHasher;
 use chunkfs::{DataContainer, Database, FileSystem};
@@ -121,4 +123,39 @@ fn non_iterable_database_can_be_used_with_fs() {
     }
 
     let _ = FileSystem::new(EmptyDatabase, SimpleHasher);
+}
+
+#[test]
+fn dedup_ratio_is_correct_for_fixed_size_chunker() {
+    let mut fs = FileSystem::new_with_key(HashMap::new(), SimpleHasher, 9);
+
+    const MB: usize = 1024 * 1024;
+    const CHUNK_SIZE: usize = 4096;
+
+    let data = vec![10; MB];
+
+    // first write => 1 MB, 1 chunk
+    let mut fh = fs
+        .create_file("file", FSChunker::new(CHUNK_SIZE), true)
+        .unwrap();
+    fs.write_to_file(&mut fh, &data).unwrap();
+    fs.close_file(fh).unwrap();
+    assert_relative_eq!(fs.cdc_dedup_ratio(), MB as f64 / CHUNK_SIZE as f64);
+
+    // second write, same data => 2 MBs, 1 chunk
+    let mut fh = fs.open_file("file", FSChunker::new(CHUNK_SIZE)).unwrap();
+    fs.write_to_file(&mut fh, &data).unwrap();
+    fs.close_file(fh).unwrap();
+    assert_relative_eq!(fs.cdc_dedup_ratio(), (2 * MB) as f64 / CHUNK_SIZE as f64);
+
+    // third write, different data => 3 MBs, 2 chunks
+    let new_data = vec![20; MB];
+    let mut fh = fs.open_file("file", FSChunker::new(CHUNK_SIZE)).unwrap();
+    fs.write_to_file(&mut fh, &new_data).unwrap();
+    fs.close_file(fh).unwrap();
+
+    assert_relative_eq!(
+        fs.cdc_dedup_ratio(),
+        (3 * MB) as f64 / (CHUNK_SIZE * 2) as f64
+    );
 }
