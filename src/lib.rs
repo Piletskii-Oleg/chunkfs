@@ -1,19 +1,26 @@
+use std::hash;
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
-use std::{hash, io};
 
-pub use system::{FileOpener, FileSystem, OpenError};
+pub use map::Database;
+pub use scrub::{CopyScrubber, Scrub, ScrubMeasurements};
+pub use storage::{Data, DataContainer};
+pub use system::FileSystem;
 
 #[cfg(feature = "chunkers")]
 pub mod chunkers;
 #[cfg(feature = "hashers")]
 pub mod hashers;
 
-pub mod base;
 mod file_layer;
+mod map;
+mod scrub;
 mod storage;
 mod system;
 
+/// Trait for a CDC hash, combining several other traits: [hash::Hash], [Clone], [Eq], [PartialEq], [Default].
+///
+/// Auto-implemented for those structures that implement all the listed traits.
 pub trait ChunkHash: hash::Hash + Clone + Eq + PartialEq + Default {}
 
 impl<T: hash::Hash + Clone + Eq + PartialEq + Default> ChunkHash for T {}
@@ -56,7 +63,7 @@ impl Chunk {
 /// Chunks that are found are returned by [`chunk_data`][Chunker::chunk_data] method.
 /// If some contents were cut because the end of `data` and not the end of the chunk was reached,
 /// it must be returned with [`rest`][Chunker::rest] instead of storing it in the [`chunk_data`][Chunker::chunk_data]'s output.
-pub trait Chunker {
+pub trait Chunker: std::fmt::Debug {
     /// Goes through whole `data` and finds chunks. If last chunk is not actually a chunk but a leftover,
     /// it is returned via [`rest`][Chunker::rest] method and is not contained in the vector.
     ///
@@ -76,34 +83,19 @@ pub trait Chunker {
     fn estimate_chunk_count(&self, data: &[u8]) -> usize;
 }
 
+impl<C: Chunker + 'static> From<C> for Box<dyn Chunker + 'static> {
+    fn from(chunker: C) -> Self {
+        Box::new(chunker)
+    }
+}
+
 /// Functionality for an object that hashes the input.
 pub trait Hasher {
+    /// Hash type that would be returned by the hasher.
     type Hash: ChunkHash;
 
     /// Takes some `data` and returns its `hash`.
     fn hash(&mut self, data: &[u8]) -> Self::Hash;
-}
-
-/// Serves as base functionality for storing the actual data.
-pub trait Database<Hash: ChunkHash> {
-    /// Saves given data to the underlying storage.
-    fn save(&mut self, segments: Vec<Segment<Hash>>) -> io::Result<()>;
-
-    /// Clones and returns the data corresponding to the given hashes, or returns Error(NotFound),
-    /// if some of the hashes were not found.
-    fn retrieve(&self, request: Vec<Hash>) -> io::Result<Vec<Vec<u8>>>;
-}
-
-/// A data segment with corresponding hash.
-pub struct Segment<Hash: ChunkHash> {
-    pub hash: Hash,
-    pub data: Vec<u8>,
-}
-
-impl<Hash: ChunkHash> Segment<Hash> {
-    pub fn new(hash: Hash, data: Vec<u8>) -> Self {
-        Self { hash, data }
-    }
 }
 
 /// Measurements that are received after writing data to a file.
