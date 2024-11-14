@@ -1,7 +1,7 @@
 extern crate chunkfs;
 
 use std::collections::HashMap;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 use std::io;
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
@@ -66,7 +66,7 @@ fn main() -> io::Result<()> {
 const MB: usize = 1024 * 1024;
 
 fn parametrized_write(
-    chunker: impl Chunker + Debug,
+    chunker: impl Chunker + Debug + 'static,
     hasher: impl Hasher + Debug,
 ) -> io::Result<Measurements> {
     println!("Current chunker: {:?}", chunker);

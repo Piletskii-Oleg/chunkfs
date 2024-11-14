@@ -56,25 +56,25 @@ where
 
     /// Tries to open a file with the given name and returns its `FileHandle` if it exists,
     /// or `None`, if it doesn't.
-    pub fn open_file<C: Chunker>(&self, name: &str, chunker: C) -> io::Result<FileHandle<C>> {
-        self.file_layer.open(name, chunker)
+    pub fn open_file(&self, name: &str, chunker: impl Into<Box<dyn Chunker>>) -> io::Result<FileHandle> {
+        self.file_layer.open(name, chunker.into())
     }
 
     /// Creates a file with the given name and returns its `FileHandle`.
     /// Returns `ErrorKind::AlreadyExists`, if the file with the same name exists in the file system.
-    pub fn create_file<C: Chunker>(
+    pub fn create_file(
         &mut self,
         name: impl Into<String>,
-        chunker: C,
+        chunker: impl Into<Box<dyn Chunker>>,
         create_new: bool,
-    ) -> io::Result<FileHandle<C>> {
-        self.file_layer.create(name, chunker, create_new)
+    ) -> io::Result<FileHandle> {
+        self.file_layer.create(name, chunker.into(), create_new)
     }
 
     /// Writes given data to the file.
-    pub fn write_to_file<C: Chunker>(
+    pub fn write_to_file(
         &mut self,
-        handle: &mut FileHandle<C>,
+        handle: &mut FileHandle,
         data: &[u8],
     ) -> io::Result<()> {
         let mut current = 0;
@@ -100,9 +100,9 @@ where
 
     /// Closes the file and ensures that all data that was written to it
     /// is stored. Returns [WriteMeasurements] containing chunking and hashing times.
-    pub fn close_file<C: Chunker>(
+    pub fn close_file(
         &mut self,
-        mut handle: FileHandle<C>,
+        mut handle: FileHandle,
     ) -> io::Result<WriteMeasurements> {
         let span = self.storage.flush(&mut handle.chunker)?;
         self.file_layer.write(&mut handle, span);
@@ -111,15 +111,15 @@ where
     }
 
     /// Reads all contents of the file from beginning to end and returns them.
-    pub fn read_file_complete<C: Chunker>(&self, handle: &FileHandle<C>) -> io::Result<Vec<u8>> {
+    pub fn read_file_complete(&self, handle: &FileHandle) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read_complete(handle);
         Ok(self.storage.retrieve(&hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 
     /// Reads 1 MB of data from a file and returns it.
-    pub fn read_from_file<C: Chunker>(
+    pub fn read_from_file(
         &mut self,
-        handle: &mut FileHandle<C>,
+        handle: &mut FileHandle,
     ) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(&hashes)?.concat())

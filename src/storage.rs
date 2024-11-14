@@ -74,10 +74,10 @@ where
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    pub fn write<C: Chunker>(
+    pub fn write(
         &mut self,
         data: &[u8],
-        chunker: &mut C,
+        chunker: &mut Box<dyn Chunker>,
     ) -> io::Result<SpansInfo<H::Hash>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
         let spans_info = writer.write(data, &mut self.database)?;
@@ -88,7 +88,7 @@ where
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
-    pub fn flush<C: Chunker>(&mut self, chunker: &mut C) -> io::Result<SpansInfo<H::Hash>> {
+    pub fn flush(&mut self, chunker: &mut Box<dyn Chunker>) -> io::Result<SpansInfo<H::Hash>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
         let spans_info = writer.flush(&mut self.database)?;
 
@@ -168,22 +168,19 @@ where
 /// Writer that conducts operations on [Storage].
 /// Only exists during [FileSystem::write_to_file][crate::FileSystem::write_to_file].
 /// Receives `buffer` from [FileHandle][crate::file_layer::FileHandle] and gives it back after a successful write.
-#[derive(Debug)]
-struct StorageWriter<'handle, C, H>
+struct StorageWriter<'handle, H>
 where
-    C: Chunker,
     H: Hasher,
 {
-    chunker: &'handle mut C,
+    chunker: &'handle mut Box<dyn Chunker>,
     hasher: &'handle mut H,
 }
 
-impl<'handle, C, H> StorageWriter<'handle, C, H>
+impl<'handle, H> StorageWriter<'handle, H>
 where
-    C: Chunker,
     H: Hasher,
 {
-    fn new(chunker: &'handle mut C, hasher: &'handle mut H) -> Self {
+    fn new(chunker: &'handle mut Box<dyn Chunker>, hasher: &'handle mut H) -> Self {
         Self { chunker, hasher }
     }
 
@@ -315,7 +312,8 @@ impl<K> Default for Data<K> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::chunkers::{FSChunker, SuperChunker};
+    use crate::Chunker;
+    use crate::chunkers::{FSChunker, LeapChunker, SuperChunker};
     use crate::hashers::SimpleHasher;
     use crate::scrub::DumbScrubber;
     use crate::storage::ChunkStorage;
@@ -355,7 +353,7 @@ mod tests {
             ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher);
 
         let data = vec![10; 1024 * 1024];
-        let mut chunker = FSChunker::new(4096);
+        let mut chunker: Box<dyn Chunker> = Box::new(FSChunker::new(4096));
 
         chunk_storage.write(&data, &mut chunker).unwrap();
         chunk_storage.flush(&mut chunker).unwrap();
@@ -375,7 +373,9 @@ mod tests {
             vec![32; 1024 * 256],
         ]
         .concat();
-        let mut chunker = SuperChunker::default();
+
+        let chunkers: Vec<Box<dyn Chunker>> = vec![SuperChunker::default().into(), LeapChunker::default().into()];
+        let mut chunker: Box<dyn Chunker> = Box::new(SuperChunker::default());
 
         chunk_storage.write(&data, &mut chunker).unwrap();
         chunk_storage.write(&data, &mut chunker).unwrap();

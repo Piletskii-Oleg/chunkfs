@@ -83,6 +83,12 @@ pub trait Chunker {
     fn estimate_chunk_count(&self, data: &[u8]) -> usize;
 }
 
+impl<C: Chunker + 'static> From<C> for Box<dyn Chunker + 'static> {
+    fn from(chunker: C) -> Self {
+        Box::new(chunker)
+    }
+}
+
 /// Functionality for an object that hashes the input.
 pub trait Hasher {
     /// Hash type that would be returned by the hasher.
