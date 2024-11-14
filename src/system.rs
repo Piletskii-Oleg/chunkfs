@@ -56,7 +56,11 @@ where
 
     /// Tries to open a file with the given name and returns its `FileHandle` if it exists,
     /// or `None`, if it doesn't.
-    pub fn open_file(&self, name: &str, chunker: impl Into<Box<dyn Chunker>>) -> io::Result<FileHandle> {
+    pub fn open_file(
+        &self,
+        name: &str,
+        chunker: impl Into<Box<dyn Chunker>>,
+    ) -> io::Result<FileHandle> {
         self.file_layer.open(name, chunker.into())
     }
 
@@ -72,11 +76,7 @@ where
     }
 
     /// Writes given data to the file.
-    pub fn write_to_file(
-        &mut self,
-        handle: &mut FileHandle,
-        data: &[u8],
-    ) -> io::Result<()> {
+    pub fn write_to_file(&mut self, handle: &mut FileHandle, data: &[u8]) -> io::Result<()> {
         let mut current = 0;
         let mut all_spans = vec![];
         while current < data.len() {
@@ -100,10 +100,7 @@ where
 
     /// Closes the file and ensures that all data that was written to it
     /// is stored. Returns [WriteMeasurements] containing chunking and hashing times.
-    pub fn close_file(
-        &mut self,
-        mut handle: FileHandle,
-    ) -> io::Result<WriteMeasurements> {
+    pub fn close_file(&mut self, mut handle: FileHandle) -> io::Result<WriteMeasurements> {
         let span = self.storage.flush(&mut handle.chunker)?;
         self.file_layer.write(&mut handle, span);
 
@@ -117,10 +114,7 @@ where
     }
 
     /// Reads 1 MB of data from a file and returns it.
-    pub fn read_from_file(
-        &mut self,
-        handle: &mut FileHandle,
-    ) -> io::Result<Vec<u8>> {
+    pub fn read_from_file(&mut self, handle: &mut FileHandle) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(&hashes)?.concat())
     }

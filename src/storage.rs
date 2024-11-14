@@ -312,13 +312,13 @@ impl<K> Default for Data<K> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::Chunker;
-    use crate::chunkers::{FSChunker, LeapChunker, SuperChunker};
+    use crate::chunkers::{FSChunker, SuperChunker};
     use crate::hashers::SimpleHasher;
     use crate::scrub::DumbScrubber;
     use crate::storage::ChunkStorage;
     use crate::storage::DataContainer;
     use crate::storage::ScrubMeasurements;
+    use crate::Chunker;
 
     #[test]
     fn hashmap_works_as_cdc_map() {
@@ -366,7 +366,7 @@ mod tests {
         let mut chunk_storage =
             ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher);
 
-        let data = vec![
+        let data = [
             vec![4; 1024 * 256],
             vec![8; 1024 * 256],
             vec![16; 1024 * 256],
@@ -374,7 +374,6 @@ mod tests {
         ]
         .concat();
 
-        let chunkers: Vec<Box<dyn Chunker>> = vec![SuperChunker::default().into(), LeapChunker::default().into()];
         let mut chunker: Box<dyn Chunker> = Box::new(SuperChunker::default());
 
         chunk_storage.write(&data, &mut chunker).unwrap();

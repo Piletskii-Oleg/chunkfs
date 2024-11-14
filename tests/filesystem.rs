@@ -5,8 +5,8 @@ use std::io::ErrorKind;
 
 use approx::assert_relative_eq;
 
-use chunkfs::chunkers::{FSChunker, LeapChunker};
-use chunkfs::hashers::SimpleHasher;
+use chunkfs::chunkers::{FSChunker, LeapChunker, SuperChunker};
+use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
 use chunkfs::{DataContainer, Database, FileSystem};
 
 const MB: usize = 1024 * 1024;
@@ -158,4 +158,27 @@ fn dedup_ratio_is_correct_for_fixed_size_chunker() {
         fs.cdc_dedup_ratio(),
         (3 * MB) as f64 / (CHUNK_SIZE * 2) as f64
     );
+}
+
+#[test]
+fn different_chunkers_from_vec_can_be_used_with_same_filesystem() {
+    let mut fs = FileSystem::new_with_key(HashMap::new(), Sha256Hasher::default(), 9);
+    let chunkers: Vec<Box<dyn chunkfs::Chunker>> = vec![
+        SuperChunker::default().into(),
+        LeapChunker::default().into(),
+    ];
+
+    let data = vec![0; 1024 * 1024];
+    for chunker in chunkers {
+        let name = format!("file-{chunker:?}");
+        let mut fh = fs.create_file(&name, chunker, true).unwrap();
+        fs.write_to_file(&mut fh, &data).unwrap();
+        fs.close_file(fh).unwrap();
+
+        let fh = fs.open_file(&name, FSChunker::default()).unwrap();
+        let read = fs.read_file_complete(&fh).unwrap();
+
+        assert_eq!(read.len(), data.len());
+        assert_eq!(read, data);
+    }
 }
