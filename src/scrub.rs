@@ -1,7 +1,7 @@
 use std::io;
 use std::time::{Duration, Instant};
 
-use crate::map::Database;
+use crate::map::{Database, IterableDatabase};
 use crate::storage::DataContainer;
 use crate::{ChunkHash, Data};
 
@@ -29,8 +29,7 @@ use crate::{ChunkHash, Data};
 ///     the target map implements [Database] trait. It should only be used for storage purposes and not contain any algorithm logic.
 pub trait Scrub<Hash: ChunkHash, B, Key>
 where
-    B: Database<Hash, DataContainer<Key>>,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<Key>)>,
+    B: IterableDatabase<Hash, DataContainer<Key>>,
 {
     /// # How to implement
     /// To iterate over the underlying chunks, `database.into_iter()` should be used.
@@ -84,10 +83,10 @@ pub struct CopyScrubber;
 
 pub struct DumbScrubber;
 
-impl<Hash: ChunkHash, B> Scrub<Hash, B, Hash> for CopyScrubber
+impl<Hash, B> Scrub<Hash, B, Hash> for CopyScrubber
 where
-    B: Database<Hash, DataContainer<Hash>>,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<Hash>)>,
+    Hash: ChunkHash,
+    B: IterableDatabase<Hash, DataContainer<Hash>>,
 {
     fn scrub<'a>(
         &mut self,
@@ -99,7 +98,7 @@ where
     {
         let now = Instant::now();
         let mut processed_data = 0;
-        for (hash, container) in database.into_iter() {
+        for (hash, container) in database.iterator_mut() {
             match container.extract() {
                 Data::Chunk(chunk) => {
                     target.insert(hash.clone(), chunk.clone())?;
@@ -118,10 +117,10 @@ where
     }
 }
 
-impl<Hash: ChunkHash, B, Key> Scrub<Hash, B, Key> for DumbScrubber
+impl<Hash, B, Key> Scrub<Hash, B, Key> for DumbScrubber
 where
-    B: Database<Hash, DataContainer<Key>>,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<Key>)>,
+    Hash: ChunkHash,
+    B: IterableDatabase<Hash, DataContainer<Key>>,
 {
     fn scrub<'a>(
         &mut self,

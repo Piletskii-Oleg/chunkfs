@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::io;
 
 use crate::file_layer::{FileHandle, FileLayer};
-use crate::map::Database;
+use crate::map::{Database, IterableDatabase};
 use crate::scrub::{Scrub, ScrubMeasurements};
 use crate::storage::{ChunkStorage, DataContainer};
 use crate::WriteMeasurements;
@@ -122,10 +122,9 @@ where
 
 impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
 where
-    B: Database<Hash, DataContainer<K>>,
+    B: IterableDatabase<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
 {
     /// Creates a file system with the given [`hasher`][Hasher], original [`base`][Base] and target map, and a [`scrubber`][Scrub].
     ///

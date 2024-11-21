@@ -36,6 +36,43 @@ pub trait Database<K, V> {
     fn contains(&self, key: &K) -> bool;
 }
 
+pub trait IterableDatabase<K, V>: Database<K, V> {
+    fn iterator(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_>;
+
+    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_>;
+
+    fn keys<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a K> + 'a>
+    where
+        V: 'a,
+    {
+        Box::new(self.iterator().map(|(k, _)| k))
+    }
+
+    fn values<'a>(&'a self) -> Box<dyn Iterator<Item = &'a V> + 'a>
+    where
+        K: 'a,
+    {
+        Box::new(self.iterator().map(|(_, v)| v))
+    }
+
+    fn values_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut V> + 'a>
+    where
+        K: 'a,
+    {
+        Box::new(self.iterator_mut().map(|(_, v)| v))
+    }
+}
+
+impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
+    fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &V)> + '_> {
+        Box::new(self.iter())
+    }
+
+    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {
+        Box::new(self.iter_mut())
+    }
+}
+
 impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
     fn insert(&mut self, key: Hash, value: V) -> io::Result<()> {
         self.insert(key, value);

@@ -3,7 +3,7 @@ use std::io;
 use std::io::ErrorKind;
 use std::time::{Duration, Instant};
 
-use crate::map::Database;
+use crate::map::{Database, IterableDatabase};
 use crate::scrub::{Scrub, ScrubMeasurements};
 use crate::WriteMeasurements;
 use crate::{ChunkHash, Chunker, Hasher};
@@ -123,8 +123,7 @@ impl<H, Hash, B, K> ChunkStorage<H, Hash, B, K>
 where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    B: Database<H::Hash, DataContainer<K>>,
-    for<'a> &'a mut B: IntoIterator<Item = (&'a Hash, &'a mut DataContainer<K>)>,
+    B: IterableDatabase<H::Hash, DataContainer<K>>,
 {
     pub fn new_with_scrubber(
         database: B,
@@ -152,8 +151,8 @@ where
     /// Returns size of CDC chunks in the storage. Doesn't count for chunks processed with SBC or FBC.
     fn total_cdc_size(&mut self) -> usize {
         self.database
-            .into_iter()
-            .fold(0, |total_size, (_, container)| match container.extract() {
+            .values()
+            .fold(0, |total_size, container| match container.extract() {
                 Data::Chunk(chunk) => total_size + chunk.len(),
                 Data::TargetChunk(_) => total_size,
             })
