@@ -1,38 +1,40 @@
 use std::cmp::min;
 use std::io;
-
+use std::marker::PhantomData;
 use crate::file_layer::{FileHandle, FileLayer};
 use crate::map::{Database, IterableDatabase};
 use crate::scrub::{Scrub, ScrubMeasurements};
-use crate::storage::{ChunkStorage, DataContainer};
+use crate::storage::{ChunkStorage, DataContainer, EmptyDatabase};
 use crate::WriteMeasurements;
 use crate::{ChunkHash, SEG_SIZE};
 use crate::{Chunker, Hasher};
 
 /// A file system provided by chunkfs.
-pub struct FileSystem<B, H, Hash, K>
+pub struct FileSystem<B, H, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
+    T: Database<K, Vec<u8>>,
 {
-    storage: ChunkStorage<H, Hash, B, K>,
+    storage: ChunkStorage<H, Hash, B, K, T>,
     file_layer: FileLayer<Hash>,
 }
 
-impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
+impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
+    T: Database<K, Vec<u8>>,
 {
     /// Functionally the same as [`Self::new`], but it also takes a key example as a parameter so that rust compiler knows
     /// which type it is.
     ///
     /// Any value can be passed as a `_key` as it is not used anywhere, e.g. 0.
-    pub fn new_with_key(base: B, hasher: H, _key: K) -> Self {
+    pub fn new_with_key(base: B, hasher: H, key: K) -> Self {
         Self {
-            storage: ChunkStorage::new(base, hasher),
+            storage: ChunkStorage::new_with_key(base, hasher, key),
             file_layer: Default::default(),
         }
     }
@@ -120,19 +122,20 @@ where
     }
 }
 
-impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
+impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
     B: IterableDatabase<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
+    T: Database<K, Vec<u8>>,
 {
     /// Creates a file system with the given [`hasher`][Hasher], original [`base`][Base] and target map, and a [`scrubber`][Scrub].
     ///
     /// Provided `database` must implement [IntoIterator].
     pub fn new_with_scrubber(
         database: B,
-        target_map: Box<dyn Database<K, Vec<u8>>>,
-        scrubber: Box<dyn Scrub<Hash, B, K>>,
+        target_map: T,
+        scrubber: Box<dyn Scrub<Hash, B, K, T>>,
         hasher: H,
     ) -> Self {
         Self {
@@ -150,7 +153,7 @@ where
     }
 
     /// Calculates deduplication ratio of the storage, not accounting for chunks processed with scrubber.
-    pub fn cdc_dedup_ratio(&mut self) -> f64 {
+    pub fn cdc_dedup_ratio(&self) -> f64 {
         self.storage.cdc_dedup_ratio()
     }
 }
