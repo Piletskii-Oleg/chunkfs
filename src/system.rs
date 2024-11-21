@@ -1,6 +1,5 @@
 use std::cmp::min;
 use std::io;
-use std::marker::PhantomData;
 use crate::file_layer::{FileHandle, FileLayer};
 use crate::map::{Database, IterableDatabase};
 use crate::scrub::{Scrub, ScrubMeasurements};
@@ -21,6 +20,15 @@ where
     file_layer: FileLayer<Hash>,
 }
 
+pub fn create_cdc_filesystem<B, H, Hash, K>(base: B, hasher: H, key: K) -> FileSystem<B, H, Hash, K, EmptyDatabase<K, Vec<u8>>>
+where
+    B: Database<Hash, DataContainer<K>>,
+    H: Hasher<Hash = Hash>,
+    Hash: ChunkHash,
+{
+    FileSystem::new(base, hasher, EmptyDatabase::new(key, vec![]))
+}
+
 impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
@@ -28,25 +36,11 @@ where
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
-    /// Functionally the same as [`Self::new`], but it also takes a key example as a parameter so that rust compiler knows
-    /// which type it is.
-    ///
-    /// Any value can be passed as a `_key` as it is not used anywhere, e.g. 0.
-    pub fn new_with_key(base: B, hasher: H, key: K) -> Self {
-        Self {
-            storage: ChunkStorage::new_with_key(base, hasher, key),
-            file_layer: Default::default(),
-        }
-    }
-
-    /// Creates a file system with the given [`hasher`][Hasher] and [`base`][Base]. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
+    /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
     /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
-    ///
-    /// Use [`Self::new_with_key`] if this method throws a long compile-time error message that says something about
-    /// giving filesystem an explicit type, where the type for type parameter 'K' is specified.
-    pub fn new(base: B, hasher: H) -> Self {
+    pub fn new(base: B, hasher: H, target_map: T) -> Self {
         Self {
-            storage: ChunkStorage::new(base, hasher),
+            storage: ChunkStorage::new(base, hasher, target_map),
             file_layer: Default::default(),
         }
     }
@@ -155,5 +149,18 @@ where
     /// Calculates deduplication ratio of the storage, not accounting for chunks processed with scrubber.
     pub fn cdc_dedup_ratio(&self) -> f64 {
         self.storage.cdc_dedup_ratio()
+    }
+}
+
+impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
+where
+    H: Hasher<Hash = Hash>,
+    Hash: ChunkHash,
+    B: IterableDatabase<H::Hash, DataContainer<K>>,
+    T: IterableDatabase<K, Vec<u8>>,
+{
+    /// Calculates total deduplication ratio of the storage, accounting for chunks both unprocessed and processed with scrubber.
+    pub fn total_dedup_ratio(&self) -> f64 {
+        self.storage.total_dedup_ratio()
     }
 }

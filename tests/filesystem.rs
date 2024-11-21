@@ -7,13 +7,13 @@ use approx::assert_relative_eq;
 
 use chunkfs::chunkers::{FSChunker, LeapChunker, SuperChunker};
 use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
-use chunkfs::{DataContainer, Database, FileSystem};
+use chunkfs::{create_cdc_filesystem, DataContainer, Database};
 
 const MB: usize = 1024 * 1024;
 
 #[test]
 fn write_read_complete_test() {
-    let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
 
     let mut handle = fs
         .create_file("file", LeapChunker::default(), true)
@@ -32,7 +32,7 @@ fn write_read_complete_test() {
 
 #[test]
 fn write_read_blocks_test() {
-    let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
 
     let mut handle = fs.create_file("file", FSChunker::new(4096), true).unwrap();
 
@@ -53,7 +53,7 @@ fn write_read_blocks_test() {
 
 #[test]
 fn read_file_with_size_less_than_1mb() {
-    let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
 
     let mut handle = fs.create_file("file", FSChunker::new(4096), true).unwrap();
 
@@ -68,7 +68,7 @@ fn read_file_with_size_less_than_1mb() {
 
 #[test]
 fn write_read_big_file_at_once() {
-    let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
 
     let mut handle = fs.create_file("file", FSChunker::new(4096), true).unwrap();
 
@@ -82,7 +82,7 @@ fn write_read_big_file_at_once() {
 
 #[test]
 fn scrub_compiles_on_cdc_map_but_returns_error() {
-    let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
     let result = fs.scrub();
     assert!(result.is_err());
     assert_eq!(result.unwrap_err().kind(), ErrorKind::InvalidInput)
@@ -90,7 +90,7 @@ fn scrub_compiles_on_cdc_map_but_returns_error() {
 
 #[test]
 fn two_file_handles_to_one_file() {
-    let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
     let mut handle1 = fs
         .create_file("file", LeapChunker::default(), true)
         .unwrap();
@@ -102,9 +102,9 @@ fn two_file_handles_to_one_file() {
 
 #[test]
 fn non_iterable_database_can_be_used_with_fs() {
-    struct EmptyDatabase;
+    struct DummyDatabase;
 
-    impl Database<Vec<u8>, DataContainer<()>> for EmptyDatabase {
+    impl Database<Vec<u8>, DataContainer<()>> for DummyDatabase {
         fn insert(&mut self, _key: Vec<u8>, _value: DataContainer<()>) -> std::io::Result<()> {
             unimplemented!()
         }
@@ -122,12 +122,12 @@ fn non_iterable_database_can_be_used_with_fs() {
         }
     }
 
-    let _ = FileSystem::new(EmptyDatabase, SimpleHasher);
+    let _ = create_cdc_filesystem(DummyDatabase, SimpleHasher, ());
 }
 
 #[test]
 fn dedup_ratio_is_correct_for_fixed_size_chunker() {
-    let mut fs = FileSystem::new_with_key(HashMap::new(), SimpleHasher, 9);
+    let mut fs = create_cdc_filesystem(HashMap::new(), SimpleHasher, 9);
 
     const MB: usize = 1024 * 1024;
     const CHUNK_SIZE: usize = 4096;
@@ -162,7 +162,7 @@ fn dedup_ratio_is_correct_for_fixed_size_chunker() {
 
 #[test]
 fn different_chunkers_from_vec_can_be_used_with_same_filesystem() {
-    let mut fs = FileSystem::new_with_key(HashMap::new(), Sha256Hasher::default(), 9);
+    let mut fs = create_cdc_filesystem(HashMap::new(), Sha256Hasher::default(), 9);
     let chunkers: Vec<Box<dyn chunkfs::Chunker>> = vec![
         SuperChunker::default().into(),
         LeapChunker::default().into(),

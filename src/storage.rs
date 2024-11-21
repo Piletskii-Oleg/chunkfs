@@ -1,6 +1,5 @@
 use std::fmt::Formatter;
 use std::io;
-use std::io::ErrorKind;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
@@ -51,7 +50,7 @@ where
 {
     database: B,
     scrubber: Option<Box<dyn Scrub<Hash, B, K, T>>>,
-    target_map: Option<T>,
+    target_map: T,
     hasher: H,
     size_written: usize,
 }
@@ -63,21 +62,11 @@ where
     B: Database<H::Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
 {
-    pub fn new(database: B, hasher: H) -> Self {
+    pub fn new(database: B, hasher: H, target_map: T) -> Self {
         Self {
             database,
             scrubber: None,
-            target_map: None,
-            hasher,
-            size_written: 0,
-        }
-    }
-
-    pub fn new_with_key(database: B, hasher: H, _key: K, target_map: T) -> Self {
-        Self {
-            database,
-            scrubber: None,
-            target_map: Some(target_map),
+            target_map,
             hasher,
             size_written: 0,
         }
@@ -121,8 +110,6 @@ where
                 Data::Chunk(chunk) => Ok(chunk.clone()),
                 Data::TargetChunk(keys) => Ok(self
                     .target_map
-                    .as_ref()
-                    .unwrap()
                     .get_multi(keys)?
                     .into_iter()
                     .flatten()
@@ -148,18 +135,17 @@ where
         Self {
             database,
             scrubber: Some(scrubber),
-            target_map: Some(target_map),
+            target_map,
             hasher,
             size_written: 0,
         }
     }
 
     pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
-        let target_map = self.target_map.as_mut().ok_or(ErrorKind::InvalidInput)?;
         self.scrubber
             .as_mut()
-            .unwrap()
-            .scrub(&mut self.database, target_map)
+            .ok_or(io::Error::new(io::ErrorKind::InvalidInput, "scrubber cannot be used with CDC filesystem"))?
+            .scrub(&mut self.database, &mut self.target_map)
     }
 
     /// Returns size of CDC chunks in the storage. Doesn't count for chunks processed with SBC or FBC.
@@ -189,14 +175,12 @@ where
         let cdc_size = self.total_cdc_size();
         let scrubbed_size = self
             .target_map
-            .as_ref()
-            .unwrap()
             .values()
             .fold(0, |total_size, data| total_size + data.len());
         cdc_size + scrubbed_size
     }
 
-    fn total_dedup_ratio(&self) -> f64 {
+    pub fn total_dedup_ratio(&self) -> f64 {
         (self.size_written as f64) / (self.total_size() as f64)
     }
 }
@@ -345,8 +329,17 @@ impl<K> Default for Data<K> {
 }
 
 pub struct EmptyDatabase<K, V> {
-    pub k: PhantomData<K>,
-    pub v: PhantomData<V>,
+    k: PhantomData<K>,
+    v: PhantomData<V>,
+}
+
+impl<K, V> EmptyDatabase<K, V> {
+    pub fn new(_key: K, _value: V) -> Self {
+        Self {
+            k: Default::default(),
+            v: Default::default(),
+        }
+    }
 }
 
 impl<K, V> Database<K, V> for EmptyDatabase<K, V> {
@@ -387,7 +380,7 @@ mod tests {
         let mut chunk_storage = ChunkStorage {
             database: map,
             scrubber: Some(Box::new(DumbScrubber)),
-            target_map: Some(HashMap::default()),
+            target_map: HashMap::default(),
             hasher: SimpleHasher,
             size_written: 0,
         };
@@ -398,7 +391,7 @@ mod tests {
             .unwrap()
             .scrub(
                 &mut chunk_storage.database,
-                chunk_storage.target_map.as_mut().unwrap(),
+                &mut chunk_storage.target_map,
             )
             .unwrap();
         assert_eq!(measurements, ScrubMeasurements::default());
@@ -408,8 +401,8 @@ mod tests {
 
     #[test]
     fn total_cdc_size_is_calculated_correctly_for_fixed_size_chunker_on_simple_data() {
-        let mut chunk_storage: ChunkStorage<SimpleHasher, Vec<u8>, HashMap<Vec<u8>, DataContainer<()>>, (), HashMap<(), Vec<u8>>> =
-            ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher);
+        let mut chunk_storage =
+            ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher, HashMap::default());
 
         let data = vec![10; 1024 * 1024];
         let mut chunker: Box<dyn Chunker> = Box::new(FSChunker::new(4096));
@@ -423,7 +416,7 @@ mod tests {
     #[test]
     fn size_written_is_calculated_correctly() {
         let mut chunk_storage: ChunkStorage<SimpleHasher, Vec<u8>, HashMap<Vec<u8>, DataContainer<()>>, (), HashMap<_, _>> =
-            ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher);
+            ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher, HashMap::default());
 
         let data = [
             vec![4; 1024 * 256],

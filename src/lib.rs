@@ -5,7 +5,7 @@ use std::time::Duration;
 pub use map::Database;
 pub use scrub::{CopyScrubber, Scrub, ScrubMeasurements};
 pub use storage::{Data, DataContainer};
-pub use system::FileSystem;
+pub use system::{FileSystem, create_cdc_filesystem};
 
 #[cfg(feature = "chunkers")]
 pub mod chunkers;
