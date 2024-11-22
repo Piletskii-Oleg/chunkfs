@@ -20,13 +20,19 @@ where
     file_layer: FileLayer<Hash>,
 }
 
-pub fn create_cdc_filesystem<B, H, Hash, K>(base: B, hasher: H, key: K) -> FileSystem<B, H, Hash, K, EmptyDatabase<K, Vec<u8>>>
+/// Creates a file system that can be used to compare CDC algorithms.
+///
+/// Resulting filesystem cannot be scrubbed using [`scrub`][FileSystem::scrub].
+///
+/// If database is iterable (e.g. `HashMap` or something that implements [`IterableDatabase`]),
+/// CDC dedup ratio can be calculated using [`cdc_dedup_ratio`][FileSystem::cdc_dedup_ratio].
+pub fn create_cdc_filesystem<B, H, Hash>(base: B, hasher: H) -> FileSystem<B, H, Hash, (), EmptyDatabase<(), Vec<u8>>>
 where
-    B: Database<Hash, DataContainer<K>>,
+    B: Database<Hash, DataContainer<()>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
-    FileSystem::new(base, hasher, EmptyDatabase::new(key, vec![]))
+    FileSystem::new(base, hasher, EmptyDatabase::new((), vec![]))
 }
 
 impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
@@ -36,15 +42,6 @@ where
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
-    /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
-    /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
-    pub fn new(base: B, hasher: H, target_map: T) -> Self {
-        Self {
-            storage: ChunkStorage::new(base, hasher, target_map),
-            file_layer: Default::default(),
-        }
-    }
-
     /// Checks if the file with the given `name` exists.
     pub fn file_exists(&self, name: &str) -> bool {
         self.file_layer.file_exists(name)
@@ -114,6 +111,15 @@ where
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(&hashes)?.concat())
     }
+
+    /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
+    /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
+    fn new(base: B, hasher: H, target_map: T) -> Self {
+        Self {
+            storage: ChunkStorage::new(base, hasher, target_map),
+            file_layer: Default::default(),
+        }
+    }
 }
 
 impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
@@ -146,7 +152,8 @@ where
         self.storage.scrub()
     }
 
-    /// Calculates deduplication ratio of the storage, not accounting for chunks processed with scrubber.
+    /// Calculates deduplication ratio of the storage, not accounting for chunks processed with scrubber,
+    /// if there had been any.
     pub fn cdc_dedup_ratio(&self) -> f64 {
         self.storage.cdc_dedup_ratio()
     }
