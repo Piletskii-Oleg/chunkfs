@@ -144,7 +144,12 @@ where
     pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
         self.scrubber
             .as_mut()
-            .ok_or(io::Error::new(io::ErrorKind::InvalidInput, "scrubber cannot be used with CDC filesystem"))?
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "scrubber cannot be used with CDC filesystem",
+                )
+            })?
             .scrub(&mut self.database, &mut self.target_map)
     }
 
@@ -389,10 +394,7 @@ mod tests {
             .scrubber
             .as_mut()
             .unwrap()
-            .scrub(
-                &mut chunk_storage.database,
-                &mut chunk_storage.target_map,
-            )
+            .scrub(&mut chunk_storage.database, &mut chunk_storage.target_map)
             .unwrap();
         assert_eq!(measurements, ScrubMeasurements::default());
 
@@ -401,8 +403,11 @@ mod tests {
 
     #[test]
     fn total_cdc_size_is_calculated_correctly_for_fixed_size_chunker_on_simple_data() {
-        let mut chunk_storage =
-            ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher, HashMap::default());
+        let mut chunk_storage = ChunkStorage::new(
+            HashMap::<Vec<u8>, DataContainer<()>>::new(),
+            SimpleHasher,
+            HashMap::default(),
+        );
 
         let data = vec![10; 1024 * 1024];
         let mut chunker: Box<dyn Chunker> = Box::new(FSChunker::new(4096));
@@ -415,8 +420,11 @@ mod tests {
 
     #[test]
     fn size_written_is_calculated_correctly() {
-        let mut chunk_storage: ChunkStorage<SimpleHasher, Vec<u8>, HashMap<Vec<u8>, DataContainer<()>>, (), HashMap<_, _>> =
-            ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher, HashMap::default());
+        let mut chunk_storage = ChunkStorage::new(
+            HashMap::<Vec<u8>, DataContainer<()>>::new(),
+            SimpleHasher,
+            HashMap::default(),
+        );
 
         let data = [
             vec![4; 1024 * 256],

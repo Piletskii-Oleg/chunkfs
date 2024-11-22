@@ -1,5 +1,6 @@
 use std::cmp::min;
 use std::io;
+
 use crate::file_layer::{FileHandle, FileLayer};
 use crate::map::{Database, IterableDatabase};
 use crate::scrub::{Scrub, ScrubMeasurements};
@@ -26,7 +27,10 @@ where
 ///
 /// If database is iterable (e.g. `HashMap` or something that implements [`IterableDatabase`]),
 /// CDC dedup ratio can be calculated using [`cdc_dedup_ratio`][FileSystem::cdc_dedup_ratio].
-pub fn create_cdc_filesystem<B, H, Hash>(base: B, hasher: H) -> FileSystem<B, H, Hash, (), EmptyDatabase<(), Vec<u8>>>
+pub fn create_cdc_filesystem<B, H, Hash>(
+    base: B,
+    hasher: H,
+) -> FileSystem<B, H, Hash, (), EmptyDatabase<(), Vec<u8>>>
 where
     B: Database<Hash, DataContainer<()>>,
     H: Hasher<Hash = Hash>,

@@ -13,7 +13,7 @@ const MB: usize = 1024 * 1024;
 
 #[test]
 fn write_read_complete_test() {
-    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
 
     let mut handle = fs
         .create_file("file", LeapChunker::default(), true)
@@ -32,7 +32,7 @@ fn write_read_complete_test() {
 
 #[test]
 fn write_read_blocks_test() {
-    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
 
     let mut handle = fs.create_file("file", FSChunker::new(4096), true).unwrap();
 
@@ -53,7 +53,7 @@ fn write_read_blocks_test() {
 
 #[test]
 fn read_file_with_size_less_than_1mb() {
-    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
 
     let mut handle = fs.create_file("file", FSChunker::new(4096), true).unwrap();
 
@@ -68,7 +68,7 @@ fn read_file_with_size_less_than_1mb() {
 
 #[test]
 fn write_read_big_file_at_once() {
-    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
 
     let mut handle = fs.create_file("file", FSChunker::new(4096), true).unwrap();
 
@@ -82,7 +82,7 @@ fn write_read_big_file_at_once() {
 
 #[test]
 fn scrub_compiles_on_cdc_map_but_returns_error() {
-    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
     let result = fs.scrub();
     assert!(result.is_err());
     assert_eq!(result.unwrap_err().kind(), ErrorKind::InvalidInput)
@@ -90,7 +90,7 @@ fn scrub_compiles_on_cdc_map_but_returns_error() {
 
 #[test]
 fn two_file_handles_to_one_file() {
-    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
     let mut handle1 = fs
         .create_file("file", LeapChunker::default(), true)
         .unwrap();
@@ -122,12 +122,12 @@ fn non_iterable_database_can_be_used_with_fs() {
         }
     }
 
-    let _ = create_cdc_filesystem(DummyDatabase, SimpleHasher, ());
+    let _ = create_cdc_filesystem(DummyDatabase, SimpleHasher);
 }
 
 #[test]
 fn dedup_ratio_is_correct_for_fixed_size_chunker() {
-    let mut fs = create_cdc_filesystem(HashMap::new(), SimpleHasher, 9);
+    let mut fs = create_cdc_filesystem(HashMap::new(), SimpleHasher);
 
     const MB: usize = 1024 * 1024;
     const CHUNK_SIZE: usize = 4096;
@@ -162,7 +162,7 @@ fn dedup_ratio_is_correct_for_fixed_size_chunker() {
 
 #[test]
 fn different_chunkers_from_vec_can_be_used_with_same_filesystem() {
-    let mut fs = create_cdc_filesystem(HashMap::new(), Sha256Hasher::default(), 9);
+    let mut fs = create_cdc_filesystem(HashMap::new(), Sha256Hasher::default());
     let chunkers: Vec<Box<dyn chunkfs::Chunker>> = vec![
         SuperChunker::default().into(),
         LeapChunker::default().into(),
