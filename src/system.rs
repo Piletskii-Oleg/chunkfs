@@ -10,6 +10,10 @@ use crate::{ChunkHash, SEG_SIZE};
 use crate::{Chunker, Hasher};
 
 /// A file system provided by chunkfs.
+///
+/// To create a file system that can be used with CDC algorithms only, [`create_cdc_filesystem`] should be used.
+///
+/// If you want to test scrubber, [`FileSystem::new_with_scrubber`] should be used.
 pub struct FileSystem<B, H, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
@@ -133,9 +137,9 @@ where
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
-    /// Creates a file system with the given [`hasher`][Hasher], original [`base`][Base] and target map, and a [`scrubber`][Scrub].
+    /// Creates a file system with the given [`hasher`][Hasher], original [`database`][Database] and target map, and a [`scrubber`][Scrub].
     ///
-    /// Provided `database` must implement [IntoIterator].
+    /// Provided `database` must implement [IterableDatabase].
     pub fn new_with_scrubber(
         database: B,
         target_map: T,
