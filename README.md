@@ -48,12 +48,12 @@ extern crate chunkfs;
 use std::io;
 use std::collections::HashMap;
 use chunkfs::chunkers::LeapChunker;
-use chunkfs::FileSystem;
+use chunkfs::{FileSystem, create_cdc_filesystem};
 use chunkfs::hashers::SimpleHasher;
 
 fn main() -> io::Result<()> {
     let base = HashMap::default();
-    let mut fs = FileSystem::new_with_key(base, SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(base, SimpleHasher, 0);
 
     let mut file = fs.create_file("file", LeapChunker::default(), true)?;
     let data = vec![10; 1024 * 1024];
@@ -75,7 +75,7 @@ Getting Scrubber measurements:
 fn main() -> io::Result<()> {
     let mut fs = FileSystem::new_with_scrubber(
         HashMap::default(),
-        Box::new(SBCMap::new()),
+        SBCMap::new(),
         Box::new(SBCScrubber::new()),
         Sha256Hasher::default()
     );

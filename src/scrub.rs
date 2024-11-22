@@ -27,13 +27,15 @@ use crate::{ChunkHash, Data};
 /// 2. A target map, which contains `Key`-`Vec<u8>` pairs, where `Key` is a generic value determined by the implementation.
 ///     The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
 ///     the target map implements [Database] trait. It should only be used for storage purposes and not contain any algorithm logic.
-pub trait Scrub<Hash: ChunkHash, B, Key>
+pub trait Scrub<Hash: ChunkHash, B, Key, T>
 where
+    Hash: ChunkHash,
     B: IterableDatabase<Hash, DataContainer<Key>>,
+    T: Database<Key, Vec<u8>>,
 {
     /// # How to implement
-    /// To iterate over the underlying chunks, `database.into_iter()` should be used.
-    /// It will automatically yield pairs, which consist of `&mut Hash` and `&mut DataContainer`. To access the underlying data in the container,
+    /// To iterate over the underlying chunks, `database.iterator_mut()` should be used.
+    /// It will automatically yield pairs, which consist of `&Hash` and `&mut DataContainer`. To access the underlying data in the container,
     /// [DataContainer::extract] or [DataContainer::extract_mut] should be used.
     ///
     /// If the chunk is suitable for being transferred to the `target_map`, it should NOT be deleted, but instead be replaced by the `target_map`'s keys,
@@ -54,11 +56,7 @@ where
     /// We should be able to iterate over the `database` to process all chunks we had stored before.
     /// The [IntoIterator] trait should be implemented for `database`, but it should not be a big concern, because the only structure that should be implemented
     /// for the algorithm is the scrubber itself. `database` should be considered a given entity, along with the `target_map`.
-    fn scrub<'a>(
-        &mut self,
-        database: &mut B,
-        target_map: &mut Box<dyn Database<Key, Vec<u8>>>,
-    ) -> io::Result<ScrubMeasurements>
+    fn scrub<'a>(&mut self, database: &mut B, target_map: &mut T) -> io::Result<ScrubMeasurements>
     where
         Hash: 'a,
         Key: 'a;
@@ -83,16 +81,13 @@ pub struct CopyScrubber;
 
 pub struct DumbScrubber;
 
-impl<Hash, B> Scrub<Hash, B, Hash> for CopyScrubber
+impl<Hash, B, T> Scrub<Hash, B, Hash, T> for CopyScrubber
 where
     Hash: ChunkHash,
     B: IterableDatabase<Hash, DataContainer<Hash>>,
+    T: Database<Hash, Vec<u8>>,
 {
-    fn scrub<'a>(
-        &mut self,
-        database: &mut B,
-        target: &mut Box<dyn Database<Hash, Vec<u8>>>,
-    ) -> io::Result<ScrubMeasurements>
+    fn scrub<'a>(&mut self, database: &mut B, target: &mut T) -> io::Result<ScrubMeasurements>
     where
         Hash: 'a,
     {
@@ -117,16 +112,13 @@ where
     }
 }
 
-impl<Hash, B, Key> Scrub<Hash, B, Key> for DumbScrubber
+impl<Hash, B, Key, T> Scrub<Hash, B, Key, T> for DumbScrubber
 where
     Hash: ChunkHash,
     B: IterableDatabase<Hash, DataContainer<Key>>,
+    T: Database<Key, Vec<u8>>,
 {
-    fn scrub<'a>(
-        &mut self,
-        _database: &mut B,
-        _target: &mut Box<dyn Database<Key, Vec<u8>>>,
-    ) -> io::Result<ScrubMeasurements>
+    fn scrub<'a>(&mut self, _database: &mut B, _target: &mut T) -> io::Result<ScrubMeasurements>
     where
         Hash: 'a,
         Key: 'a,

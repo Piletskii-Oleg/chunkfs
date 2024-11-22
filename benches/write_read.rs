@@ -6,8 +6,8 @@ use criterion::measurement::WallTime;
 use criterion::{criterion_group, BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 
 use chunkfs::chunkers::UltraChunker;
+use chunkfs::create_cdc_filesystem;
 use chunkfs::hashers::Sha256Hasher;
-use chunkfs::FileSystem;
 
 struct Dataset<'a> {
     path: &'a str,
@@ -46,7 +46,7 @@ fn bench_write(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &[
         b.iter_batched(
             || {
                 let base = HashMap::default();
-                let mut fs = FileSystem::new_with_key(base, Sha256Hasher::default(), 0);
+                let mut fs = create_cdc_filesystem(base, Sha256Hasher::default());
 
                 let chunker = UltraChunker::default();
                 let handle = fs.create_file("file", chunker, true).unwrap();
@@ -67,7 +67,7 @@ fn bench_read(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &[u
         b.iter_batched(
             || {
                 let base = HashMap::default();
-                let mut fs = FileSystem::new_with_key(base, Sha256Hasher::default(), 0);
+                let mut fs = create_cdc_filesystem(base, Sha256Hasher::default());
 
                 let chunker = UltraChunker::default();
                 let mut handle = fs.create_file("file", chunker, true).unwrap();
