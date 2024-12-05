@@ -1,3 +1,5 @@
+mod fio;
+
 extern crate chunkfs;
 
 use std::collections::HashMap;
