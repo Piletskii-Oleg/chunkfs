@@ -24,7 +24,7 @@ fn main() -> io::Result<()> {
     let base = HashMap::default();
     let mut fs = FileSystem::new_with_key(base, SimpleHasher, 0);
 
-    let mut file = fs.create_file("file", LeapChunker::default(), true)?;
+    let mut file = fs.create_file("file", LeapChunker::default())?;
     let data = vec![10; 1024 * 1024];
     fs.write_to_file(&mut file, &data)?;
     let measurements = fs.close_file(file)?;
@@ -49,7 +49,7 @@ fn main() -> io::Result<()> {
 //         SimpleHasher,
 //     );
 //
-//     let mut handle = fs.create_file("file", SuperChunker::new(), true)?;
+//     let mut handle = fs.create_file("file", SuperChunker::new())?;
 //     let data = generate_data(10);
 //     fs.write_to_file(&mut handle, &data)?;
 //     fs.close_file(handle)?;
@@ -75,7 +75,7 @@ fn parametrized_write(
     let base = HashMap::default();
     let mut fs = FileSystem::new_with_key(base, hasher, 0);
 
-    let mut handle = fs.create_file("file", chunker, true)?;
+    let mut handle = fs.create_file("file", chunker)?;
 
     const MB_COUNT: usize = 1024;
 
