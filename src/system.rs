@@ -78,6 +78,8 @@ where
     }
 
     /// Writes given data to the file.
+    ///
+    /// Input data is a slice.
     pub fn write_to_file(&mut self, handle: &mut FileHandle, data: &[u8]) -> io::Result<()> {
         let Some(chunker) = &mut handle.chunker else {
             let msg = "file handle is read-only";
@@ -96,6 +98,37 @@ where
             all_spans.push(spans);
 
             current += to_process;
+        }
+
+        for spans in all_spans {
+            self.file_layer.write(handle, spans);
+        }
+
+        Ok(())
+    }
+
+    /// Writes given data to the file.
+    ///
+    /// Takes any reader as an input, including slices.
+    pub fn write_from_stream<R>(&mut self, handle: &mut FileHandle, mut reader: R) -> io::Result<()>
+    where
+        R: io::Read,
+    {
+        let Some(chunker) = &mut handle.chunker else {
+            let msg = "file handle is read-only";
+            return Err(io::Error::new(io::ErrorKind::PermissionDenied, msg));
+        };
+
+        let mut buffer = vec![0u8; 1024 * 1024];
+        let mut all_spans = vec![];
+        loop {
+            let n = reader.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+
+            let spans = self.storage.write(&buffer[..n], chunker)?;
+            all_spans.push(spans);
         }
 
         for spans in all_spans {

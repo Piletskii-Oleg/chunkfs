@@ -1,9 +1,9 @@
 extern crate chunkfs;
 
-use std::collections::HashMap;
-use std::io::ErrorKind;
-
 use approx::assert_relative_eq;
+use std::collections::HashMap;
+use std::io;
+use std::io::{Seek, Write};
 
 use chunkfs::chunkers::{FSChunker, LeapChunker, SuperChunker};
 use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
@@ -83,7 +83,7 @@ fn scrub_compiles_on_cdc_map_but_returns_error() {
     let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
     let result = fs.scrub();
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err().kind(), ErrorKind::InvalidInput)
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput)
 }
 
 #[test]
@@ -188,7 +188,7 @@ fn readonly_file_handle_cannot_write_can_read() {
     let mut ro_fh = fs.open_file_readonly("file").unwrap();
     let result = fs.write_to_file(&mut ro_fh, &[1; MB]);
     assert!(result.is_err());
-    assert!(result.is_err_and(|e| e.kind() == ErrorKind::PermissionDenied));
+    assert!(result.is_err_and(|e| e.kind() == io::ErrorKind::PermissionDenied));
 
     // can read complete
     let read = fs.read_file_complete(&ro_fh).unwrap();
@@ -202,4 +202,35 @@ fn readonly_file_handle_cannot_write_can_read() {
     // can close
     let measurements = fs.close_file(ro_fh).unwrap();
     assert_eq!(measurements, WriteMeasurements::default())
+}
+
+#[test]
+fn write_from_stream_slice() {
+    let mut fs = FileSystem::new_with_key(HashMap::new(), SimpleHasher, 0);
+    let mut fh = fs.create_file("file", FSChunker::default()).unwrap();
+    fs.write_from_stream(&mut fh, &[1; MB * 2][..]).unwrap();
+    fs.close_file(fh).unwrap();
+
+    let ro_fh = fs.open_file_readonly("file").unwrap();
+    let read = fs.read_file_complete(&ro_fh).unwrap();
+    assert_eq!(read.len(), MB * 2);
+    assert_eq!(fs.read_file_complete(&ro_fh).unwrap(), vec![1; MB * 2]);
+}
+
+#[test]
+fn write_from_stream_buf_reader() {
+    let mut file = tempfile::tempfile().unwrap();
+    file.write_all(&[1; MB]).unwrap();
+    file.seek(io::SeekFrom::Start(0)).unwrap();
+
+    let mut fs = FileSystem::new_with_key(HashMap::new(), SimpleHasher, 0);
+    let mut fh = fs.create_file("file", FSChunker::default()).unwrap();
+
+    fs.write_from_stream(&mut fh, file).unwrap();
+    fs.close_file(fh).unwrap();
+
+    let ro_fh = fs.open_file_readonly("file").unwrap();
+    let read = fs.read_file_complete(&ro_fh).unwrap();
+    assert_eq!(read.len(), MB);
+    assert_eq!(read, [1; MB]);
 }

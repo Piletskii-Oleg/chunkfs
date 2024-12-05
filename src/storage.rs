@@ -1,6 +1,5 @@
 use std::fmt::Formatter;
 use std::io;
-use std::io::ErrorKind;
 use std::time::{Duration, Instant};
 
 use crate::map::{Database, IterableDatabase};
@@ -141,7 +140,10 @@ where
     }
 
     pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
-        let target_map = self.target_map.as_mut().ok_or(ErrorKind::InvalidInput)?;
+        let target_map = self
+            .target_map
+            .as_mut()
+            .ok_or(io::ErrorKind::InvalidInput)?;
         self.scrubber
             .as_mut()
             .unwrap()
