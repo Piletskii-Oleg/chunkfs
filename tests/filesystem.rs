@@ -7,7 +7,7 @@ use approx::assert_relative_eq;
 
 use chunkfs::chunkers::{FSChunker, LeapChunker, SuperChunker};
 use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
-use chunkfs::{DataContainer, Database, FileSystem};
+use chunkfs::{DataContainer, Database, FileSystem, WriteMeasurements};
 
 const MB: usize = 1024 * 1024;
 
@@ -15,9 +15,7 @@ const MB: usize = 1024 * 1024;
 fn write_read_complete_test() {
     let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
 
-    let mut handle = fs
-        .create_file("file", LeapChunker::default(), true)
-        .unwrap();
+    let mut handle = fs.create_file("file", LeapChunker::default()).unwrap();
     fs.write_to_file(&mut handle, &[1; MB]).unwrap();
     fs.write_to_file(&mut handle, &[1; MB]).unwrap();
 
@@ -34,7 +32,7 @@ fn write_read_complete_test() {
 fn write_read_blocks_test() {
     let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
 
-    let mut handle = fs.create_file("file", FSChunker::new(4096), true).unwrap();
+    let mut handle = fs.create_file("file", FSChunker::new(4096)).unwrap();
 
     let ones = vec![1; MB];
     let twos = vec![2; MB];
@@ -55,7 +53,7 @@ fn write_read_blocks_test() {
 fn read_file_with_size_less_than_1mb() {
     let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
 
-    let mut handle = fs.create_file("file", FSChunker::new(4096), true).unwrap();
+    let mut handle = fs.create_file("file", FSChunker::new(4096)).unwrap();
 
     let ones = vec![1; 10];
     fs.write_to_file(&mut handle, &ones).unwrap();
@@ -70,7 +68,7 @@ fn read_file_with_size_less_than_1mb() {
 fn write_read_big_file_at_once() {
     let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
 
-    let mut handle = fs.create_file("file", FSChunker::new(4096), true).unwrap();
+    let mut handle = fs.create_file("file", FSChunker::new(4096)).unwrap();
 
     let data = vec![1; 3 * MB + 50];
     fs.write_to_file(&mut handle, &data).unwrap();
@@ -91,9 +89,7 @@ fn scrub_compiles_on_cdc_map_but_returns_error() {
 #[test]
 fn two_file_handles_to_one_file() {
     let mut fs = FileSystem::new_with_key(HashMap::default(), SimpleHasher, 0);
-    let mut handle1 = fs
-        .create_file("file", LeapChunker::default(), true)
-        .unwrap();
+    let mut handle1 = fs.create_file("file", LeapChunker::default()).unwrap();
     let mut handle2 = fs.open_file("file", LeapChunker::default()).unwrap();
     fs.write_to_file(&mut handle1, &[1; MB]).unwrap();
     fs.close_file(handle1).unwrap();
@@ -135,9 +131,7 @@ fn dedup_ratio_is_correct_for_fixed_size_chunker() {
     let data = vec![10; MB];
 
     // first write => 1 MB, 1 chunk
-    let mut fh = fs
-        .create_file("file", FSChunker::new(CHUNK_SIZE), true)
-        .unwrap();
+    let mut fh = fs.create_file("file", FSChunker::new(CHUNK_SIZE)).unwrap();
     fs.write_to_file(&mut fh, &data).unwrap();
     fs.close_file(fh).unwrap();
     assert_relative_eq!(fs.cdc_dedup_ratio(), MB as f64 / CHUNK_SIZE as f64);
@@ -171,7 +165,7 @@ fn different_chunkers_from_vec_can_be_used_with_same_filesystem() {
     let data = vec![0; 1024 * 1024];
     for chunker in chunkers {
         let name = format!("file-{chunker:?}");
-        let mut fh = fs.create_file(&name, chunker, true).unwrap();
+        let mut fh = fs.create_file(&name, chunker).unwrap();
         fs.write_to_file(&mut fh, &data).unwrap();
         fs.close_file(fh).unwrap();
 
@@ -181,4 +175,31 @@ fn different_chunkers_from_vec_can_be_used_with_same_filesystem() {
         assert_eq!(read.len(), data.len());
         assert_eq!(read, data);
     }
+}
+
+#[test]
+fn readonly_file_handle_cannot_write_can_read() {
+    let mut fs = FileSystem::new_with_key(HashMap::new(), SimpleHasher, 0);
+    let mut fh = fs.create_file("file", FSChunker::default()).unwrap();
+    fs.write_to_file(&mut fh, &[1; MB]).unwrap();
+    fs.close_file(fh).unwrap();
+
+    // cannot write
+    let mut ro_fh = fs.open_file_readonly("file").unwrap();
+    let result = fs.write_to_file(&mut ro_fh, &[1; MB]);
+    assert!(result.is_err());
+    assert!(result.is_err_and(|e| e.kind() == ErrorKind::PermissionDenied));
+
+    // can read complete
+    let read = fs.read_file_complete(&ro_fh).unwrap();
+    assert_eq!(read.len(), MB);
+    assert_eq!(read, [1; MB]);
+
+    let read = fs.read_from_file(&mut ro_fh).unwrap();
+    assert_eq!(read.len(), MB);
+    assert_eq!(read, [1; MB]);
+
+    // can close
+    let measurements = fs.close_file(ro_fh).unwrap();
+    assert_eq!(measurements, WriteMeasurements::default())
 }
