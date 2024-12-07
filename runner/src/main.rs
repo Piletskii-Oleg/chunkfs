@@ -1,18 +1,18 @@
-mod fio;
-
 extern crate chunkfs;
 
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::io;
+use std::io::Read;
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
-use chunkfs::chunkers::LeapChunker;
+use chunkfs::chunkers::{LeapChunker, RabinChunker};
 use chunkfs::hashers::SimpleHasher;
 use chunkfs::Chunker;
 use chunkfs::FileSystem;
 use chunkfs::Hasher;
+use chunkfs::fio::generate_with_fio;
 
 #[derive(Default)]
 struct Measurements {
@@ -25,21 +25,13 @@ struct Measurements {
 fn main() -> io::Result<()> {
     let base = HashMap::default();
     let mut fs = FileSystem::new_with_key(base, SimpleHasher, 0);
+    let mut file = fs.create_file("file", RabinChunker::default())?;
 
-    let mut file = fs.create_file("file", LeapChunker::default())?;
-    let data = vec![10; 1024 * 1024];
-    fs.write_to_file(&mut file, &data)?;
+    let data = generate_with_fio(100000, 100)?;
+    fs.write_from_stream(&mut file, data)?;
     let measurements = fs.close_file(file)?;
     println!("{:?}", measurements);
-
     println!("{}", fs.cdc_dedup_ratio());
-
-    let mut file = fs.open_file("file", LeapChunker::default())?;
-    let read = fs.read_from_file(&mut file)?;
-
-    assert_eq!(read.len(), 1024 * 1024);
-    assert_eq!(read, data);
-
     Ok(())
 }
 

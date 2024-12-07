@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
 
-use crate::storage::SpansInfo;
 use crate::ChunkHash;
 use crate::Chunker;
 use crate::{WriteMeasurements, SEG_SIZE};
+
+use super::storage::SpansInfo;
 
 /// Hashed span, starting at `offset`.
 #[derive(Debug, PartialEq, Eq, Default)]
@@ -180,7 +181,7 @@ mod tests {
     use std::io::ErrorKind;
 
     use crate::chunkers::FSChunker;
-    use crate::file_layer::FileLayer;
+    use super::super::file_layer::FileLayer;
     use crate::Chunker;
 
     #[test]

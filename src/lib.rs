@@ -2,21 +2,20 @@ use std::hash;
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
 
-pub use map::Database;
-pub use scrub::{CopyScrubber, Scrub, ScrubMeasurements};
-pub use storage::{Data, DataContainer};
-pub use system::FileSystem;
+pub use fs::database::{IterableDatabase, Database};
+pub use fs::scrub::{CopyScrubber, Scrub, ScrubMeasurements};
+pub use fs::storage::{Data, DataContainer};
+pub use fs::FileSystem;
+
+pub use bench::fio;
 
 #[cfg(feature = "chunkers")]
 pub mod chunkers;
 #[cfg(feature = "hashers")]
 pub mod hashers;
 
-mod file_layer;
-mod map;
-mod scrub;
-mod storage;
-mod system;
+mod fs;
+mod bench;
 
 /// Trait for a CDC hash, combining several other traits: [hash::Hash], [Clone], [Eq], [PartialEq], [Default].
 ///

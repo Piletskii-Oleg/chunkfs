@@ -8,7 +8,7 @@ use std::process::Command;
 /// * size - size of the file, in **KB**
 /// * dedup_ratio - percentage of identical buffers when writing, from 0 to 100
 pub fn generate_with_fio(size: usize, dedup_percentage: u8) -> io::Result<File> {
-    if dedup_percentage < 0 || dedup_percentage > 100 {
+    if dedup_percentage > 100 {
         let msg = "dedup_percentage must be between 0 and 100";
         return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
     }
