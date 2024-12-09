@@ -2,10 +2,10 @@ use std::hash;
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
 
-pub use map::Database;
+pub use map::{Database, IterableDatabase};
 pub use scrub::{CopyScrubber, Scrub, ScrubMeasurements};
 pub use storage::{Data, DataContainer};
-pub use system::FileSystem;
+pub use system::{create_cdc_filesystem, FileSystem};
 
 #[cfg(feature = "chunkers")]
 pub mod chunkers;

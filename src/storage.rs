@@ -40,30 +40,32 @@ impl<Hash: ChunkHash> Span<Hash> {
 }
 
 /// Underlying storage for the actual stored data.
-pub struct ChunkStorage<H, Hash, B, K>
+pub struct ChunkStorage<H, Hash, B, K, T>
 where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: Database<Hash, DataContainer<K>>,
+    T: Database<K, Vec<u8>>,
 {
     database: B,
-    scrubber: Option<Box<dyn Scrub<Hash, B, K>>>,
-    target_map: Option<Box<dyn Database<K, Vec<u8>>>>,
+    scrubber: Option<Box<dyn Scrub<Hash, B, K, T>>>,
+    target_map: T,
     hasher: H,
     size_written: usize,
 }
 
-impl<H, Hash, B, K> ChunkStorage<H, Hash, B, K>
+impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: Database<H::Hash, DataContainer<K>>,
+    T: Database<K, Vec<u8>>,
 {
-    pub fn new(database: B, hasher: H) -> Self {
+    pub fn new(database: B, hasher: H, target_map: T) -> Self {
         Self {
             database,
             scrubber: None,
-            target_map: None,
+            target_map,
             hasher,
             size_written: 0,
         }
@@ -107,8 +109,6 @@ where
                 Data::Chunk(chunk) => Ok(chunk.clone()),
                 Data::TargetChunk(keys) => Ok(self
                     .target_map
-                    .as_ref()
-                    .unwrap()
                     .get_multi(keys)?
                     .into_iter()
                     .flatten()
@@ -118,40 +118,42 @@ where
     }
 }
 
-impl<H, Hash, B, K> ChunkStorage<H, Hash, B, K>
+impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
+    T: Database<K, Vec<u8>>,
 {
     pub fn new_with_scrubber(
         database: B,
-        target_map: Box<dyn Database<K, Vec<u8>>>,
-        scrubber: Box<dyn Scrub<Hash, B, K>>,
+        target_map: T,
+        scrubber: Box<dyn Scrub<Hash, B, K, T>>,
         hasher: H,
     ) -> Self {
         Self {
             database,
             scrubber: Some(scrubber),
-            target_map: Some(target_map),
+            target_map,
             hasher,
             size_written: 0,
         }
     }
 
     pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
-        let target_map = self
-            .target_map
-            .as_mut()
-            .ok_or(io::ErrorKind::InvalidInput)?;
         self.scrubber
             .as_mut()
-            .unwrap()
-            .scrub(&mut self.database, target_map)
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "scrubber cannot be used with CDC filesystem",
+                )
+            })?
+            .scrub(&mut self.database, &mut self.target_map)
     }
 
     /// Returns size of CDC chunks in the storage. Doesn't count for chunks processed with SBC or FBC.
-    fn total_cdc_size(&mut self) -> usize {
+    fn total_cdc_size(&self) -> usize {
         self.database
             .values()
             .fold(0, |total_size, container| match container.extract() {
@@ -161,8 +163,29 @@ where
     }
 
     /// Calculates deduplication ratio of the storage, not accounting for chunks processed with scrubber.
-    pub fn cdc_dedup_ratio(&mut self) -> f64 {
+    pub fn cdc_dedup_ratio(&self) -> f64 {
         (self.size_written as f64) / (self.total_cdc_size() as f64)
+    }
+}
+
+impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
+where
+    H: Hasher<Hash = Hash>,
+    Hash: ChunkHash,
+    B: IterableDatabase<H::Hash, DataContainer<K>>,
+    T: IterableDatabase<K, Vec<u8>>,
+{
+    fn total_size(&self) -> usize {
+        let cdc_size = self.total_cdc_size();
+        let scrubbed_size = self
+            .target_map
+            .values()
+            .fold(0, |total_size, data| total_size + data.len());
+        cdc_size + scrubbed_size
+    }
+
+    pub fn total_dedup_ratio(&self) -> f64 {
+        (self.size_written as f64) / (self.total_size() as f64)
     }
 }
 
@@ -329,7 +352,7 @@ mod tests {
         let mut chunk_storage = ChunkStorage {
             database: map,
             scrubber: Some(Box::new(DumbScrubber)),
-            target_map: Some(Box::new(HashMap::default())),
+            target_map: HashMap::default(),
             hasher: SimpleHasher,
             size_written: 0,
         };
@@ -338,10 +361,7 @@ mod tests {
             .scrubber
             .as_mut()
             .unwrap()
-            .scrub(
-                &mut chunk_storage.database,
-                chunk_storage.target_map.as_mut().unwrap(),
-            )
+            .scrub(&mut chunk_storage.database, &mut chunk_storage.target_map)
             .unwrap();
         assert_eq!(measurements, ScrubMeasurements::default());
 
@@ -350,8 +370,11 @@ mod tests {
 
     #[test]
     fn total_cdc_size_is_calculated_correctly_for_fixed_size_chunker_on_simple_data() {
-        let mut chunk_storage =
-            ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher);
+        let mut chunk_storage = ChunkStorage::new(
+            HashMap::<Vec<u8>, DataContainer<()>>::new(),
+            SimpleHasher,
+            HashMap::default(),
+        );
 
         let data = vec![10; 1024 * 1024];
         let mut chunker: Box<dyn Chunker> = Box::new(FSChunker::new(4096));
@@ -364,8 +387,11 @@ mod tests {
 
     #[test]
     fn size_written_is_calculated_correctly() {
-        let mut chunk_storage =
-            ChunkStorage::new(HashMap::<Vec<u8>, DataContainer<()>>::new(), SimpleHasher);
+        let mut chunk_storage = ChunkStorage::new(
+            HashMap::<Vec<u8>, DataContainer<()>>::new(),
+            SimpleHasher,
+            HashMap::default(),
+        );
 
         let data = [
             vec![4; 1024 * 256],

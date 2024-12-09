@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::collections::HashMap;
 use std::io;
 
 use crate::file_layer::{FileHandle, FileLayer};
@@ -10,45 +11,46 @@ use crate::{ChunkHash, SEG_SIZE};
 use crate::{Chunker, Hasher};
 
 /// A file system provided by chunkfs.
-pub struct FileSystem<B, H, Hash, K>
+///
+/// To create a file system that can be used with CDC algorithms only, [`create_cdc_filesystem`] should be used.
+///
+/// If you want to test scrubber, [`FileSystem::new_with_scrubber`] should be used.
+pub struct FileSystem<B, H, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
+    T: Database<K, Vec<u8>>,
 {
-    storage: ChunkStorage<H, Hash, B, K>,
+    storage: ChunkStorage<H, Hash, B, K, T>,
     file_layer: FileLayer<Hash>,
 }
 
-impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
+/// Creates a file system that can be used to compare CDC algorithms.
+///
+/// Resulting filesystem cannot be scrubbed using [`scrub`][FileSystem::scrub].
+///
+/// If database is iterable (e.g. `HashMap` or something that implements [`IterableDatabase`]),
+/// CDC dedup ratio can be calculated using [`cdc_dedup_ratio`][FileSystem::cdc_dedup_ratio].
+pub fn create_cdc_filesystem<B, H, Hash>(
+    base: B,
+    hasher: H,
+) -> FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>
+where
+    B: Database<Hash, DataContainer<()>>,
+    H: Hasher<Hash = Hash>,
+    Hash: ChunkHash,
+{
+    FileSystem::new(base, hasher, HashMap::default())
+}
+
+impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
+    T: Database<K, Vec<u8>>,
 {
-    /// Functionally the same as [`Self::new`], but it also takes a key example as a parameter so that rust compiler knows
-    /// which type it is.
-    ///
-    /// Any value can be passed as a `_key` as it is not used anywhere, e.g. 0.
-    pub fn new_with_key(base: B, hasher: H, _key: K) -> Self {
-        Self {
-            storage: ChunkStorage::new(base, hasher),
-            file_layer: Default::default(),
-        }
-    }
-
-    /// Creates a file system with the given [`hasher`][Hasher] and [`base`][Base]. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
-    /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
-    ///
-    /// Use [`Self::new_with_key`] if this method throws a long compile-time error message that says something about
-    /// giving filesystem an explicit type, where the type for type parameter 'K' is specified.
-    pub fn new(base: B, hasher: H) -> Self {
-        Self {
-            storage: ChunkStorage::new(base, hasher),
-            file_layer: Default::default(),
-        }
-    }
-
     /// Checks if the file with the given `name` exists.
     pub fn file_exists(&self, name: &str) -> bool {
         self.file_layer.file_exists(name)
@@ -162,21 +164,31 @@ where
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(&hashes)?.concat())
     }
+
+    /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
+    /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
+    fn new(base: B, hasher: H, target_map: T) -> Self {
+        Self {
+            storage: ChunkStorage::new(base, hasher, target_map),
+            file_layer: Default::default(),
+        }
+    }
 }
 
-impl<B, H, Hash, K> FileSystem<B, H, Hash, K>
+impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
     B: IterableDatabase<Hash, DataContainer<K>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
+    T: Database<K, Vec<u8>>,
 {
-    /// Creates a file system with the given [`hasher`][Hasher], original [`base`][Base] and target map, and a [`scrubber`][Scrub].
+    /// Creates a file system with the given [`hasher`][Hasher], original [`database`][Database] and target map, and a [`scrubber`][Scrub].
     ///
-    /// Provided `database` must implement [IntoIterator].
+    /// Provided `database` must implement [`IterableDatabase`].
     pub fn new_with_scrubber(
         database: B,
-        target_map: Box<dyn Database<K, Vec<u8>>>,
-        scrubber: Box<dyn Scrub<Hash, B, K>>,
+        target_map: T,
+        scrubber: Box<dyn Scrub<Hash, B, K, T>>,
         hasher: H,
     ) -> Self {
         Self {
@@ -193,8 +205,22 @@ where
         self.storage.scrub()
     }
 
-    /// Calculates deduplication ratio of the storage, not accounting for chunks processed with scrubber.
-    pub fn cdc_dedup_ratio(&mut self) -> f64 {
+    /// Calculates deduplication ratio of the storage, not accounting for chunks processed with scrubber,
+    /// if there had been any.
+    pub fn cdc_dedup_ratio(&self) -> f64 {
         self.storage.cdc_dedup_ratio()
+    }
+}
+
+impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
+where
+    H: Hasher<Hash = Hash>,
+    Hash: ChunkHash,
+    B: IterableDatabase<H::Hash, DataContainer<K>>,
+    T: IterableDatabase<K, Vec<u8>>,
+{
+    /// Calculates total deduplication ratio of the storage, accounting for chunks both unprocessed and processed with scrubber.
+    pub fn total_dedup_ratio(&self) -> f64 {
+        self.storage.total_dedup_ratio()
     }
 }
