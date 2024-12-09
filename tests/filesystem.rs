@@ -7,7 +7,7 @@ use std::io::{Seek, Write};
 
 use chunkfs::chunkers::{FSChunker, LeapChunker, SuperChunker};
 use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
-use chunkfs::{create_cdc_filesystem, DataContainer, Database};
+use chunkfs::{create_cdc_filesystem, DataContainer, Database, WriteMeasurements};
 
 const MB: usize = 1024 * 1024;
 
@@ -90,7 +90,7 @@ fn scrub_compiles_on_cdc_map_but_returns_error() {
 fn two_file_handles_to_one_file() {
     let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
     let mut handle1 = fs
-        .create_file("file", LeapChunker::default(), true)
+        .create_file("file", LeapChunker::default())
         .unwrap();
     let mut handle2 = fs.open_file("file", LeapChunker::default()).unwrap();
     fs.write_to_file(&mut handle1, &[1; MB]).unwrap();
@@ -177,7 +177,7 @@ fn different_chunkers_from_vec_can_be_used_with_same_filesystem() {
 
 #[test]
 fn readonly_file_handle_cannot_write_can_read() {
-    let mut fs = FileSystem::new_with_key(HashMap::new(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::new(), SimpleHasher);
     let mut fh = fs.create_file("file", FSChunker::default()).unwrap();
     fs.write_to_file(&mut fh, &[1; MB]).unwrap();
     fs.close_file(fh).unwrap();
@@ -204,7 +204,7 @@ fn readonly_file_handle_cannot_write_can_read() {
 
 #[test]
 fn write_from_stream_slice() {
-    let mut fs = FileSystem::new_with_key(HashMap::new(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::new(), SimpleHasher);
     let mut fh = fs.create_file("file", FSChunker::default()).unwrap();
     fs.write_from_stream(&mut fh, &[1; MB * 2][..]).unwrap();
     fs.close_file(fh).unwrap();
@@ -221,7 +221,7 @@ fn write_from_stream_buf_reader() {
     file.write_all(&[1; MB]).unwrap();
     file.seek(io::SeekFrom::Start(0)).unwrap();
 
-    let mut fs = FileSystem::new_with_key(HashMap::new(), SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::new(), SimpleHasher);
     let mut fh = fs.create_file("file", FSChunker::default()).unwrap();
 
     fs.write_from_stream(&mut fh, file).unwrap();
