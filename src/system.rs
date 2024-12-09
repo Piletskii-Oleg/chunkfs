@@ -1,10 +1,11 @@
 use std::cmp::min;
+use std::collections::HashMap;
 use std::io;
 
 use crate::file_layer::{FileHandle, FileLayer};
 use crate::map::{Database, IterableDatabase};
 use crate::scrub::{Scrub, ScrubMeasurements};
-use crate::storage::{ChunkStorage, DataContainer, EmptyDatabase};
+use crate::storage::{ChunkStorage, DataContainer};
 use crate::WriteMeasurements;
 use crate::{ChunkHash, SEG_SIZE};
 use crate::{Chunker, Hasher};
@@ -34,13 +35,13 @@ where
 pub fn create_cdc_filesystem<B, H, Hash>(
     base: B,
     hasher: H,
-) -> FileSystem<B, H, Hash, (), EmptyDatabase<(), Vec<u8>>>
+) -> FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>
 where
     B: Database<Hash, DataContainer<()>>,
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
-    FileSystem::new(base, hasher, EmptyDatabase::new((), vec![]))
+    FileSystem::new(base, hasher, HashMap::default())
 }
 
 impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>

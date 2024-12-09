@@ -1,6 +1,5 @@
 use std::fmt::Formatter;
 use std::io;
-use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
 use crate::map::{Database, IterableDatabase};
@@ -330,38 +329,6 @@ impl<K> std::fmt::Debug for Data<K> {
 impl<K> Default for Data<K> {
     fn default() -> Self {
         Self::Chunk(vec![])
-    }
-}
-
-pub struct EmptyDatabase<K, V> {
-    k: PhantomData<K>,
-    v: PhantomData<V>,
-}
-
-impl<K, V> EmptyDatabase<K, V> {
-    pub fn new(_key: K, _value: V) -> Self {
-        Self {
-            k: Default::default(),
-            v: Default::default(),
-        }
-    }
-}
-
-impl<K, V> Database<K, V> for EmptyDatabase<K, V> {
-    fn insert(&mut self, _key: K, _value: V) -> io::Result<()> {
-        unimplemented!()
-    }
-
-    fn get(&self, _key: &K) -> io::Result<V> {
-        unimplemented!()
-    }
-
-    fn remove(&mut self, _key: &K) {
-        unimplemented!()
-    }
-
-    fn contains(&self, _key: &K) -> bool {
-        unimplemented!()
     }
 }
 
