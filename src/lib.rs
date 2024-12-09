@@ -2,7 +2,7 @@ use std::hash;
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
 
-pub use fs::database::{IterableDatabase, Database};
+pub use fs::database::{Database, IterableDatabase};
 pub use fs::scrub::{CopyScrubber, Scrub, ScrubMeasurements};
 pub use fs::storage::{Data, DataContainer};
 pub use fs::FileSystem;
@@ -14,8 +14,8 @@ pub mod chunkers;
 #[cfg(feature = "hashers")]
 pub mod hashers;
 
-mod fs;
 mod bench;
+mod fs;
 
 /// Trait for a CDC hash, combining several other traits: [hash::Hash], [Clone], [Eq], [PartialEq], [Default].
 ///

@@ -313,12 +313,12 @@ impl<K> Default for Data<K> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::chunkers::{FSChunker, SuperChunker};
-    use crate::hashers::SimpleHasher;
     use super::super::scrub::DumbScrubber;
     use super::ChunkStorage;
     use super::DataContainer;
     use super::ScrubMeasurements;
+    use crate::chunkers::{FSChunker, SuperChunker};
+    use crate::hashers::SimpleHasher;
     use crate::Chunker;
 
     #[test]

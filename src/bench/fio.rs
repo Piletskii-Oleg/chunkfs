@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 /// Generates a file using fio
 ///
@@ -28,6 +28,7 @@ pub fn generate_with_fio(size: usize, dedup_percentage: u8) -> io::Result<File> 
         .arg(dedup_ratio_arg)
         .arg(name_arg)
         .arg(dir_arg)
+        .stdout(Stdio::null())
         .spawn()?;
     output.wait()?;
 
@@ -44,6 +45,6 @@ mod tests {
     // file must be opened
     #[test]
     fn fio_test() {
-        let file = generate_with_fio(10000, 10).unwrap();
+        let _ = generate_with_fio(10000, 10).unwrap();
     }
 }

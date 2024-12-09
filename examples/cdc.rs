@@ -1,11 +1,12 @@
 use std::collections::HashMap;
+use std::fs::File;
 use std::io;
 use std::io::{Read as _, Seek as _};
 
 use chunkfs::chunkers::LeapChunker;
-use chunkfs::FileSystem;
 use chunkfs::fio::generate_with_fio;
 use chunkfs::hashers::Sha256Hasher;
+use chunkfs::{Chunker, FileSystem};
 
 fn main() -> io::Result<()> {
     let base = HashMap::default();

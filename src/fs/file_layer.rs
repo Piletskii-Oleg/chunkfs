@@ -180,8 +180,8 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
 mod tests {
     use std::io::ErrorKind;
 
-    use crate::chunkers::FSChunker;
     use super::super::file_layer::FileLayer;
+    use crate::chunkers::FSChunker;
     use crate::Chunker;
 
     #[test]

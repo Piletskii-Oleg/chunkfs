@@ -8,11 +8,11 @@ use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
 use chunkfs::chunkers::{LeapChunker, RabinChunker};
+use chunkfs::fio::generate_with_fio;
 use chunkfs::hashers::SimpleHasher;
 use chunkfs::Chunker;
 use chunkfs::FileSystem;
 use chunkfs::Hasher;
-use chunkfs::fio::generate_with_fio;
 
 #[derive(Default)]
 struct Measurements {
@@ -34,28 +34,6 @@ fn main() -> io::Result<()> {
     println!("{}", fs.cdc_dedup_ratio());
     Ok(())
 }
-
-// fn main() -> io::Result<()> {
-//     let mut fs = FileSystem::new_with_scrubber(
-//         HashMap::default(),
-//         Box::new(HashMap::default()),
-//         Box::new(chunkfs::CopyScrubber),
-//         SimpleHasher,
-//     );
-//
-//     let mut handle = fs.create_file("file", SuperChunker::new())?;
-//     let data = generate_data(10);
-//     fs.write_to_file(&mut handle, &data)?;
-//     fs.close_file(handle)?;
-//
-//     let res = fs.scrub().unwrap();
-//     println!("{res:?}");
-//
-//     let mut handle = fs.open_file("file", SuperChunker::new())?;
-//     let read = fs.read_file_complete(&mut handle)?;
-//     assert_eq!(read.len(), data.len());
-//     Ok(())
-// }
 
 const MB: usize = 1024 * 1024;
 
