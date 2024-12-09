@@ -36,7 +36,7 @@ pub struct FileHandle {
     offset: usize,
     measurements: WriteMeasurements,
     // maybe not pub(crate) but something else? cannot think of anything
-    pub(crate) chunker: Box<dyn Chunker>,
+    pub(crate) chunker: Option<Box<dyn Chunker>>,
 }
 
 impl<Hash: ChunkHash> File<Hash> {
@@ -54,7 +54,16 @@ impl FileHandle {
             file_name: file.name.clone(),
             offset: 0,
             measurements: Default::default(),
-            chunker,
+            chunker: Some(chunker),
+        }
+    }
+
+    fn new_readonly<Hash: ChunkHash>(file: &File<Hash>) -> Self {
+        FileHandle {
+            file_name: file.name.clone(),
+            offset: 0,
+            measurements: Default::default(),
+            chunker: None,
         }
     }
 
@@ -93,6 +102,13 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
         self.files
             .get(name)
             .map(|file| FileHandle::new(file, chunker))
+            .ok_or(ErrorKind::NotFound.into())
+    }
+
+    pub fn open_readonly(&self, name: &str) -> io::Result<FileHandle> {
+        self.files
+            .get(name)
+            .map(|file| FileHandle::new_readonly(file))
             .ok_or(ErrorKind::NotFound.into())
     }
 

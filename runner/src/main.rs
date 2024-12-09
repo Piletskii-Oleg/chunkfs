@@ -1,3 +1,5 @@
+mod fio;
+
 extern crate chunkfs;
 
 use std::collections::HashMap;
@@ -23,7 +25,7 @@ fn main() -> io::Result<()> {
     let base = HashMap::default();
     let mut fs = create_cdc_filesystem(base, SimpleHasher);
 
-    let mut file = fs.create_file("file", LeapChunker::default(), true)?;
+    let mut file = fs.create_file("file", LeapChunker::default())?;
     let data = vec![10; 1024 * 1024];
     fs.write_to_file(&mut file, &data)?;
     let measurements = fs.close_file(file)?;
@@ -48,7 +50,7 @@ fn main() -> io::Result<()> {
 //         SimpleHasher,
 //     );
 //
-//     let mut handle = fs.create_file("file", SuperChunker::new(), true)?;
+//     let mut handle = fs.create_file("file", SuperChunker::new())?;
 //     let data = generate_data(10);
 //     fs.write_to_file(&mut handle, &data)?;
 //     fs.close_file(handle)?;
@@ -74,7 +76,7 @@ fn parametrized_write(
     let base = HashMap::default();
     let mut fs = create_cdc_filesystem(base, hasher);
 
-    let mut handle = fs.create_file("file", chunker, true)?;
+    let mut handle = fs.create_file("file", chunker)?;
 
     const MB_COUNT: usize = 1024;
 

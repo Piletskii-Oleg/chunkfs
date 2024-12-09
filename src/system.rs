@@ -58,27 +58,36 @@ where
 
     /// Tries to open a file with the given name and returns its `FileHandle` if it exists,
     /// or `None`, if it doesn't.
-    pub fn open_file(
-        &self,
-        name: &str,
-        chunker: impl Into<Box<dyn Chunker>>,
-    ) -> io::Result<FileHandle> {
+    pub fn open_file<C>(&self, name: &str, chunker: C) -> io::Result<FileHandle>
+    where
+        C: Into<Box<dyn Chunker>>,
+    {
         self.file_layer.open(name, chunker.into())
+    }
+
+    pub fn open_file_readonly(&self, name: &str) -> io::Result<FileHandle> {
+        self.file_layer.open_readonly(name)
     }
 
     /// Creates a file with the given name and returns its `FileHandle`.
     /// Returns `ErrorKind::AlreadyExists`, if the file with the same name exists in the file system.
-    pub fn create_file(
-        &mut self,
-        name: impl Into<String>,
-        chunker: impl Into<Box<dyn Chunker>>,
-        create_new: bool,
-    ) -> io::Result<FileHandle> {
-        self.file_layer.create(name, chunker.into(), create_new)
+    pub fn create_file<S, C>(&mut self, name: S, chunker: C) -> io::Result<FileHandle>
+    where
+        S: Into<String>,
+        C: Into<Box<dyn Chunker>>,
+    {
+        self.file_layer.create(name, chunker.into(), true)
     }
 
     /// Writes given data to the file.
+    ///
+    /// Input data is a slice.
     pub fn write_to_file(&mut self, handle: &mut FileHandle, data: &[u8]) -> io::Result<()> {
+        let Some(chunker) = &mut handle.chunker else {
+            let msg = "file handle is read-only";
+            return Err(io::Error::new(io::ErrorKind::PermissionDenied, msg));
+        };
+
         let mut current = 0;
         let mut all_spans = vec![];
         while current < data.len() {
@@ -87,7 +96,7 @@ where
 
             let spans = self
                 .storage
-                .write(&data[current..current + to_process], &mut handle.chunker)?;
+                .write(&data[current..current + to_process], chunker)?;
             all_spans.push(spans);
 
             current += to_process;
@@ -100,11 +109,44 @@ where
         Ok(())
     }
 
+    /// Writes given data to the file.
+    ///
+    /// Takes any reader as an input, including slices.
+    pub fn write_from_stream<R>(&mut self, handle: &mut FileHandle, mut reader: R) -> io::Result<()>
+    where
+        R: io::Read,
+    {
+        let Some(chunker) = &mut handle.chunker else {
+            let msg = "file handle is read-only";
+            return Err(io::Error::new(io::ErrorKind::PermissionDenied, msg));
+        };
+
+        let mut buffer = vec![0u8; 1024 * 1024];
+        let mut all_spans = vec![];
+        loop {
+            let n = reader.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+
+            let spans = self.storage.write(&buffer[..n], chunker)?;
+            all_spans.push(spans);
+        }
+
+        for spans in all_spans {
+            self.file_layer.write(handle, spans);
+        }
+
+        Ok(())
+    }
+
     /// Closes the file and ensures that all data that was written to it
     /// is stored. Returns [WriteMeasurements] containing chunking and hashing times.
     pub fn close_file(&mut self, mut handle: FileHandle) -> io::Result<WriteMeasurements> {
-        let span = self.storage.flush(&mut handle.chunker)?;
-        self.file_layer.write(&mut handle, span);
+        if let Some(chunker) = &mut handle.chunker {
+            let span = self.storage.flush(chunker)?;
+            self.file_layer.write(&mut handle, span);
+        }
 
         Ok(handle.close())
     }
@@ -116,6 +158,8 @@ where
     }
 
     /// Reads 1 MB of data from a file and returns it.
+    ///
+    /// **Careful:** it modifies internal `FileHandle` data. After using this `write_to_file` should not be used on the same FileHandle.
     pub fn read_from_file(&mut self, handle: &mut FileHandle) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(&hashes)?.concat())

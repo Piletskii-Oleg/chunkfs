@@ -32,7 +32,7 @@ const SEG_SIZE: usize = 1024 * 1024; // 1MB
 
 /// A chunk of the processed data. Doesn't store any data,
 /// only contains offset and length of the chunk.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Chunk {
     offset: usize,
     length: usize,
