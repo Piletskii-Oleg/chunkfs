@@ -140,7 +140,7 @@ where
 {
     /// Creates a file system with the given [`hasher`][Hasher], original [`database`][Database] and target map, and a [`scrubber`][Scrub].
     ///
-    /// Provided `database` must implement [IterableDatabase].
+    /// Provided `database` must implement [`IterableDatabase`].
     pub fn new_with_scrubber(
         database: B,
         target_map: T,
