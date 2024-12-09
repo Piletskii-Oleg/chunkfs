@@ -113,10 +113,6 @@ fn non_iterable_database_can_be_used_with_fs() {
             unimplemented!()
         }
 
-        fn remove(&mut self, _key: &Vec<u8>) {
-            unimplemented!()
-        }
-
         fn contains(&self, _key: &Vec<u8>) -> bool {
             unimplemented!()
         }
