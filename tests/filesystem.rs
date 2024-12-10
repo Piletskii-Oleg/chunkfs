@@ -89,9 +89,7 @@ fn scrub_compiles_on_cdc_map_but_returns_error() {
 #[test]
 fn two_file_handles_to_one_file() {
     let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
-    let mut handle1 = fs
-        .create_file("file", LeapChunker::default())
-        .unwrap();
+    let mut handle1 = fs.create_file("file", LeapChunker::default()).unwrap();
     let mut handle2 = fs.open_file("file", LeapChunker::default()).unwrap();
     fs.write_to_file(&mut handle1, &[1; MB]).unwrap();
     fs.close_file(handle1).unwrap();

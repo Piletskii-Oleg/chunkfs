@@ -1,16 +1,15 @@
 use std::collections::HashMap;
-use std::fs::File;
 use std::io;
 use std::io::{Read as _, Seek as _};
 
 use chunkfs::chunkers::LeapChunker;
+use chunkfs::create_cdc_filesystem;
 use chunkfs::fio::generate_with_fio;
 use chunkfs::hashers::Sha256Hasher;
-use chunkfs::{Chunker, FileSystem};
 
 fn main() -> io::Result<()> {
     let base = HashMap::default();
-    let mut fs = FileSystem::new_with_key(base, Sha256Hasher::default(), 0);
+    let mut fs = create_cdc_filesystem(base, Sha256Hasher::default());
 
     let mut file = fs.create_file("file", LeapChunker::default())?;
 

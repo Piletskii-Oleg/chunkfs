@@ -9,7 +9,7 @@ use std::io::{Read, Seek};
 fn main() -> io::Result<()> {
     let mut fs = FileSystem::new_with_scrubber(
         HashMap::default(),
-        Box::new(HashMap::default()),
+        HashMap::default(),
         Box::new(chunkfs::CopyScrubber),
         Sha256Hasher::default(),
     );

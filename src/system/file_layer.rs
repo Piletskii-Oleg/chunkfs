@@ -6,7 +6,7 @@ use crate::ChunkHash;
 use crate::Chunker;
 use crate::{WriteMeasurements, SEG_SIZE};
 
-use crate::storage::SpansInfo;
+use crate::system::storage::SpansInfo;
 
 /// Hashed span, starting at `offset`.
 #[derive(Debug, PartialEq, Eq, Default)]
@@ -180,8 +180,8 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
 mod tests {
     use std::io::ErrorKind;
 
-    use crate::file_layer::FileLayer;
     use crate::chunkers::FSChunker;
+    use crate::system::file_layer::FileLayer;
     use crate::Chunker;
 
     #[test]

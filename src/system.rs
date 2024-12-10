@@ -2,14 +2,17 @@ use std::cmp::min;
 use std::collections::HashMap;
 use std::io;
 
-use crate::WriteMeasurements;
-use crate::{ChunkHash, SEG_SIZE};
-use crate::{Chunker, Hasher};
+use super::{ChunkHash, Chunker, Hasher, WriteMeasurements, SEG_SIZE};
 
-use crate::database::{Database, IterableDatabase};
-use crate::file_layer::{FileHandle, FileLayer};
-use crate::scrub::{Scrub, ScrubMeasurements};
-use crate::storage::{ChunkStorage, DataContainer};
+use database::{Database, IterableDatabase};
+use file_layer::{FileHandle, FileLayer};
+use scrub::{Scrub, ScrubMeasurements};
+use storage::{ChunkStorage, DataContainer};
+
+pub mod database;
+pub mod file_layer;
+pub mod scrub;
+pub mod storage;
 
 /// A file system provided by chunkfs.
 ///
@@ -122,7 +125,7 @@ where
             return Err(io::Error::new(io::ErrorKind::PermissionDenied, msg));
         };
 
-        let mut buffer = vec![0u8; 1024 * 1024];
+        let mut buffer = vec![0u8; SEG_SIZE];
         let mut all_spans = vec![];
         loop {
             let n = reader.read(&mut buffer)?;
@@ -220,7 +223,8 @@ where
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: IterableDatabase<K, Vec<u8>>,
 {
-    /// Calculates total deduplication ratio of the storage, accounting for chunks both unprocessed and processed with scrubber.
+    /// Calculates total deduplication ratio of the storage,
+    /// accounting for chunks both unprocessed and processed with scrubber.
     pub fn total_dedup_ratio(&self) -> f64 {
         self.storage.total_dedup_ratio()
     }

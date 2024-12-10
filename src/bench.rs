@@ -1,4 +1,4 @@
-use crate::{Chunker, FileSystem, Hasher};
+use crate::{create_cdc_filesystem, Chunker, Hasher};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
@@ -25,7 +25,7 @@ impl<'a> Dataset<'a> {
 }
 
 fn measure(chunker: Box<dyn Chunker>, hasher: impl Hasher, dataset: Dataset) -> io::Result<()> {
-    let mut fs = FileSystem::new_with_key(HashMap::new(), hasher, 0);
+    let mut fs = create_cdc_filesystem(HashMap::new(), hasher);
     let mut file = fs.create_file("file", chunker)?;
 
     let mut data = dataset.open()?;

@@ -2,9 +2,9 @@ use std::hash;
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
 
-pub use map::{Database, IterableDatabase};
-pub use scrub::{CopyScrubber, Scrub, ScrubMeasurements};
-pub use storage::{Data, DataContainer};
+pub use system::database::{Database, IterableDatabase};
+pub use system::scrub::{CopyScrubber, Scrub, ScrubMeasurements};
+pub use system::storage::{Data, DataContainer};
 pub use system::{create_cdc_filesystem, FileSystem};
 
 pub use bench::fio;
@@ -16,10 +16,6 @@ pub mod hashers;
 
 mod bench;
 mod system;
-pub mod database;
-pub mod file_layer;
-pub mod scrub;
-pub mod storage;
 
 /// Trait for a CDC hash, combining several other traits: [hash::Hash], [Clone], [Eq], [PartialEq], [Default].
 ///
