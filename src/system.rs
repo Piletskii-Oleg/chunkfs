@@ -85,7 +85,8 @@ where
 
     /// Writes given data to the file.
     ///
-    /// Input data is a slice.
+    /// # Errors
+    /// `io::ErrorKind::PermissionDenied` - if the handle was opened in read-only mode
     pub fn write_to_file(&mut self, handle: &mut FileHandle, data: &[u8]) -> io::Result<()> {
         let Some(chunker) = &mut handle.chunker else {
             let msg = "file handle is read-only";
@@ -113,9 +114,10 @@ where
         Ok(())
     }
 
-    /// Writes given data to the file.
+    /// Writes given data to the file. Takes any reader as an input, including slices.
     ///
-    /// Takes any reader as an input, including slices.
+    /// # Errors
+    /// `io::ErrorKind::PermissionDenied` - if the handle was opened in read-only mode
     pub fn write_from_stream<R>(&mut self, handle: &mut FileHandle, mut reader: R) -> io::Result<()>
     where
         R: io::Read,
@@ -144,8 +146,8 @@ where
         Ok(())
     }
 
-    /// Closes the file and ensures that all data that was written to it
-    /// is stored. Returns [WriteMeasurements] containing chunking and hashing times.
+    /// Closes the file and ensures that all data that was written to it is stored.
+    /// Returns [WriteMeasurements] containing chunking and hashing times.
     pub fn close_file(&mut self, mut handle: FileHandle) -> io::Result<WriteMeasurements> {
         if let Some(chunker) = &mut handle.chunker {
             let span = self.storage.flush(chunker)?;
