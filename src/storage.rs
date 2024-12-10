@@ -2,8 +2,8 @@ use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
 
-use crate::fs::database::{Database, IterableDatabase};
-use crate::fs::scrub::{Scrub, ScrubMeasurements};
+use crate::database::{Database, IterableDatabase};
+use crate::scrub::{Scrub, ScrubMeasurements};
 use crate::WriteMeasurements;
 use crate::{ChunkHash, Chunker, Hasher};
 
@@ -313,7 +313,7 @@ impl<K> Default for Data<K> {
 mod tests {
     use std::collections::HashMap;
 
-    use super::super::scrub::DumbScrubber;
+    use crate::scrub::DumbScrubber;
     use super::ChunkStorage;
     use super::DataContainer;
     use super::ScrubMeasurements;
