@@ -10,9 +10,8 @@ use std::time::{Duration, Instant};
 use chunkfs::chunkers::{LeapChunker, RabinChunker};
 use chunkfs::fio::generate_with_fio;
 use chunkfs::hashers::SimpleHasher;
-use chunkfs::Chunker;
-use chunkfs::FileSystem;
 use chunkfs::Hasher;
+use chunkfs::{create_cdc_filesystem, Chunker};
 
 #[derive(Default)]
 struct Measurements {
@@ -24,9 +23,8 @@ struct Measurements {
 
 fn main() -> io::Result<()> {
     let base = HashMap::default();
-    let mut fs = FileSystem::new_with_key(base, SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(base, SimpleHasher);
     let mut file = fs.create_file("file", RabinChunker::default())?;
-
     let data = generate_with_fio(100000, 100)?;
     fs.write_from_stream(&mut file, data)?;
     let measurements = fs.close_file(file)?;
@@ -45,7 +43,7 @@ fn parametrized_write(
     println!("Current hasher: {:?}", hasher);
 
     let base = HashMap::default();
-    let mut fs = FileSystem::new_with_key(base, hasher, 0);
+    let mut fs = create_cdc_filesystem(base, hasher);
 
     let mut handle = fs.create_file("file", chunker)?;
 

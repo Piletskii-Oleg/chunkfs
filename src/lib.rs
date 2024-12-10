@@ -2,7 +2,10 @@ use std::hash;
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
 
-pub use system::FileSystem;
+pub use map::{Database, IterableDatabase};
+pub use scrub::{CopyScrubber, Scrub, ScrubMeasurements};
+pub use storage::{Data, DataContainer};
+pub use system::{create_cdc_filesystem, FileSystem};
 
 pub use bench::fio;
 

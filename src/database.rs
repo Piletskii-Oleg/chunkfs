@@ -4,7 +4,9 @@ use std::io::ErrorKind;
 
 use crate::ChunkHash;
 
-/// Serves as base functionality for storing the actual data.
+/// Serves as base functionality for storing the actual data as key-value pairs.
+///
+/// Supports inserting and getting values by key, checking if the key is present in the storage.
 pub trait Database<K, V> {
     /// Inserts a key-value pair into the storage.
     fn insert(&mut self, key: K, value: V) -> io::Result<()>;
@@ -15,9 +17,6 @@ pub trait Database<K, V> {
     /// Should return [ErrorKind::NotFound], if the key-value pair
     /// was not found in the storage.
     fn get(&self, key: &K) -> io::Result<V>;
-
-    /// Removes a key-value pair from the storage, given the key.
-    fn remove(&mut self, key: &K);
 
     /// Inserts multiple key-value pairs into the storage.
     fn insert_multi(&mut self, pairs: Vec<(K, V)>) -> io::Result<()> {
@@ -36,11 +35,15 @@ pub trait Database<K, V> {
     fn contains(&self, key: &K) -> bool;
 }
 
+/// Allows iteration over database contents.
 pub trait IterableDatabase<K, V>: Database<K, V> {
+    /// Returns a simple immutable iterator over values.
     fn iterator(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_>;
 
+    /// Returns an iterator that can mutate values but not keys.
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_>;
 
+    /// Returns an immutable iterator over keys.
     fn keys<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a K> + 'a>
     where
         V: 'a,
@@ -48,6 +51,7 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
         Box::new(self.iterator().map(|(k, _)| k))
     }
 
+    /// Returns an immutable iterator over values.
     fn values<'a>(&'a self) -> Box<dyn Iterator<Item = &'a V> + 'a>
     where
         K: 'a,
@@ -55,21 +59,12 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
         Box::new(self.iterator().map(|(_, v)| v))
     }
 
+    /// Returns a mutable iterator over values.
     fn values_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut V> + 'a>
     where
         K: 'a,
     {
         Box::new(self.iterator_mut().map(|(_, v)| v))
-    }
-}
-
-impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
-    fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &V)> + '_> {
-        Box::new(self.iter())
-    }
-
-    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {
-        Box::new(self.iter_mut())
     }
 }
 
@@ -83,11 +78,17 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
         self.get(key).ok_or(ErrorKind::NotFound.into()).cloned()
     }
 
-    fn remove(&mut self, key: &Hash) {
-        self.remove(key);
-    }
-
     fn contains(&self, key: &Hash) -> bool {
         self.contains_key(key)
+    }
+}
+
+impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
+    fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &V)> + '_> {
+        Box::new(self.iter())
+    }
+
+    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {
+        Box::new(self.iter_mut())
     }
 }
