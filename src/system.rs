@@ -62,15 +62,19 @@ where
 
     /// Tries to open a file with the given name and returns its `FileHandle` if it exists,
     /// or `None`, if it doesn't.
-    pub fn open_file<C>(&self, name: &str, chunker: C) -> io::Result<FileHandle>
+    pub fn open_file<S, C>(&self, name: S, chunker: C) -> io::Result<FileHandle>
     where
+        S: AsRef<str>,
         C: Into<Box<dyn Chunker>>,
     {
-        self.file_layer.open(name, chunker.into())
+        self.file_layer.open(name.as_ref(), chunker.into())
     }
 
-    pub fn open_file_readonly(&self, name: &str) -> io::Result<FileHandle> {
-        self.file_layer.open_readonly(name)
+    pub fn open_file_readonly<S>(&self, name: S) -> io::Result<FileHandle>
+    where
+        S: AsRef<str>,
+    {
+        self.file_layer.open_readonly(name.as_ref())
     }
 
     /// Creates a file with the given name and returns its `FileHandle`.

@@ -7,14 +7,12 @@ pub use system::scrub::{CopyScrubber, Scrub, ScrubMeasurements};
 pub use system::storage::{Data, DataContainer};
 pub use system::{create_cdc_filesystem, FileSystem};
 
-pub use bench::fio;
-
 #[cfg(feature = "chunkers")]
 pub mod chunkers;
 #[cfg(feature = "hashers")]
 pub mod hashers;
 
-mod bench;
+pub mod bench;
 mod system;
 
 /// Trait for a CDC hash, combining several other traits: [hash::Hash], [Clone], [Eq], [PartialEq], [Default].

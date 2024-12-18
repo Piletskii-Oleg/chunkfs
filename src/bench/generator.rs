@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 /// # Parameters
 /// * size - size of the file, in **KB**
 /// * dedup_ratio - percentage of identical buffers when writing, from 0 to 100
-pub fn generate_with_fio(size: usize, dedup_percentage: u8) -> io::Result<File> {
+pub fn fio(size: usize, dedup_percentage: u8) -> io::Result<File> {
     if dedup_percentage > 100 {
         let msg = "dedup_percentage must be between 0 and 100";
         return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
@@ -39,12 +39,12 @@ pub fn generate_with_fio(size: usize, dedup_percentage: u8) -> io::Result<File> 
 
 #[cfg(test)]
 mod tests {
-    use super::generate_with_fio;
+    use super::fio;
 
     // fio should work
     // file must be opened
     #[test]
     fn fio_test() {
-        let _ = generate_with_fio(10000, 10).unwrap();
+        let _ = fio(10000, 10).unwrap();
     }
 }
