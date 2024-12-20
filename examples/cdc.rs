@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io;
 use std::io::{BufReader, Read as _, Seek as _};
+
 use chunkfs::bench::generator::fio;
 use chunkfs::chunkers::LeapChunker;
 use chunkfs::create_cdc_filesystem;
@@ -15,7 +16,7 @@ fn main() -> io::Result<()> {
     const SIZE: usize = 8192 * 100;
     const KB: usize = 1024;
 
-    let mut reader = BufReader::new(fio(SIZE, 10)?);
+    let mut reader = BufReader::new(fio("cdc", SIZE, 10)?.open()?);
     fs.write_from_stream(&mut file, &mut reader)?;
     let measurements = fs.close_file(file)?;
     println!("{:?}", measurements);

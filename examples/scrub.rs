@@ -1,10 +1,11 @@
-use chunkfs::chunkers::SuperChunker;
-use chunkfs::hashers::Sha256Hasher;
-use chunkfs::FileSystem;
 use std::collections::HashMap;
 use std::io;
 use std::io::{BufReader, Read, Seek};
+
 use chunkfs::bench::generator::fio;
+use chunkfs::chunkers::SuperChunker;
+use chunkfs::hashers::Sha256Hasher;
+use chunkfs::FileSystem;
 
 fn main() -> io::Result<()> {
     let mut fs = FileSystem::new_with_scrubber(
@@ -18,7 +19,7 @@ fn main() -> io::Result<()> {
     const KB: usize = 1024;
 
     let mut handle = fs.create_file("file", SuperChunker::default())?;
-    let mut file = BufReader::new(fio(SIZE, 30)?);
+    let mut file = BufReader::new(fio("scrub", SIZE, 30)?.open()?);
     fs.write_from_stream(&mut handle, &mut file)?;
     fs.close_file(handle)?;
 

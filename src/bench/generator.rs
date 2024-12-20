@@ -1,4 +1,4 @@
-use std::fs::File;
+use super::Dataset;
 use std::io;
 use std::process::{Command, Stdio};
 
@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 /// # Parameters
 /// * size - size of the file, in **KB**
 /// * dedup_ratio - percentage of identical buffers when writing, from 0 to 100
-pub fn fio(size: usize, dedup_percentage: u8) -> io::Result<File> {
+pub fn fio(name: &str, size: usize, dedup_percentage: u8) -> io::Result<Dataset> {
     if dedup_percentage > 100 {
         let msg = "dedup_percentage must be between 0 and 100";
         return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
@@ -16,7 +16,6 @@ pub fn fio(size: usize, dedup_percentage: u8) -> io::Result<File> {
     let size_arg = format!("--size={size}K");
     let dedup_ratio_arg = format!("--dedupe_percentage={dedup_percentage}");
 
-    let name = "file";
     let dir = std::env::temp_dir();
     let name_arg = format!("--name={name}");
     let dir_arg = format!("--directory={}", dir.display());
@@ -32,9 +31,12 @@ pub fn fio(size: usize, dedup_percentage: u8) -> io::Result<File> {
         .spawn()?;
     output.wait()?;
 
-    let name = format!("{name}.0.0");
-    let path = dir.join(name);
-    File::open(path)
+    let file_name = format!("{name}.0.0");
+    let path = dir.join(&file_name);
+
+    Dataset::new(
+        &path.into_os_string().into_string().unwrap(),
+        name)
 }
 
 #[cfg(test)]
@@ -45,6 +47,6 @@ mod tests {
     // file must be opened
     #[test]
     fn fio_test() {
-        let _ = fio(10000, 10).unwrap();
+        let _ = fio("hi", 10000, 10).unwrap();
     }
 }

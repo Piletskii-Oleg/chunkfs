@@ -1,21 +1,27 @@
-use crate::{create_cdc_filesystem, ChunkHash, Chunker, DataContainer, FileSystem, Hasher, IterableDatabase, WriteMeasurements};
+pub mod generator;
+
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use std::io;
-use std::io::{Read};
+use std::io::Read;
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
+
 use uuid::Uuid;
 
-pub mod generator;
+use crate::{
+    create_cdc_filesystem, ChunkHash, Chunker, DataContainer, FileSystem, Hasher, IterableDatabase,
+    WriteMeasurements,
+};
 
 /// A file system fixture that allows user to do measurements and carry out benchmarks
 /// for CDC algorithms.
 pub struct CDCFixture<B, H, Hash>
-where B: IterableDatabase<Hash, DataContainer<()>>,
-H: Hasher<Hash = Hash>,
-Hash: ChunkHash,
+where
+    B: IterableDatabase<Hash, DataContainer<()>>,
+    H: Hasher<Hash=Hash>,
+    Hash: ChunkHash,
 {
     fs: FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>,
 }
@@ -23,7 +29,7 @@ Hash: ChunkHash,
 impl<B, H, Hash> CDCFixture<B, H, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
 {
     /// Creates a fixture, opening a database with given base and hasher.
@@ -32,39 +38,34 @@ where
         Self { fs }
     }
 
-    /// Conducts measurements on a given dataset using given chunkers.
-    ///
-    /// Returns a measurement for each chunker.
+    /// Conducts a measurement on a given dataset using given chunker.
     pub fn measure(
         &mut self,
-        chunkers: Vec<Box<dyn Chunker>>,
-        dataset: Dataset,
-    ) -> io::Result<Vec<Measurement>> {
-        let mut measurements = vec![];
-        for chunker in chunkers {
-            let mut file = self.fs.create_file(dataset.uuid, chunker)?;
+        chunker: Box<dyn Chunker>,
+        dataset: &Dataset,
+    ) -> io::Result<Measurement> {
+        let mut file = self.fs.create_file(dataset.uuid, chunker)?;
 
-            let mut dataset_file = dataset.open()?;
+        let mut dataset_file = dataset.open()?;
 
-            let now = Instant::now();
-            self.fs.write_from_stream(&mut file, &mut dataset_file)?;
-            let write_time = now.elapsed();
+        let now = Instant::now();
+        self.fs.write_from_stream(&mut file, &mut dataset_file)?;
+        let write_time = now.elapsed();
 
-            let write_measurements = self.fs.close_file(file)?;
+        let write_measurements = self.fs.close_file(file)?;
 
-            let read_time = self.verify(dataset)?;
+        let read_time = self.verify(dataset)?;
 
-            measurements.push(Measurement {
-                uuid: dataset.uuid.to_string(),
-                name: dataset.name.to_string(),
-                write_time,
-                read_time,
-                write_measurements,
-                dedup_ratio: self.fs.cdc_dedup_ratio(),
-            })
-        }
+        let measurement = Measurement {
+            uuid: dataset.uuid.to_string(),
+            name: dataset.name.to_string(),
+            write_time,
+            read_time,
+            write_measurements,
+            dedup_ratio: self.fs.cdc_dedup_ratio(),
+        };
 
-        Ok(measurements)
+        Ok(measurement)
     }
 
     pub fn measure_multi(&mut self, _n: usize) -> Measurement {
@@ -78,7 +79,7 @@ where
     /// Verifies that the written dataset contents are valid.
     ///
     /// Returns read time for the file.
-    fn verify(&self, dataset: Dataset) -> io::Result<Duration> {
+    fn verify(&self, dataset: &Dataset) -> io::Result<Duration> {
         let file = self.fs.open_file_readonly(dataset.uuid.to_string())?;
 
         let now = Instant::now();
@@ -113,15 +114,15 @@ pub struct Measurement {
     pub dedup_ratio: f64,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct Dataset<'a> {
-    path: &'a str,
-    name: &'a str,
-    size: usize,
+#[derive(Debug, Clone)]
+pub struct Dataset {
+    pub path: String,
+    pub name: String,
+    pub size: usize,
     uuid: Uuid,
 }
 
-impl<'a> Dataset<'a> {
+impl Dataset {
     /// Creates a new instance of dataset.
     ///
     /// Will fail if the provided path does not exist,
@@ -130,12 +131,12 @@ impl<'a> Dataset<'a> {
     /// # Parameters
     /// * `path` - path of the dataset file
     /// * `name` - custom name of the dataset
-    pub fn new(path: &'a str, name: &'a str) -> io::Result<Self> {
+    pub fn new(path: &str, name: &str) -> io::Result<Self> {
         let size = File::open(path)?.metadata()?.len() as usize;
         let uuid = Uuid::new_v4();
         Ok(Dataset {
-            path,
-            name,
+            path: path.to_string(),
+            name: name.to_string(),
             size,
             uuid,
         })
@@ -145,8 +146,8 @@ impl<'a> Dataset<'a> {
     ///
     /// Can be used to open the underlying dataset multiple times,
     /// but it is not recommended.
-   fn open(&self) -> io::Result<File> {
-        File::open(self.path)
+    pub fn open(&self) -> io::Result<File> {
+        File::open(&self.path)
     }
 }
 
@@ -162,11 +163,13 @@ impl Debug for Measurement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Read time: {:?}\nWrite time: {:?}\nChunk time: {:?}\nHash time: {:?}",
+            "Dataset: {}\nRead time: {:?}\nWrite time: {:?}\nChunk time: {:?}\nHash time: {:?}\nDedup ratio: {:.3}",
+            self.name,
             self.read_time,
             self.write_time,
             self.write_measurements.chunk_time,
-            self.write_measurements.hash_time
+            self.write_measurements.hash_time,
+            self.dedup_ratio,
         )
     }
 }
