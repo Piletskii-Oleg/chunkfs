@@ -26,7 +26,12 @@ criterion = "0.5"
 sha3 = "0.10"
 approx = "0.5"
 tempfile = "3.14"
+itertools = "0.13"
 
 [[bench]]
 name = "write_read"
+harness = false
+
+[[bench]]
+name = "chunker_sizes"
 harness = false
