@@ -10,7 +10,7 @@ use itertools::iproduct;
 use chunkfs::bench::Dataset;
 use chunkfs::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker};
 use chunkfs::hashers::Sha256Hasher;
-use chunkfs::{create_cdc_filesystem, Chunker};
+use chunkfs::{create_cdc_filesystem, ChunkerRef};
 
 const SAMPLE_SIZE: usize = 60;
 
@@ -47,12 +47,12 @@ fn chunkers() -> Vec<Algorithms> {
     ]
 }
 
-fn get_chunker(algorithm: Algorithms, params: SizeParams) -> Box<dyn Chunker> {
+fn get_chunker(algorithm: Algorithms, params: SizeParams) -> ChunkerRef {
     match algorithm {
-        Algorithms::Rabin => Box::new(RabinChunker::new(params)),
-        Algorithms::Leap => Box::new(LeapChunker::new(params)),
-        Algorithms::Super => Box::new(UltraChunker::new(params)),
-        Algorithms::Ultra => Box::new(SuperChunker::new(params)),
+        Algorithms::Rabin => RabinChunker::new(params).into(),
+        Algorithms::Leap => LeapChunker::new(params).into(),
+        Algorithms::Super => UltraChunker::new(params).into(),
+        Algorithms::Ultra => SuperChunker::new(params).into(),
     }
 }
 

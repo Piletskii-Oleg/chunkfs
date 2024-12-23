@@ -1,5 +1,8 @@
+use std::cell::RefCell;
+use std::fmt::{Debug, Formatter};
 use std::hash;
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Deref, DerefMut};
+use std::rc::Rc;
 use std::time::Duration;
 
 pub use system::database::{Database, IterableDatabase};
@@ -60,7 +63,7 @@ impl Chunk {
 /// Chunks that are found are returned by [`chunk_data`][Chunker::chunk_data] method.
 /// If some contents were cut because the end of `data` and not the end of the chunk was reached,
 /// it must be returned with [`rest`][Chunker::rest] instead of storing it in the [`chunk_data`][Chunker::chunk_data]'s output.
-pub trait Chunker: std::fmt::Debug {
+pub trait Chunker: Debug {
     /// Goes through whole `data` and finds chunks. If last chunk is not actually a chunk but a leftover,
     /// it is returned via [`rest`][Chunker::rest] method and is not contained in the vector.
     ///
@@ -80,9 +83,40 @@ pub trait Chunker: std::fmt::Debug {
     fn estimate_chunk_count(&self, data: &[u8]) -> usize;
 }
 
-impl<C: Chunker + 'static> From<C> for Box<dyn Chunker + 'static> {
+pub struct ChunkerRef(Rc<RefCell<dyn Chunker>>);
+
+impl Deref for ChunkerRef {
+    type Target = Rc<RefCell<dyn Chunker>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for ChunkerRef {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<Rc<RefCell<dyn Chunker>>> for ChunkerRef {
+    fn from(value: Rc<RefCell<dyn Chunker>>) -> Self {
+        Self(value)
+    }
+}
+
+impl<C> From<C> for ChunkerRef
+where
+    C: Chunker + 'static,
+{
     fn from(chunker: C) -> Self {
-        Box::new(chunker)
+        ChunkerRef(Rc::new(RefCell::new(chunker)))
+    }
+}
+
+impl Debug for ChunkerRef {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.borrow().fmt(f)
     }
 }
 

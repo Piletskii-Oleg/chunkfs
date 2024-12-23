@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 use crate::{
-    create_cdc_filesystem, ChunkHash, Chunker, DataContainer, FileSystem, Hasher, IterableDatabase,
-    WriteMeasurements,
+    create_cdc_filesystem, ChunkHash, ChunkerRef, DataContainer, FileSystem, Hasher,
+    IterableDatabase, WriteMeasurements,
 };
 
 /// A file system fixture that allows user to do measurements and carry out benchmarks
@@ -20,7 +20,7 @@ use crate::{
 pub struct CDCFixture<B, H, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
 {
     fs: FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>,
@@ -29,7 +29,7 @@ where
 impl<B, H, Hash> CDCFixture<B, H, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
 {
     /// Creates a fixture, opening a database with given base and hasher.
@@ -39,11 +39,7 @@ where
     }
 
     /// Conducts a measurement on a given dataset using given chunker.
-    pub fn measure(
-        &mut self,
-        chunker: Box<dyn Chunker>,
-        dataset: &Dataset,
-    ) -> io::Result<Measurement> {
+    pub fn measure(&mut self, chunker: ChunkerRef, dataset: &Dataset) -> io::Result<Measurement> {
         let mut file = self.fs.create_file(dataset.uuid, chunker)?;
 
         let mut dataset_file = dataset.open()?;

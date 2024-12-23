@@ -8,7 +8,7 @@ use criterion::{BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 use chunkfs::bench::Dataset;
 use chunkfs::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker};
 use chunkfs::hashers::Sha256Hasher;
-use chunkfs::{create_cdc_filesystem, Chunker};
+use chunkfs::{create_cdc_filesystem, ChunkerRef};
 
 const SAMPLE_SIZE: usize = 60;
 
@@ -29,12 +29,12 @@ fn chunkers() -> Vec<Algorithms> {
     ]
 }
 
-fn get_chunker(algorithm: Algorithms) -> Box<dyn Chunker> {
+fn get_chunker(algorithm: Algorithms) -> ChunkerRef {
     match algorithm {
-        Algorithms::Rabin => Box::new(RabinChunker::default()),
-        Algorithms::Leap => Box::new(LeapChunker::default()),
-        Algorithms::Super => Box::new(UltraChunker::default()),
-        Algorithms::Ultra => Box::new(SuperChunker::default()),
+        Algorithms::Rabin => RabinChunker::default().into(),
+        Algorithms::Leap => LeapChunker::default().into(),
+        Algorithms::Super => UltraChunker::default().into(),
+        Algorithms::Ultra => SuperChunker::default().into(),
     }
 }
 

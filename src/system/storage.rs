@@ -2,8 +2,8 @@ use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
 
-use crate::WriteMeasurements;
-use crate::{ChunkHash, Chunker, Hasher};
+use crate::{ChunkHash, Hasher};
+use crate::{ChunkerRef, WriteMeasurements};
 
 use super::database::{Database, IterableDatabase};
 use super::scrub::{Scrub, ScrubMeasurements};
@@ -43,7 +43,7 @@ impl<Hash: ChunkHash> Span<Hash> {
 /// Underlying storage for the actual stored data.
 pub struct ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     B: Database<Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -57,7 +57,7 @@ where
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     B: Database<H::Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -79,7 +79,7 @@ where
     pub fn write(
         &mut self,
         data: &[u8],
-        chunker: &mut Box<dyn Chunker>,
+        chunker: &ChunkerRef,
     ) -> io::Result<SpansInfo<H::Hash>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
         let spans_info = writer.write(data, &mut self.database)?;
@@ -90,7 +90,7 @@ where
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
-    pub fn flush(&mut self, chunker: &mut Box<dyn Chunker>) -> io::Result<SpansInfo<H::Hash>> {
+    pub fn flush(&mut self, chunker: &ChunkerRef) -> io::Result<SpansInfo<H::Hash>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
         let spans_info = writer.flush(&mut self.database)?;
 
@@ -121,7 +121,7 @@ where
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -171,7 +171,7 @@ where
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: IterableDatabase<K, Vec<u8>>,
@@ -197,7 +197,7 @@ struct StorageWriter<'handle, H>
 where
     H: Hasher,
 {
-    chunker: &'handle mut Box<dyn Chunker>,
+    chunker: &'handle ChunkerRef,
     hasher: &'handle mut H,
 }
 
@@ -205,7 +205,7 @@ impl<'handle, H> StorageWriter<'handle, H>
 where
     H: Hasher,
 {
-    fn new(chunker: &'handle mut Box<dyn Chunker>, hasher: &'handle mut H) -> Self {
+    fn new(chunker: &'handle ChunkerRef, hasher: &'handle mut H) -> Self {
         Self { chunker, hasher }
     }
 
@@ -220,13 +220,13 @@ where
     ) -> io::Result<SpansInfo<H::Hash>> {
         //debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
-        let mut buffer = self.chunker.remainder().to_vec();
+        let mut buffer = self.chunker.borrow().remainder().to_vec();
         buffer.extend_from_slice(data);
 
-        let empty = Vec::with_capacity(self.chunker.estimate_chunk_count(&buffer));
+        let empty = Vec::with_capacity(self.chunker.borrow().estimate_chunk_count(&buffer));
 
         let start = Instant::now();
-        let chunks = self.chunker.chunk_data(&buffer, empty);
+        let chunks = self.chunker.borrow_mut().chunk_data(&buffer, empty);
         let chunk_time = start.elapsed();
 
         let start = Instant::now();
@@ -270,7 +270,7 @@ where
         base: &mut B,
     ) -> io::Result<SpansInfo<H::Hash>> {
         // is this necessary?
-        if self.chunker.remainder().is_empty() {
+        if self.chunker.borrow().remainder().is_empty() {
             return Ok(SpansInfo {
                 spans: vec![],
                 measurements: Default::default(),
@@ -278,7 +278,7 @@ where
             });
         }
 
-        let remainder = self.chunker.remainder().to_vec();
+        let remainder = self.chunker.borrow().remainder().to_vec();
         let remainder_length = remainder.len();
         let start = Instant::now();
         let hash = self.hasher.hash(&remainder);
@@ -343,7 +343,6 @@ mod tests {
     use crate::chunkers::{FSChunker, SuperChunker};
     use crate::hashers::SimpleHasher;
     use crate::system::scrub::DumbScrubber;
-    use crate::Chunker;
 
     #[test]
     fn hashmap_works_as_cdc_map() {
@@ -378,10 +377,10 @@ mod tests {
         );
 
         let data = vec![10; 1024 * 1024];
-        let mut chunker: Box<dyn Chunker> = Box::new(FSChunker::new(4096));
+        let chunker = FSChunker::new(4096).into();
 
-        chunk_storage.write(&data, &mut chunker).unwrap();
-        chunk_storage.flush(&mut chunker).unwrap();
+        chunk_storage.write(&data, &chunker).unwrap();
+        chunk_storage.flush(&chunker).unwrap();
 
         assert_eq!(chunk_storage.total_cdc_size(), 4096)
     }
@@ -400,13 +399,13 @@ mod tests {
             vec![16; 1024 * 256],
             vec![32; 1024 * 256],
         ]
-        .concat();
+            .concat();
 
-        let mut chunker: Box<dyn Chunker> = Box::new(SuperChunker::default());
+        let chunker = SuperChunker::default().into();
 
-        chunk_storage.write(&data, &mut chunker).unwrap();
-        chunk_storage.write(&data, &mut chunker).unwrap();
-        chunk_storage.flush(&mut chunker).unwrap();
+        chunk_storage.write(&data, &chunker).unwrap();
+        chunk_storage.write(&data, &chunker).unwrap();
+        chunk_storage.flush(&chunker).unwrap();
 
         assert_eq!(chunk_storage.size_written, 1024 * 1024 * 2);
     }

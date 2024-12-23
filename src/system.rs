@@ -2,12 +2,12 @@ use std::cmp::min;
 use std::collections::HashMap;
 use std::io;
 
-use super::{ChunkHash, Chunker, Hasher, WriteMeasurements, SEG_SIZE};
-
 use database::{Database, IterableDatabase};
 use file_layer::{FileHandle, FileLayer};
 use scrub::{Scrub, ScrubMeasurements};
 use storage::{ChunkStorage, DataContainer};
+
+use super::{ChunkHash, ChunkerRef, Hasher, WriteMeasurements, SEG_SIZE};
 
 pub mod database;
 pub mod file_layer;
@@ -65,7 +65,7 @@ where
     pub fn open_file<S, C>(&self, name: S, chunker: C) -> io::Result<FileHandle>
     where
         S: AsRef<str>,
-        C: Into<Box<dyn Chunker>>,
+        C: Into<ChunkerRef>,
     {
         self.file_layer.open(name.as_ref(), chunker.into())
     }
@@ -82,7 +82,7 @@ where
     pub fn create_file<S, C>(&mut self, name: S, chunker: C) -> io::Result<FileHandle>
     where
         S: Into<String>,
-        C: Into<Box<dyn Chunker>>,
+        C: Into<ChunkerRef>,
     {
         self.file_layer.create(name, chunker.into(), true)
     }

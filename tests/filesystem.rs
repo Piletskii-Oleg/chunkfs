@@ -1,13 +1,14 @@
 extern crate chunkfs;
 
-use approx::assert_relative_eq;
 use std::collections::HashMap;
 use std::io;
 use std::io::{Seek, Write};
 
+use approx::assert_relative_eq;
+
 use chunkfs::chunkers::{FSChunker, LeapChunker, SuperChunker};
 use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
-use chunkfs::{create_cdc_filesystem, DataContainer, Database, WriteMeasurements};
+use chunkfs::{create_cdc_filesystem, ChunkerRef, DataContainer, Database, WriteMeasurements};
 
 const MB: usize = 1024 * 1024;
 
@@ -153,7 +154,7 @@ fn dedup_ratio_is_correct_for_fixed_size_chunker() {
 #[test]
 fn different_chunkers_from_vec_can_be_used_with_same_filesystem() {
     let mut fs = create_cdc_filesystem(HashMap::new(), Sha256Hasher::default());
-    let chunkers: Vec<Box<dyn chunkfs::Chunker>> = vec![
+    let chunkers: Vec<ChunkerRef> = vec![
         SuperChunker::default().into(),
         LeapChunker::default().into(),
     ];

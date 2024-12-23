@@ -2,11 +2,9 @@ use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
 
-use crate::ChunkHash;
-use crate::Chunker;
-use crate::{WriteMeasurements, SEG_SIZE};
-
 use crate::system::storage::SpansInfo;
+use crate::{ChunkHash, ChunkerRef};
+use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
 #[derive(Debug, PartialEq, Eq, Default)]
@@ -37,7 +35,7 @@ pub struct FileHandle {
     offset: usize,
     measurements: WriteMeasurements,
     // maybe not pub(crate) but something else? cannot think of anything
-    pub(crate) chunker: Option<Box<dyn Chunker>>,
+    pub(crate) chunker: Option<ChunkerRef>,
 }
 
 impl<Hash: ChunkHash> File<Hash> {
@@ -50,7 +48,7 @@ impl<Hash: ChunkHash> File<Hash> {
 }
 
 impl FileHandle {
-    fn new<Hash: ChunkHash>(file: &File<Hash>, chunker: Box<dyn Chunker>) -> Self {
+    fn new<Hash: ChunkHash>(file: &File<Hash>, chunker: ChunkerRef) -> Self {
         FileHandle {
             file_name: file.name.clone(),
             offset: 0,
@@ -84,7 +82,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     pub fn create(
         &mut self,
         name: impl Into<String>,
-        chunker: Box<dyn Chunker>,
+        chunker: ChunkerRef,
         create_new: bool,
     ) -> io::Result<FileHandle> {
         let name = name.into();
@@ -99,7 +97,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     }
 
     /// Opens a [`file`][File] based on its name and returns its [`FileHandle`]
-    pub fn open(&self, name: &str, chunker: Box<dyn Chunker>) -> io::Result<FileHandle> {
+    pub fn open(&self, name: &str, chunker: ChunkerRef) -> io::Result<FileHandle> {
         self.files
             .get(name)
             .map(|file| FileHandle::new(file, chunker))
@@ -182,13 +180,12 @@ mod tests {
 
     use crate::chunkers::FSChunker;
     use crate::system::file_layer::FileLayer;
-    use crate::Chunker;
 
     #[test]
     fn file_layer_create_file() {
         let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
         let name = "hello";
-        let chunker: Box<dyn Chunker> = FSChunker::default().into();
+        let chunker = FSChunker::default().into();
         fl.create(name, chunker, true).unwrap();
 
         assert_eq!(fl.files.get(name).unwrap().name, "hello");
@@ -198,10 +195,10 @@ mod tests {
     #[test]
     fn cant_create_two_files_with_same_name() {
         let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
-        fl.create("hello".to_string(), Box::new(FSChunker::new(4096)), false)
+        fl.create("hello".to_string(), FSChunker::new(4096).into(), false)
             .unwrap();
 
-        let result = fl.create("hello".to_string(), Box::new(FSChunker::new(4096)), false);
+        let result = fl.create("hello".to_string(), FSChunker::new(4096).into(), false);
         assert!(result.is_err());
         assert_eq!(result.err().unwrap().kind(), ErrorKind::AlreadyExists);
     }
