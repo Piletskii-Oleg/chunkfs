@@ -20,7 +20,7 @@ use crate::{
 pub struct CDCFixture<B, H, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
     fs: FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>,
@@ -29,7 +29,7 @@ where
 impl<B, H, Hash> CDCFixture<B, H, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
     /// Creates a fixture, opening a database with given base and hasher.

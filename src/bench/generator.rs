@@ -34,9 +34,7 @@ pub fn fio(name: &str, size: usize, dedup_percentage: u8) -> io::Result<Dataset>
     let file_name = format!("{name}.0.0");
     let path = dir.join(&file_name);
 
-    Dataset::new(
-        &path.into_os_string().into_string().unwrap(),
-        name)
+    Dataset::new(&path.into_os_string().into_string().unwrap(), name)
 }
 
 #[cfg(test)]

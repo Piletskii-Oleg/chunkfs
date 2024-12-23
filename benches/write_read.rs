@@ -1,60 +1,75 @@
-use std::collections::HashMap;
-use std::fs;
-use std::fs::File;
-
-use criterion::measurement::WallTime;
-use criterion::{criterion_group, BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
-
-use chunkfs::chunkers::UltraChunker;
-use chunkfs::create_cdc_filesystem;
+use chunkfs::bench::Dataset;
+use chunkfs::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker};
 use chunkfs::hashers::Sha256Hasher;
+use chunkfs::{create_cdc_filesystem, Chunker};
+use criterion::measurement::WallTime;
+use criterion::{BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::BufReader;
+const SAMPLE_SIZE: usize = 60;
 
-struct Dataset<'a> {
-    path: &'a str,
-    name: &'a str,
-    size: u64,
+#[derive(Copy, Clone, Debug)]
+enum Algorithms {
+    Rabin,
+    Leap,
+    Super,
+    Ultra,
 }
 
-impl<'a> Dataset<'a> {
-    fn new(path: &'a str, name: &'a str) -> Self {
-        let size = File::open(path).unwrap().metadata().unwrap().len();
-        Dataset { path, name, size }
+fn chunkers() -> Vec<Algorithms> {
+    vec![
+        Algorithms::Rabin,
+        Algorithms::Leap,
+        Algorithms::Super,
+        Algorithms::Ultra,
+    ]
+}
+
+fn get_chunker(algorithm: Algorithms) -> Box<dyn Chunker> {
+    match algorithm {
+        Algorithms::Rabin => Box::new(RabinChunker::default()),
+        Algorithms::Leap => Box::new(LeapChunker::default()),
+        Algorithms::Super => Box::new(UltraChunker::default()),
+        Algorithms::Ultra => Box::new(SuperChunker::default()),
     }
 }
 
-pub fn criterion_benchmark(c: &mut Criterion) {
-    let datasets = vec![
-        Dataset::new("linux.tar", "linux"),
-        Dataset::new("ubuntu.iso", "ubuntu"),
-    ];
+pub fn bench(c: &mut Criterion) {
+    let datasets = vec![Dataset::new("kernel.tar", "kernel").unwrap()];
 
     for dataset in datasets {
         let mut group = c.benchmark_group("Chunkers");
-        group.sample_size(60);
-        group.throughput(Throughput::Bytes(dataset.size));
+        group.sample_size(SAMPLE_SIZE);
+        group.throughput(Throughput::Bytes(dataset.size as u64));
 
-        let data = fs::read(dataset.path).unwrap();
+        for chunker in chunkers() {
+            bench_write(&dataset, &mut group, chunker);
+        }
 
-        bench_write(&dataset, &mut group, &data);
-
-        bench_read(&dataset, &mut group, &data);
+        for chunker in chunkers() {
+            bench_read(&dataset, &mut group, chunker);
+        }
     }
 }
 
-fn bench_write(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &[u8]) {
-    group.bench_function(BenchmarkId::new("write", dataset.name), |b| {
+fn bench_write(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, algorithm: Algorithms) {
+    let bench_name = &dataset.name;
+    let parameter = format!("write-{:?}", algorithm);
+    group.bench_function(BenchmarkId::new(bench_name, parameter), |b| {
         b.iter_batched(
             || {
-                let base = HashMap::default();
-                let mut fs = create_cdc_filesystem(base, Sha256Hasher::default());
+                let data = BufReader::new(File::open(&dataset.path).unwrap());
 
-                let chunker = UltraChunker::default();
+                let mut fs = create_cdc_filesystem(HashMap::default(), Sha256Hasher::default());
+
+                let chunker = get_chunker(algorithm);
                 let handle = fs.create_file("file", chunker).unwrap();
 
-                (fs, handle)
+                (fs, handle, data)
             },
-            |(mut fs, mut handle)| {
-                fs.write_to_file(&mut handle, data).unwrap();
+            |(mut fs, mut handle, data)| {
+                fs.write_from_stream(&mut handle, data).unwrap();
                 fs.close_file(handle).unwrap();
             },
             BatchSize::PerIteration,
@@ -62,20 +77,23 @@ fn bench_write(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &[
     });
 }
 
-fn bench_read(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &[u8]) {
-    group.bench_function(BenchmarkId::new("read-ultra", dataset.name), |b| {
+fn bench_read(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, algorithm: Algorithms) {
+    let bench_name = &dataset.name;
+    let parameter = format!("read-{:?}", algorithm);
+    group.bench_function(BenchmarkId::new(bench_name, parameter), |b| {
         b.iter_batched(
             || {
+                let data = BufReader::new(File::open(&dataset.path).unwrap());
+
                 let base = HashMap::default();
                 let mut fs = create_cdc_filesystem(base, Sha256Hasher::default());
 
-                let chunker = UltraChunker::default();
+                let chunker = get_chunker(algorithm);
                 let mut handle = fs.create_file("file", chunker).unwrap();
-                fs.write_to_file(&mut handle, data).unwrap();
+                fs.write_from_stream(&mut handle, data).unwrap();
                 fs.close_file(handle).unwrap();
 
-                let chunker = UltraChunker::default();
-                let handle = fs.open_file("file", chunker).unwrap();
+                let handle = fs.open_file_readonly("file").unwrap();
 
                 (fs, handle)
             },
@@ -87,7 +105,10 @@ fn bench_read(dataset: &Dataset, group: &mut BenchmarkGroup<WallTime>, data: &[u
     });
 }
 
-criterion_group!(benches, criterion_benchmark);
+pub fn benches() {
+    let mut criterion: Criterion<_> = Criterion::default().configure_from_args();
+    bench(&mut criterion);
+}
 
 fn main() {
     benches();
