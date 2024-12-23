@@ -2,6 +2,31 @@ use super::Dataset;
 use std::io;
 use std::process::{Command, Stdio};
 
+/// Trait for structures that generate datasets.
+pub trait DatasetGenerator {
+    /// Parameters necessary for generating the dataset.
+    type Parameters;
+
+    /// Generates the dataset using given parameters.
+    fn generate(&self, parameters: Self::Parameters) -> io::Result<Dataset>;
+}
+
+pub struct Fio;
+
+pub struct FioParameters {
+    name: String,
+    size: usize,
+    dedup_percentage: u8,
+}
+
+impl DatasetGenerator for Fio {
+    type Parameters = FioParameters;
+
+    fn generate(&self, params: Self::Parameters) -> io::Result<Dataset> {
+        fio(&params.name, params.size, params.dedup_percentage)
+    }
+}
+
 /// Generates a file using fio
 ///
 /// # Parameters
