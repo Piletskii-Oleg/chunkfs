@@ -3,7 +3,7 @@ use std::io;
 use std::io::{BufReader, Read as _, Seek as _};
 
 use chunkfs::bench::generator::fio;
-use chunkfs::chunkers::LeapChunker;
+use chunkfs::chunkers::SuperChunker;
 use chunkfs::create_cdc_filesystem;
 use chunkfs::hashers::Sha256Hasher;
 
@@ -11,7 +11,7 @@ fn main() -> io::Result<()> {
     let base = HashMap::default();
     let mut fs = create_cdc_filesystem(base, Sha256Hasher::default());
 
-    let mut file = fs.create_file("file", LeapChunker::default())?;
+    let mut file = fs.create_file("file", SuperChunker::default())?;
 
     const SIZE: usize = 8192 * 100;
     const KB: usize = 1024;

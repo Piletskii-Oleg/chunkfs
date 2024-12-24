@@ -13,7 +13,7 @@ fn main() -> io::Result<()> {
 
     let dataset = fio("a", 100000, 30)?;
 
-    let mes = fixture.measure(Box::new(RabinChunker::default()), &dataset)?;
+    let mes = fixture.measure(RabinChunker::default().into(), &dataset)?;
 
     println!("{:?}", mes);
 

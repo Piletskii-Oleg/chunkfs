@@ -5,7 +5,8 @@ use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use std::io;
 use std::io::Read;
-use std::ops::AddAssign;
+use std::iter::Sum;
+use std::ops::{Add, AddAssign};
 use std::time::{Duration, Instant};
 
 use uuid::Uuid;
@@ -40,7 +41,8 @@ where
 
     /// Conducts a measurement on a given dataset using given chunker.
     pub fn measure(&mut self, chunker: ChunkerRef, dataset: &Dataset) -> io::Result<Measurement> {
-        let mut file = self.fs.create_file(dataset.uuid, chunker)?;
+        let uuid = Uuid::new_v4().to_string();
+        let mut file = self.fs.create_file(&uuid, chunker)?;
 
         let mut dataset_file = dataset.open()?;
 
@@ -50,22 +52,29 @@ where
 
         let write_measurements = self.fs.close_file(file)?;
 
-        let read_time = self.verify(dataset)?;
+        let read_time = self.verify(dataset, &uuid)?;
 
         let measurement = Measurement {
-            uuid: dataset.uuid.to_string(),
             name: dataset.name.to_string(),
             write_time,
             read_time,
             write_measurements,
-            dedup_ratio: self.fs.cdc_dedup_ratio(),
         };
 
         Ok(measurement)
     }
 
-    pub fn measure_multi(&mut self, _n: usize) -> Measurement {
-        todo!()
+    pub fn measure_multi(
+        &mut self,
+        chunker: ChunkerRef,
+        dataset: &Dataset,
+        n: usize,
+    ) -> io::Result<Vec<Measurement>> {
+        (0..n)
+            .map(|_|
+                self.measure(chunker.clone().into(), &dataset)
+            )
+            .collect()
     }
 
     pub fn measure_repeated(&mut self, _m: usize) -> Measurement {
@@ -75,8 +84,8 @@ where
     /// Verifies that the written dataset contents are valid.
     ///
     /// Returns read time for the file.
-    fn verify(&self, dataset: &Dataset) -> io::Result<Duration> {
-        let file = self.fs.open_file_readonly(dataset.uuid.to_string())?;
+    fn verify(&self, dataset: &Dataset, uuid: &str) -> io::Result<Duration> {
+        let file = self.fs.open_file_readonly(uuid.to_string())?;
 
         let now = Instant::now();
         let read = self.fs.read_file_complete(&file)?;
@@ -100,14 +109,29 @@ where
     }
 }
 
+pub fn avg_measurement(measurements: Vec<Measurement>) -> Measurement {
+    let n = measurements.len();
+    let sum = measurements.into_iter().sum::<Measurement>();
+
+    let write_measurements = WriteMeasurements {
+        chunk_time: sum.write_measurements.chunk_time / n as u32,
+        hash_time: sum.write_measurements.hash_time / n as u32,
+    };
+
+    Measurement {
+        name: sum.name,
+        write_time: sum.write_time / n as u32,
+        read_time: sum.read_time / n as u32,
+        write_measurements,
+    }
+}
+
 #[derive(Default)]
 pub struct Measurement {
-    pub uuid: String,
     pub name: String,
     pub write_time: Duration,
     pub read_time: Duration,
     pub write_measurements: WriteMeasurements,
-    pub dedup_ratio: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -115,7 +139,6 @@ pub struct Dataset {
     pub path: String,
     pub name: String,
     pub size: usize,
-    uuid: Uuid,
 }
 
 impl Dataset {
@@ -129,12 +152,10 @@ impl Dataset {
     /// * `name` - custom name of the dataset
     pub fn new(path: &str, name: &str) -> io::Result<Self> {
         let size = File::open(path)?.metadata()?.len() as usize;
-        let uuid = Uuid::new_v4();
         Ok(Dataset {
             path: path.to_string(),
             name: name.to_string(),
             size,
-            uuid,
         })
     }
 
@@ -144,6 +165,18 @@ impl Dataset {
     /// but it is not recommended.
     pub fn open(&self) -> io::Result<File> {
         File::open(&self.path)
+    }
+}
+
+impl Add for Measurement {
+    type Output = Measurement;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut measurement = self;
+        measurement.read_time += rhs.read_time;
+        measurement.write_time += rhs.write_time;
+        measurement.write_measurements += rhs.write_measurements;
+        measurement
     }
 }
 
@@ -159,13 +192,18 @@ impl Debug for Measurement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Dataset: {}\nRead time: {:?}\nWrite time: {:?}\nChunk time: {:?}\nHash time: {:?}\nDedup ratio: {:.3}",
+            "Dataset: {}\nRead time: {:?}\nWrite time: {:?}\nChunk time: {:?}\nHash time: {:?}",
             self.name,
             self.read_time,
             self.write_time,
             self.write_measurements.chunk_time,
             self.write_measurements.hash_time,
-            self.dedup_ratio,
         )
+    }
+}
+
+impl Sum for Measurement {
+    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+        iter.fold(Measurement::default(), |acc, next| acc + next)
     }
 }

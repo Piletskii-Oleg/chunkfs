@@ -43,7 +43,7 @@ impl<Hash: ChunkHash> Span<Hash> {
 /// Underlying storage for the actual stored data.
 pub struct ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: Database<Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -57,7 +57,7 @@ where
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: Database<H::Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -76,11 +76,7 @@ where
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    pub fn write(
-        &mut self,
-        data: &[u8],
-        chunker: &ChunkerRef,
-    ) -> io::Result<SpansInfo<H::Hash>> {
+    pub fn write(&mut self, data: &[u8], chunker: &ChunkerRef) -> io::Result<SpansInfo<H::Hash>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
         let spans_info = writer.write(data, &mut self.database)?;
 
@@ -121,7 +117,7 @@ where
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -171,7 +167,7 @@ where
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: IterableDatabase<K, Vec<u8>>,
@@ -399,7 +395,7 @@ mod tests {
             vec![16; 1024 * 256],
             vec![32; 1024 * 256],
         ]
-            .concat();
+        .concat();
 
         let chunker = SuperChunker::default().into();
 
