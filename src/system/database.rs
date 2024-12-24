@@ -33,6 +33,8 @@ pub trait Database<K, V> {
 
     /// Returns `true` if the database contains a value for the specified key.
     fn contains(&self, key: &K) -> bool;
+
+    fn clear(&mut self) -> io::Result<()>;
 }
 
 /// Allows iteration over database contents.
@@ -80,6 +82,10 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
 
     fn contains(&self, key: &Hash) -> bool {
         self.contains_key(key)
+    }
+
+    fn clear(&mut self) -> io::Result<()> {
+        Ok(HashMap::clear(self))
     }
 }
 

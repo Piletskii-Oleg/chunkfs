@@ -92,6 +92,10 @@ where
     /// # Errors
     /// `io::ErrorKind::PermissionDenied` - if the handle was opened in read-only mode
     pub fn write_to_file(&mut self, handle: &mut FileHandle, data: &[u8]) -> io::Result<()> {
+        if !self.file_exists(handle.name()) {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+
         let Some(chunker) = &mut handle.chunker else {
             let msg = "file handle is read-only";
             return Err(io::Error::new(io::ErrorKind::PermissionDenied, msg));
@@ -126,6 +130,10 @@ where
     where
         R: io::Read,
     {
+        if !self.file_exists(handle.name()) {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+
         let Some(chunker) = &mut handle.chunker else {
             let msg = "file handle is read-only";
             return Err(io::Error::new(io::ErrorKind::PermissionDenied, msg));
@@ -153,6 +161,10 @@ where
     /// Closes the file and ensures that all data that was written to it is stored.
     /// Returns [WriteMeasurements] containing chunking and hashing times.
     pub fn close_file(&mut self, mut handle: FileHandle) -> io::Result<WriteMeasurements> {
+        if !self.file_exists(handle.name()) {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+
         if let Some(chunker) = &mut handle.chunker {
             let span = self.storage.flush(chunker)?;
             self.file_layer.write(&mut handle, span);
@@ -173,6 +185,11 @@ where
     pub fn read_from_file(&mut self, handle: &mut FileHandle) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(&hashes)?.concat())
+    }
+
+    pub fn clear(&mut self) -> io::Result<()> {
+        self.file_layer.clear();
+        self.storage.clear()
     }
 
     /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],

@@ -172,6 +172,10 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     pub fn file_exists(&self, name: &str) -> bool {
         self.files.contains_key(name)
     }
+
+    pub fn clear(&mut self) {
+        self.files.clear()
+    }
 }
 
 #[cfg(test)]

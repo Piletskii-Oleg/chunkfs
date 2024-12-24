@@ -113,6 +113,12 @@ where
             })
             .collect()
     }
+
+    pub fn clear(&mut self) -> io::Result<()> {
+        self.size_written = 0;
+        self.target_map.clear()?;
+        self.database.clear()
+    }
 }
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
