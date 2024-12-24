@@ -173,6 +173,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
         self.files.contains_key(name)
     }
 
+    /// Deletes all file data.
     pub fn clear(&mut self) {
         self.files.clear()
     }

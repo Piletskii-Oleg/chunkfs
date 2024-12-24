@@ -43,7 +43,7 @@ impl<Hash: ChunkHash> Span<Hash> {
 /// Underlying storage for the actual stored data.
 pub struct ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     B: Database<Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -57,7 +57,7 @@ where
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     B: Database<H::Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -114,6 +114,7 @@ where
             .collect()
     }
 
+    /// Removes all stored data in both database and target map and sets written size to 0.
     pub fn clear(&mut self) -> io::Result<()> {
         self.size_written = 0;
         self.target_map.clear()?;
@@ -123,7 +124,7 @@ where
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -173,7 +174,7 @@ where
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: IterableDatabase<K, Vec<u8>>,
@@ -401,7 +402,7 @@ mod tests {
             vec![16; 1024 * 256],
             vec![32; 1024 * 256],
         ]
-        .concat();
+            .concat();
 
         let chunker = SuperChunker::default().into();
 

@@ -22,7 +22,7 @@ pub mod storage;
 pub struct FileSystem<B, H, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
@@ -42,7 +42,7 @@ pub fn create_cdc_filesystem<B, H, Hash>(
 ) -> FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>
 where
     B: Database<Hash, DataContainer<()>>,
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
 {
     FileSystem::new(base, hasher, HashMap::default())
@@ -51,7 +51,7 @@ where
 impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
@@ -187,6 +187,7 @@ where
         Ok(self.storage.retrieve(&hashes)?.concat())
     }
 
+    /// Completely clears the file system, invalidating already created file handles.
     pub fn clear(&mut self) -> io::Result<()> {
         self.file_layer.clear();
         self.storage.clear()
@@ -205,7 +206,7 @@ where
 impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
     B: IterableDatabase<Hash, DataContainer<K>>,
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
@@ -241,7 +242,7 @@ where
 
 impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: IterableDatabase<K, Vec<u8>>,
