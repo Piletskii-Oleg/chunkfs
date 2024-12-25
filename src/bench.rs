@@ -112,6 +112,26 @@ where
         })
     }
 
+    /// Gives out a hash map containing chunk size distribution in the database.
+    ///
+    /// Takes `adjustment` as a parameter, which specifies minimal difference between different sized chunks,
+    /// i.e. the size step in the distribution.
+    pub fn size_distribution(&self, adjustment: usize) -> HashMap<usize, u32> {
+        let mut chunk_map = HashMap::new();
+        for chunk in self
+            .fs
+            .iterator()
+            .map(|(_, container)| container.unwrap_chunk())
+        {
+            chunk_map
+                .entry(chunk.len() / adjustment * adjustment)
+                .and_modify(|count| *count += 1)
+                .or_insert(1);
+        }
+
+        chunk_map
+    }
+
     /// Verifies that the written dataset contents are valid.
     ///
     /// Returns read time for the file.
