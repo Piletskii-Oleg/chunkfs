@@ -76,7 +76,7 @@ where
     {
         (0..n)
             .map(|_| {
-                self.fs.clear()?;
+                self.fs.clear_database()?;
                 self.measure::<C>(dataset)
             })
             .collect()
@@ -97,7 +97,7 @@ where
     where
         C: Chunker + Default + 'static,
     {
-        self.fs.clear()?;
+        self.fs.clear_database()?;
 
         let (mut file, uuid) = self.init_file::<C>()?;
         let mut dataset_file = dataset.open()?;

@@ -33,21 +33,18 @@ pub trait Database<K, V> {
 
     /// Returns `true` if the database contains a value for the specified key.
     fn contains(&self, key: &K) -> bool;
-
-    /// Clears the database, removing all contained key-value pairs.
-    fn clear(&mut self) -> io::Result<()>;
 }
 
 /// Allows iteration over database contents.
 pub trait IterableDatabase<K, V>: Database<K, V> {
     /// Returns a simple immutable iterator over values.
-    fn iterator(&self) -> Box<dyn Iterator<Item=(&K, &V)> + '_>;
+    fn iterator(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_>;
 
     /// Returns an iterator that can mutate values but not keys.
-    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item=(&K, &mut V)> + '_>;
+    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_>;
 
     /// Returns an immutable iterator over keys.
-    fn keys<'a>(&'a mut self) -> Box<dyn Iterator<Item=&'a K> + 'a>
+    fn keys<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a K> + 'a>
     where
         V: 'a,
     {
@@ -55,7 +52,7 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
     }
 
     /// Returns an immutable iterator over values.
-    fn values<'a>(&'a self) -> Box<dyn Iterator<Item=&'a V> + 'a>
+    fn values<'a>(&'a self) -> Box<dyn Iterator<Item = &'a V> + 'a>
     where
         K: 'a,
     {
@@ -63,12 +60,15 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
     }
 
     /// Returns a mutable iterator over values.
-    fn values_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item=&'a mut V> + 'a>
+    fn values_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut V> + 'a>
     where
         K: 'a,
     {
         Box::new(self.iterator_mut().map(|(_, v)| v))
     }
+
+    /// Clears the database, removing all contained key-value pairs.
+    fn clear(&mut self) -> io::Result<()>;
 }
 
 impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
@@ -84,18 +84,18 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
     fn contains(&self, key: &Hash) -> bool {
         self.contains_key(key)
     }
-
-    fn clear(&mut self) -> io::Result<()> {
-        Ok(HashMap::clear(self))
-    }
 }
 
 impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
-    fn iterator(&self) -> Box<dyn Iterator<Item=(&Hash, &V)> + '_> {
+    fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &V)> + '_> {
         Box::new(self.iter())
     }
 
-    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item=(&Hash, &mut V)> + '_> {
+    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {
         Box::new(self.iter_mut())
+    }
+
+    fn clear(&mut self) -> io::Result<()> {
+        Ok(HashMap::clear(self))
     }
 }

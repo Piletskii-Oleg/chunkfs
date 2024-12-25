@@ -43,7 +43,7 @@ impl<Hash: ChunkHash> Span<Hash> {
 /// Underlying storage for the actual stored data.
 pub struct ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: Database<Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -57,7 +57,7 @@ where
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: Database<H::Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -113,18 +113,11 @@ where
             })
             .collect()
     }
-
-    /// Removes all stored data in both database and target map and sets written size to 0.
-    pub fn clear(&mut self) -> io::Result<()> {
-        self.size_written = 0;
-        self.target_map.clear()?;
-        self.database.clear()
-    }
 }
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -170,11 +163,28 @@ where
     pub fn cdc_dedup_ratio(&self) -> f64 {
         (self.size_written as f64) / (self.total_cdc_size() as f64)
     }
+
+    pub fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
+        self.database.iterator()
+    }
+
+    /// Removes all stored data in the database and sets written size to 0.
+    pub fn clear_database(&mut self) -> io::Result<()> {
+        let size_to_remove =
+            self.database
+                .iterator()
+                .fold(0, |acc, (_, data)| match data.extract() {
+                    Data::Chunk(chunk) => acc + chunk.len(),
+                    Data::TargetChunk(_) => acc,
+                });
+        self.size_written -= size_to_remove;
+        self.database.clear()
+    }
 }
 
 impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
 where
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: IterableDatabase<K, Vec<u8>>,
@@ -190,6 +200,19 @@ where
 
     pub fn total_dedup_ratio(&self) -> f64 {
         (self.size_written as f64) / (self.total_size() as f64)
+    }
+
+    /// Removes all stored data in the target map and sets written size to 0.
+    pub fn clear_target_map(&mut self) -> io::Result<()> {
+        let size_to_remove =
+            self.database
+                .iterator()
+                .fold(0, |acc, (_, data)| match data.extract() {
+                    Data::Chunk(_) => acc,
+                    Data::TargetChunk(chunk) => acc + chunk.len(),
+                });
+        self.size_written -= size_to_remove;
+        self.target_map.clear()
     }
 }
 
@@ -402,7 +425,7 @@ mod tests {
             vec![16; 1024 * 256],
             vec![32; 1024 * 256],
         ]
-            .concat();
+        .concat();
 
         let chunker = SuperChunker::default().into();
 

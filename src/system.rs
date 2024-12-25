@@ -22,7 +22,7 @@ pub mod storage;
 pub struct FileSystem<B, H, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
@@ -42,7 +42,7 @@ pub fn create_cdc_filesystem<B, H, Hash>(
 ) -> FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>
 where
     B: Database<Hash, DataContainer<()>>,
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
     FileSystem::new(base, hasher, HashMap::default())
@@ -51,7 +51,7 @@ where
 impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
@@ -187,12 +187,6 @@ where
         Ok(self.storage.retrieve(&hashes)?.concat())
     }
 
-    /// Completely clears the file system, invalidating already created file handles.
-    pub fn clear(&mut self) -> io::Result<()> {
-        self.file_layer.clear();
-        self.storage.clear()
-    }
-
     /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
     /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
     fn new(base: B, hasher: H, target_map: T) -> Self {
@@ -206,7 +200,7 @@ where
 impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
     B: IterableDatabase<Hash, DataContainer<K>>,
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
@@ -238,11 +232,24 @@ where
     pub fn cdc_dedup_ratio(&self) -> f64 {
         self.storage.cdc_dedup_ratio()
     }
+
+    pub fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
+        self.storage.iterator()
+    }
+
+    /// Completely clears the chunk database, invalidating already created file handles. Doesn't touch the target map.
+    ///
+    /// **WARNING**: Since it invalidates all file handles, data contained in target map will not be valid too.
+    /// If the target map is iterable, it can be cleared with [`clear_target_map`][Self::clear_target_map].
+    pub fn clear_database(&mut self) -> io::Result<()> {
+        self.file_layer.clear();
+        self.storage.clear_database()
+    }
 }
 
 impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
 where
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: IterableDatabase<H::Hash, DataContainer<K>>,
     T: IterableDatabase<K, Vec<u8>>,
@@ -251,5 +258,10 @@ where
     /// accounting for chunks both unprocessed and processed with scrubber.
     pub fn total_dedup_ratio(&self) -> f64 {
         self.storage.total_dedup_ratio()
+    }
+
+    /// Clears the contained target map. Doesn't remove the info about file handles.
+    pub fn clear_target_map(&mut self) -> io::Result<()> {
+        self.storage.clear_target_map()
     }
 }
