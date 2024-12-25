@@ -14,7 +14,7 @@ pub use system::{create_cdc_filesystem, FileSystem};
 pub mod chunkers;
 #[cfg(feature = "hashers")]
 pub mod hashers;
-
+#[cfg(feature = "bench")]
 pub mod bench;
 mod system;
 

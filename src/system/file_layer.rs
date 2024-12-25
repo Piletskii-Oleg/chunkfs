@@ -177,6 +177,27 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     pub fn clear(&mut self) {
         self.files.clear()
     }
+
+    /// Gives out a distribution of the chunks with the same hash for the given file.
+    pub fn chunk_count_distribution(&self, handle: &FileHandle) -> HashMap<Hash, (u32, usize)> {
+        let file = self.find_file(handle);
+
+        let mut distribution = HashMap::new();
+
+        let lengths = file
+            .spans
+            .iter()
+            .zip(file.spans.iter().skip(1))
+            .map(|(first, second)| second.offset - first.offset);
+
+        for (span, length) in file.spans.iter().zip(lengths) {
+            distribution
+                .entry(span.hash.clone())
+                .and_modify(|(count, _)| *count += 1)
+                .or_insert((1, length));
+        }
+        distribution
+    }
 }
 
 #[cfg(test)]

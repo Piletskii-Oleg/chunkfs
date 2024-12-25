@@ -187,6 +187,14 @@ where
         Ok(self.storage.retrieve(&hashes)?.concat())
     }
 
+    /// Gives out a distribution of the chunks with the same hash for the given file.
+    ///
+    /// Output is a hash map, where the key is the used hash and the value is
+    /// count of the same chunks and the length of one of them.
+    pub fn chunk_count_distribution(&self, handle: &FileHandle) -> HashMap<Hash, (u32, usize)> {
+        self.file_layer.chunk_count_distribution(handle)
+    }
+
     /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
     /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
     fn new(base: B, hasher: H, target_map: T) -> Self {

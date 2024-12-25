@@ -14,11 +14,12 @@ debug = true
 [dependencies]
 chunking = { git = "https://github.com/Piletskii-Oleg/rust-chunking.git", optional = true }
 sha2 = { version = "0.10", optional = true }
-uuid = { version = "1", features = ["fast-rng", "v4"] }
+uuid = { version = "1", features = ["fast-rng", "v4"], optional = true }
 
 [features]
 chunkers = ["chunking"]
 hashers = ["sha2"]
+bench = ["uuid"]
 
 [dev-dependencies]
 chunkfs = { path = ".", features = ["chunkers", "hashers"] }
