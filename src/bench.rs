@@ -25,7 +25,7 @@ where
     H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
-    fs: FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>,
+    pub fs: FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>,
 }
 
 impl<B, H, Hash> CDCFixture<B, H, Hash>

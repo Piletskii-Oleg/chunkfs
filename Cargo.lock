@@ -86,6 +86,8 @@ dependencies = [
  "chunking",
  "criterion",
  "itertools 0.13.0",
+ "serde",
+ "serde_json",
  "sha2",
  "sha3",
  "tempfile",

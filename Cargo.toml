@@ -22,12 +22,14 @@ hashers = ["sha2"]
 bench = ["uuid"]
 
 [dev-dependencies]
-chunkfs = { path = ".", features = ["chunkers", "hashers"] }
+chunkfs = { path = ".", features = ["chunkers", "hashers", "bench"] }
 criterion = "0.5"
 sha3 = "0.10"
 approx = "0.5"
 tempfile = "3.14"
 itertools = "0.13"
+serde = "1"
+serde_json = "1"
 
 [[bench]]
 name = "write_read"
