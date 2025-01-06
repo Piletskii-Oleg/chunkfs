@@ -60,9 +60,9 @@ pub fn fio(name: &str, size: usize, dedup_percentage: u8) -> io::Result<Dataset>
     output.wait()?;
 
     let file_name = format!("{name}.0.0");
-    let path = dir.join(&file_name);
+    let path = dir.join(file_name);
 
-    Dataset::new(&path.to_str().unwrap(), name)
+    Dataset::new(path.to_str().unwrap(), name)
 }
 
 /// Generates a dataset using a given distribution.
