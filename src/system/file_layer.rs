@@ -7,7 +7,7 @@ use crate::{ChunkHash, ChunkerRef};
 use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
-#[derive(Debug, PartialEq, Eq, Default)]
+#[derive(Debug, PartialEq, Eq, Default, Clone)]
 pub struct FileSpan<Hash: ChunkHash> {
     hash: Hash,
     offset: usize,
@@ -15,6 +15,7 @@ pub struct FileSpan<Hash: ChunkHash> {
 
 /// A named file, doesn't store actual contents,
 /// but rather hashes for them.
+#[derive(Clone)]
 pub struct File<Hash: ChunkHash> {
     name: String,
     spans: Vec<FileSpan<Hash>>,
