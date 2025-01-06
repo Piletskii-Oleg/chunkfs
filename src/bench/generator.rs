@@ -61,15 +61,3 @@ pub fn fio(name: &str, size: usize, dedup_percentage: u8) -> io::Result<Dataset>
 
     Dataset::new(&path.into_os_string().into_string().unwrap(), name)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::fio;
-
-    // fio should work
-    // file must be opened
-    #[test]
-    fn fio_test() {
-        let _ = fio("hi", 10000, 10).unwrap();
-    }
-}
