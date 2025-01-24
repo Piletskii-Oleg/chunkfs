@@ -136,7 +136,7 @@ where
     ///
     /// Returns read time for the file.
     fn verify(&self, dataset: &Dataset, uuid: &str) -> io::Result<Duration> {
-        let file = self.fs.open_file_readonly(uuid.to_string())?;
+        let file = self.fs.open_file_readonly(uuid)?;
 
         let now = Instant::now();
         let read = self.fs.read_file_complete(&file)?;

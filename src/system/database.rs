@@ -96,6 +96,7 @@ impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        Ok(HashMap::clear(self))
+        HashMap::clear(self);
+        Ok(())
     }
 }

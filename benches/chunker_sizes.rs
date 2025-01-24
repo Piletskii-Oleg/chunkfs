@@ -30,6 +30,7 @@ impl SizeParameters {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 enum Algorithms {
     Rabin,
@@ -38,6 +39,7 @@ enum Algorithms {
     Ultra,
 }
 
+#[allow(dead_code)]
 fn chunkers() -> Vec<Algorithms> {
     vec![
         Algorithms::Rabin,
@@ -47,6 +49,7 @@ fn chunkers() -> Vec<Algorithms> {
     ]
 }
 
+#[allow(dead_code)]
 fn get_chunker(algorithm: Algorithms, params: SizeParams) -> ChunkerRef {
     match algorithm {
         Algorithms::Rabin => RabinChunker::new(params).into(),
