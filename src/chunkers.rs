@@ -3,6 +3,7 @@ pub use chunking::SizeParams;
 pub use fixed_size::FSChunker;
 pub use leap::LeapChunker;
 pub use rabin::RabinChunker;
+pub use seq::SeqChunker;
 pub use supercdc::SuperChunker;
 pub use ultra::UltraChunker;
 
@@ -11,6 +12,7 @@ mod leap;
 mod rabin;
 mod supercdc;
 mod ultra;
+mod seq;
 
 #[cfg(test)]
 mod tests {

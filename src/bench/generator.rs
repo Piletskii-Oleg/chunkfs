@@ -1,5 +1,4 @@
 use super::Dataset;
-use crate::{ChunkHash, DataContainer, Database, FileSystem, Hasher};
 use std::io;
 use std::process::{Command, Stdio};
 
@@ -63,10 +62,10 @@ pub fn fio(name: &str, size: usize, dedup_percentage: u8) -> io::Result<Dataset>
     Dataset::new(&path.into_os_string().into_string().unwrap(), name)
 }
 
-pub fn entropy<B, H, Hash, K, T>(fs: FileSystem<B, H, Hash, K, T>) -> io::Result<Dataset>
-where
-    B: Database<Hash, DataContainer<K>>,
-    H: Hasher<Hash=Hash>,
-    Hash: ChunkHash,
-    T: Database<K, Vec<u8>>,
-{}
+// pub fn entropy<B, H, Hash, K, T>(fs: FileSystem<B, H, Hash, K, T>) -> io::Result<Dataset>
+// where
+//     B: Database<Hash, DataContainer<K>>,
+//     H: Hasher<Hash=Hash>,
+//     Hash: ChunkHash,
+//     T: Database<K, Vec<u8>>,
+// {}
