@@ -1,14 +1,14 @@
 extern crate serde_json;
 
+use chunkfs::bench::generator::fio;
+use chunkfs::bench::{CDCFixture, Dataset};
+use chunkfs::chunkers::SuperChunker;
+use chunkfs::hashers::Sha256Hasher;
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::BufWriter;
-use itertools::Itertools;
-use chunkfs::bench::{CDCFixture, Dataset};
-use chunkfs::bench::generator::fio;
-use chunkfs::chunkers::SuperChunker;
-use chunkfs::hashers::Sha256Hasher;
 
 fn main() -> io::Result<()> {
     let mut fixture = CDCFixture::new(HashMap::new(), Sha256Hasher::default());
