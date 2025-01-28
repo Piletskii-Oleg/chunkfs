@@ -6,7 +6,6 @@ use chunking::{seq, SizeParams};
 use crate::{Chunk, Chunker};
 
 pub struct SeqChunker {
-    rest: Vec<u8>,
     mode: OperationMode,
     sizes: SizeParams,
     config: Config,
@@ -15,7 +14,6 @@ pub struct SeqChunker {
 impl SeqChunker {
     pub fn new(mode: OperationMode, sizes: SizeParams, config: Config) -> Self {
         Self {
-            rest: vec![],
             mode,
             sizes,
             config,
@@ -25,7 +23,11 @@ impl SeqChunker {
 
 impl Default for SeqChunker {
     fn default() -> Self {
-        Self::new(OperationMode::Increasing, SizeParams::seq_default(), Config::default())
+        Self::new(
+            OperationMode::Increasing,
+            SizeParams::seq_default(),
+            Config::default(),
+        )
     }
 }
 
@@ -44,18 +46,10 @@ impl Chunker for SeqChunker {
             chunks.push(Chunk::new(chunk.pos, chunk.len));
         }
 
-        self.rest = data[chunks.pop().unwrap().range()].to_vec();
-
         chunks
-    }
-
-    fn remainder(&self) -> &[u8] {
-        &self.rest
     }
 
     fn estimate_chunk_count(&self, data: &[u8]) -> usize {
         data.len() / self.sizes.avg
     }
 }
-
-

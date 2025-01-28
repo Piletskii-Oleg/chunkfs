@@ -7,7 +7,6 @@ use crate::{Chunk, Chunker};
 
 /// Chunker that utilizes Super CDC algorithm.
 pub struct SuperChunker {
-    rest: Vec<u8>,
     records: Option<HashMap<u64, usize>>,
     sizes: SizeParams,
 }
@@ -15,7 +14,6 @@ pub struct SuperChunker {
 impl SuperChunker {
     pub fn new(sizes: SizeParams) -> Self {
         Self {
-            rest: vec![],
             records: Some(HashMap::new()),
             sizes,
         }
@@ -50,12 +48,7 @@ impl Chunker for SuperChunker {
         }
 
         self.records = Some(chunker.give_records());
-        self.rest = data[chunks.pop().unwrap().range()].to_vec();
         chunks
-    }
-
-    fn remainder(&self) -> &[u8] {
-        &self.rest
     }
 
     fn estimate_chunk_count(&self, data: &[u8]) -> usize {

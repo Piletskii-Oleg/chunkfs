@@ -9,15 +9,11 @@ use crate::{Chunk, Chunker};
 /// Default chunk size is 4096 bytes.
 pub struct FSChunker {
     chunk_size: usize,
-    rest: Vec<u8>,
 }
 
 impl FSChunker {
     pub fn new(chunk_size: usize) -> Self {
-        Self {
-            chunk_size,
-            rest: vec![],
-        }
+        Self { chunk_size }
     }
 }
 
@@ -43,18 +39,7 @@ impl Chunker for FSChunker {
             offset += self.chunk_size;
         }
 
-        let last_chunk = chunks.pop().unwrap();
-        if last_chunk.length() < self.chunk_size {
-            self.rest = data[last_chunk.range()].to_vec();
-        } else {
-            chunks.push(last_chunk);
-            self.rest = vec![];
-        }
         chunks
-    }
-
-    fn remainder(&self) -> &[u8] {
-        &self.rest
     }
 
     fn estimate_chunk_count(&self, data: &[u8]) -> usize {

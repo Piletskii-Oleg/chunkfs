@@ -6,31 +6,34 @@ Chunkfs is currently under active development, breaking changes can always happe
 ## Goals and ideas
 
 The main idea behind **Chunkfs** is to provide a way to interchangeably use and compare different
-data deduplication methods in a single controlled environment, notably Content Defined Chunking (CDC) algorithms and some optimization methods,
+data deduplication methods in a single controlled environment, notably Content Defined Chunking (CDC) algorithms and
+some optimization methods,
 such as Frequency Based Chunking (FBC) and Similarity Based Chunking (SBC).
 
 This is all implemented via a file system, in which user is able to write and read files onto a chosen means of storage,
-be it a simple Hash Map, or something more complicated, like an LSM-tree. If it implements `Database` trait, 
+be it a simple Hash Map, or something more complicated, like an LSM-tree. If it implements `Database` trait,
 it can be used as a storage for **Chunkfs**.
 
 To create a CDC file system, only a hasher and a storage must be provided.
-To create a file system to test and compare more complicated means of data deduplication, a target map and a scrubber must be provided.
+To create a file system to test and compare more complicated means of data deduplication, a target map and a scrubber
+must be provided.
 
-When a file is created or opened with write access, a `chunker` must be provided by the user to split the 
+When a file is created or opened with write access, a `chunker` must be provided by the user to split the
 data in chunks.
 
-The end goal is to provide a *unified* and *easily customizable* instrument to compare CDC algorithms and data deduplication methods. 
+The end goal is to provide a *unified* and *easily customizable* instrument to compare CDC algorithms and data
+deduplication methods.
 
 ## Features
 
 - Supports different kinds of:
-  - CDC algorithms
-  - hashing algorithms
-  - key-value storage types
-  - chunk storage optimization methods (FBC, SBC, and others)
+    - CDC algorithms
+    - hashing algorithms
+    - key-value storage types
+    - chunk storage optimization methods (FBC, SBC, and others)
 - Writing to and reading from files
-  - file metadata is stored in RAM
-  - no folders
+    - file metadata is stored in RAM
+    - no folders
 
 ## Chunking algorithms
 
@@ -40,10 +43,10 @@ following definition:
 ```rust
 pub trait Chunker {
     fn chunk_data(&mut self, data: &[u8], empty: Vec<Chunk>) -> Vec<Chunk>;
-    fn rest(&self) -> &[u8];
     fn estimate_chunk_count(&self, data: &[u8]) -> usize;
 }
 ```
+
 Comments for each method are provided in [lib.rs](src/lib.rs).
 
 ## Chunking optimization methods (SBC, FBC)
@@ -71,6 +74,7 @@ chunkfs = { git = "https://github.com/Piletskii-Oleg/chunkfs.git", features = ["
 ## Examples
 
 Getting chunker measurements:
+
 ```rust
 extern crate chunkfs;
 
@@ -99,7 +103,9 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 ```
+
 Getting Scrubber measurements:
+
 ```rust
 fn main() -> io::Result<()> {
     let mut fs = FileSystem::new_with_scrubber(

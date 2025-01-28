@@ -10,9 +10,9 @@ pub use ultra::UltraChunker;
 mod fixed_size;
 mod leap;
 mod rabin;
+mod seq;
 mod supercdc;
 mod ultra;
-mod seq;
 
 #[cfg(test)]
 mod tests {

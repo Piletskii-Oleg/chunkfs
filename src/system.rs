@@ -1,4 +1,3 @@
-use std::cmp::min;
 use std::collections::HashMap;
 use std::io;
 
@@ -7,7 +6,7 @@ use file_layer::{FileHandle, FileLayer};
 use scrub::{Scrub, ScrubMeasurements};
 use storage::{ChunkStorage, DataContainer};
 
-use super::{ChunkHash, ChunkerRef, Hasher, WriteMeasurements, SEG_SIZE};
+use super::{ChunkHash, ChunkerRef, Hasher, WriteMeasurements};
 
 pub mod database;
 pub mod file_layer;
@@ -101,19 +100,7 @@ where
             return Err(io::Error::new(io::ErrorKind::PermissionDenied, msg));
         };
 
-        let mut current = 0;
-        let mut all_spans = vec![];
-        while current < data.len() {
-            let remaining = data.len() - current;
-            let to_process = min(SEG_SIZE, remaining);
-
-            let spans = self
-                .storage
-                .write(&data[current..current + to_process], chunker)?;
-            all_spans.push(spans);
-
-            current += to_process;
-        }
+        let all_spans = self.storage.write(data, chunker)?;
 
         for spans in all_spans {
             self.file_layer.write(handle, spans);
@@ -126,7 +113,7 @@ where
     ///
     /// # Errors
     /// `io::ErrorKind::PermissionDenied` - if the handle was opened in read-only mode
-    pub fn write_from_stream<R>(&mut self, handle: &mut FileHandle, mut reader: R) -> io::Result<()>
+    pub fn write_from_stream<R>(&mut self, handle: &mut FileHandle, reader: R) -> io::Result<()>
     where
         R: io::Read,
     {
@@ -139,17 +126,7 @@ where
             return Err(io::Error::new(io::ErrorKind::PermissionDenied, msg));
         };
 
-        let mut buffer = vec![0u8; SEG_SIZE];
-        let mut all_spans = vec![];
-        loop {
-            let n = reader.read(&mut buffer)?;
-            if n == 0 {
-                break;
-            }
-
-            let spans = self.storage.write(&buffer[..n], chunker)?;
-            all_spans.push(spans);
-        }
+        let all_spans = self.storage.write_from_stream(reader, chunker)?;
 
         for spans in all_spans {
             self.file_layer.write(handle, spans);
@@ -160,14 +137,9 @@ where
 
     /// Closes the file and ensures that all data that was written to it is stored.
     /// Returns [WriteMeasurements] containing chunking and hashing times.
-    pub fn close_file(&mut self, mut handle: FileHandle) -> io::Result<WriteMeasurements> {
+    pub fn close_file(&mut self, handle: FileHandle) -> io::Result<WriteMeasurements> {
         if !self.file_exists(handle.name()) {
             return Err(io::ErrorKind::NotFound.into());
-        }
-
-        if let Some(chunker) = &mut handle.chunker {
-            let span = self.storage.flush(chunker)?;
-            self.file_layer.write(&mut handle, span);
         }
 
         Ok(handle.close())

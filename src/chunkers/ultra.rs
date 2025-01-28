@@ -6,16 +6,12 @@ use crate::{Chunk, Chunker};
 
 /// Chunker that utilizes Ultra CDC algorithm.
 pub struct UltraChunker {
-    rest: Vec<u8>,
     sizes: SizeParams,
 }
 
 impl UltraChunker {
     pub fn new(sizes: SizeParams) -> Self {
-        Self {
-            rest: vec![],
-            sizes,
-        }
+        Self { sizes }
     }
 }
 
@@ -39,12 +35,7 @@ impl Chunker for UltraChunker {
             chunks.push(Chunk::new(chunk.pos, chunk.len));
         }
 
-        self.rest = data[chunks.pop().unwrap().range()].to_vec();
         chunks
-    }
-
-    fn remainder(&self) -> &[u8] {
-        &self.rest
     }
 
     fn estimate_chunk_count(&self, data: &[u8]) -> usize {

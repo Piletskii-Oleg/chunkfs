@@ -6,16 +6,12 @@ use crate::{Chunk, Chunker};
 
 /// Chunker that utilizes Leap-based CDC algorithm.
 pub struct LeapChunker {
-    rest: Vec<u8>,
     sizes: SizeParams,
 }
 
 impl LeapChunker {
     pub fn new(sizes: SizeParams) -> Self {
-        Self {
-            rest: vec![],
-            sizes,
-        }
+        Self { sizes }
     }
 }
 
@@ -39,12 +35,7 @@ impl Chunker for LeapChunker {
             chunks.push(Chunk::new(chunk.pos, chunk.len));
         }
 
-        self.rest = data[chunks.pop().unwrap().range()].to_vec();
         chunks
-    }
-
-    fn remainder(&self) -> &[u8] {
-        &self.rest
     }
 
     fn estimate_chunk_count(&self, data: &[u8]) -> usize {

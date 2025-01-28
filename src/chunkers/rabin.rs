@@ -6,7 +6,6 @@ use crate::{Chunk, Chunker};
 
 /// Chunker that utilizes Rabin CDC algorithm.
 pub struct RabinChunker {
-    rest: Vec<u8>,
     params: Option<chunking::rabin::ChunkerParams>,
     sizes: SizeParams,
 }
@@ -14,7 +13,6 @@ pub struct RabinChunker {
 impl RabinChunker {
     pub fn new(sizes: SizeParams) -> Self {
         Self {
-            rest: vec![],
             params: Some(chunking::rabin::ChunkerParams::new()),
             sizes,
         }
@@ -46,12 +44,7 @@ impl Chunker for RabinChunker {
         }
 
         self.params = Some(chunker.give_params());
-        self.rest = data[chunks.pop().unwrap().range()].to_vec();
         chunks
-    }
-
-    fn remainder(&self) -> &[u8] {
-        &self.rest
     }
 
     fn estimate_chunk_count(&self, data: &[u8]) -> usize {

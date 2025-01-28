@@ -71,12 +71,6 @@ pub trait Chunker: Debug {
     /// Resulting chunks should be written right to it, and it should be returned as result.
     fn chunk_data(&mut self, data: &[u8], empty: Vec<Chunk>) -> Vec<Chunk>;
 
-    /// Returns leftover data that was not enough for chunk to be found,
-    /// but had to be cut because no more data is available.
-    ///
-    /// Empty if the whole file was successfully chunked.
-    fn remainder(&self) -> &[u8];
-
     /// Returns an estimate amount of chunks that will be created once the algorithm runs through the whole
     /// data buffer. Used to pre-allocate the buffer with the required size so that allocation times are not counted
     /// towards total chunking time.
