@@ -22,7 +22,7 @@ use crate::{
 pub struct CDCFixture<B, H, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
 {
     pub fs: FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>,
@@ -31,7 +31,7 @@ where
 impl<B, H, Hash> CDCFixture<B, H, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash = Hash>,
+    H: Hasher<Hash=Hash>,
     Hash: ChunkHash,
 {
     /// Creates a fixture, opening a database with given base and hasher.
@@ -93,13 +93,11 @@ where
         (0..m).map(|_| self.measure::<C>(dataset)).collect()
     }
 
-    pub fn dedup_ratio<C>(&mut self, dataset: &Dataset) -> io::Result<DedupMeasurement>
-    where
-        C: Chunker + Default + 'static,
+    pub fn dedup_ratio(&mut self, dataset: &Dataset, chunker: ChunkerRef) -> io::Result<DedupMeasurement>
     {
         self.fs.clear_database()?;
 
-        let (mut file, uuid) = self.init_file::<C>()?;
+        let (mut file, uuid) = self.init_file_with(chunker)?;
         let mut dataset_file = dataset.open()?;
 
         self.fs.write_from_stream(&mut file, &mut dataset_file)?;
@@ -166,6 +164,12 @@ where
         let uuid = Uuid::new_v4().to_string();
 
         let chunker: ChunkerRef = C::default().into();
+
+        self.fs.create_file(&uuid, chunker).map(|file| (file, uuid))
+    }
+
+    fn init_file_with(&mut self, chunker: ChunkerRef) -> io::Result<(FileHandle, String)> {
+        let uuid = Uuid::new_v4().to_string();
 
         self.fs.create_file(&uuid, chunker).map(|file| (file, uuid))
     }
@@ -271,7 +275,7 @@ impl Debug for TimeMeasurement {
 }
 
 impl Sum for TimeMeasurement {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
         iter.fold(TimeMeasurement::default(), |acc, next| acc + next)
     }
 }
