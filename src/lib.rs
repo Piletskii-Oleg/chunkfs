@@ -77,6 +77,7 @@ pub trait Chunker: Debug {
     fn estimate_chunk_count(&self, data: &[u8]) -> usize;
 }
 
+#[derive(Clone)]
 pub struct ChunkerRef(Rc<RefCell<dyn Chunker>>);
 
 impl Deref for ChunkerRef {

@@ -41,11 +41,9 @@ where
     }
 
     /// Conducts a measurement on a given dataset using given chunker.
-    pub fn measure<C>(&mut self, dataset: &Dataset) -> io::Result<TimeMeasurement>
-    where
-        C: Chunker + Default + 'static,
+    pub fn measure(&mut self, dataset: &Dataset, chunker: ChunkerRef) -> io::Result<TimeMeasurement>
     {
-        let (mut file, uuid) = self.init_file::<C>()?;
+        let (mut file, uuid) = self.init_file_with(chunker)?;
 
         let mut dataset_file = dataset.open()?;
 
@@ -66,18 +64,17 @@ where
         Ok(measurement)
     }
 
-    pub fn measure_multi<C>(
+    pub fn measure_multi(
         &mut self,
         dataset: &Dataset,
+        chunker: ChunkerRef,
         n: usize,
     ) -> io::Result<Vec<TimeMeasurement>>
-    where
-        C: Chunker + Default + 'static,
     {
         (0..n)
             .map(|_| {
                 self.fs.clear_database()?;
-                self.measure::<C>(dataset)
+                self.measure(dataset, chunker.clone())
             })
             .collect()
     }
@@ -85,16 +82,18 @@ where
     pub fn measure_repeated<C>(
         &mut self,
         dataset: &Dataset,
+        chunker: ChunkerRef,
         m: usize,
     ) -> io::Result<Vec<TimeMeasurement>>
-    where
-        C: Chunker + Default + 'static,
     {
-        (0..m).map(|_| self.measure::<C>(dataset)).collect()
+        (0..m).map(|_| self.measure(dataset, chunker.clone())).collect()
     }
 
-    pub fn dedup_ratio(&mut self, dataset: &Dataset, chunker: ChunkerRef) -> io::Result<DedupMeasurement>
-    {
+    pub fn dedup_ratio(
+        &mut self,
+        dataset: &Dataset,
+        chunker: ChunkerRef,
+    ) -> io::Result<DedupMeasurement> {
         self.fs.clear_database()?;
 
         let (mut file, uuid) = self.init_file_with(chunker)?;
