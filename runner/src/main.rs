@@ -15,7 +15,7 @@ fn main() -> io::Result<()> {
 
     println!("{dataset:?}");
 
-    let mes = fixture.measure::<SuperChunker>(&dataset)?;
+    let mes = fixture.measure(&dataset, SuperChunker::default())?;
 
     println!("{:?}", mes);
 
