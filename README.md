@@ -59,7 +59,7 @@ must be provided.
 When a file is created or opened with write access, a `chunker` must be provided by the user to split the
 data in chunks.
 
-Add the following dependency to your `Cargo.toml`:
+To use it in your code, add the following dependency to your `Cargo.toml`:
 
 ```toml
 [dependencies]
