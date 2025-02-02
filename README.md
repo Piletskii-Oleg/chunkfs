@@ -63,21 +63,21 @@ To use it in your code, add the following dependency to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-chunkfs = { git = "https://github.com/Piletskii-Oleg/chunkfs.git" }
+chunkfs = "0.1"
 ```
 
 To use provided chunkers and hashers, use the corresponding features:
 
 ```toml
 [dependencies]
-chunkfs = { git = "https://github.com/Piletskii-Oleg/chunkfs.git", features = ["chunkers", "hashers"] }
+chunkfs = { version = "0.1", features = ["chunkers", "hashers"] }
 ```
 
 Chunkfs provides methods to analyse chunking algorithms efficiency using different metrics. 
 To access them, use the corresponding feature:
 ```toml
 [dependencies]
-chunkfs = { git = "https://github.com/Piletskii-Oleg/chunkfs.git", features = ["bench"] }
+chunkfs = { version = "0.1", features = ["bench"] }
 ```
 
 ## Examples
