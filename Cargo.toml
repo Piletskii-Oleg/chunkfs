@@ -6,6 +6,12 @@ resolver = "2"
 name = "chunkfs"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/Piletskii-Oleg/chunkfs"
+readme = "README.md"
+description = "An in-memory file system that can be used to compare different deduplication algorithms"
+categories = ["algorithms", "filesystem"]
+keywords = ["filesystem", "cdc", "chunking", "deduplication"]
 
 [profile.release-deb]
 inherits = "release"
