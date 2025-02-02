@@ -2,8 +2,8 @@ use chunkfs::bench::generator::fio;
 use chunkfs::bench::CDCFixture;
 use chunkfs::chunkers::{SeqChunker, SuperChunker};
 use chunkfs::hashers::Sha256Hasher;
-use chunking::seq::{Config, OperationMode};
-use chunking::SizeParams;
+use cdc_chunkers::seq::{Config, OperationMode};
+use cdc_chunkers::SizeParams;
 use std::collections::HashMap;
 use std::io;
 

@@ -72,6 +72,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
+name = "cdc-chunkers"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62fb9bdda2f7a56694428faf24ff9f779a64682cec977ce1a020f6e6a0b717c4"
+dependencies = [
+ "rand",
+ "rand_distr",
+ "sha3",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -82,8 +93,8 @@ name = "chunkfs"
 version = "0.1.0"
 dependencies = [
  "approx",
+ "cdc-chunkers",
  "chunkfs",
- "chunking",
  "criterion",
  "itertools 0.13.0",
  "rand",
@@ -93,16 +104,6 @@ dependencies = [
  "sha3",
  "tempfile",
  "uuid",
-]
-
-[[package]]
-name = "chunking"
-version = "0.1.0"
-source = "git+https://github.com/Piletskii-Oleg/rust-chunking.git#39bc5ae5e5c9545af86fff32c437e3c499c054d4"
-dependencies = [
- "rand",
- "rand_distr",
- "sha3",
 ]
 
 [[package]]

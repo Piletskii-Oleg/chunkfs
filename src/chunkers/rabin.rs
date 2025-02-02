@@ -1,19 +1,19 @@
 use std::fmt::{Debug, Formatter};
 
-use chunking::SizeParams;
+use cdc_chunkers::SizeParams;
 
 use crate::{Chunk, Chunker};
 
 /// Chunker that utilizes Rabin CDC algorithm.
 pub struct RabinChunker {
-    params: Option<chunking::rabin::ChunkerParams>,
+    params: Option<cdc_chunkers::rabin::ChunkerParams>,
     sizes: SizeParams,
 }
 
 impl RabinChunker {
     pub fn new(sizes: SizeParams) -> Self {
         Self {
-            params: Some(chunking::rabin::ChunkerParams::new()),
+            params: Some(cdc_chunkers::rabin::ChunkerParams::new()),
             sizes,
         }
     }
@@ -34,7 +34,7 @@ impl Debug for RabinChunker {
 impl Chunker for RabinChunker {
     fn chunk_data(&mut self, data: &[u8], empty: Vec<Chunk>) -> Vec<Chunk> {
         let mut chunker =
-            chunking::rabin::Chunker::with_params(data, self.params.take().unwrap(), self.sizes);
+            cdc_chunkers::rabin::Chunker::with_params(data, self.params.take().unwrap(), self.sizes);
         let mut chunks = empty;
         loop {
             match chunker.next() {

@@ -1,4 +1,4 @@
-pub use chunking::SizeParams;
+pub use cdc_chunkers::SizeParams;
 
 pub use fixed_size::FSChunker;
 pub use leap::LeapChunker;

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 
-use chunking::SizeParams;
+use cdc_chunkers::SizeParams;
 use criterion::measurement::WallTime;
 use criterion::{BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 use itertools::iproduct;

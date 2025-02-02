@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 
-use chunking::SizeParams;
+use cdc_chunkers::SizeParams;
 
 use crate::{Chunk, Chunker};
 
@@ -34,7 +34,7 @@ impl Debug for SuperChunker {
 
 impl Chunker for SuperChunker {
     fn chunk_data(&mut self, data: &[u8], empty: Vec<Chunk>) -> Vec<Chunk> {
-        let mut chunker = chunking::supercdc::Chunker::with_records(
+        let mut chunker = cdc_chunkers::supercdc::Chunker::with_records(
             data,
             self.records.take().unwrap(),
             self.sizes,

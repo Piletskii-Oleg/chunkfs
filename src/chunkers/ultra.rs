@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 
-use chunking::SizeParams;
+use cdc_chunkers::SizeParams;
 
 use crate::{Chunk, Chunker};
 
@@ -29,7 +29,7 @@ impl Debug for UltraChunker {
 
 impl Chunker for UltraChunker {
     fn chunk_data(&mut self, data: &[u8], empty: Vec<Chunk>) -> Vec<Chunk> {
-        let chunker = chunking::ultra::Chunker::new(data, self.sizes);
+        let chunker = cdc_chunkers::ultra::Chunker::new(data, self.sizes);
         let mut chunks = empty;
         for chunk in chunker {
             chunks.push(Chunk::new(chunk.pos, chunk.len));
