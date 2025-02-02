@@ -19,6 +19,8 @@ use crate::{
 
 /// A file system fixture that allows user to do measurements and carry out benchmarks
 /// for CDC algorithms.
+///
+/// Clears the database before each method call.
 pub struct CDCFixture<B, H, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
@@ -142,6 +144,8 @@ where
     ///
     /// Takes `adjustment` as a parameter, which specifies minimal difference between different sized chunks,
     /// i.e. the size step in the distribution.
+    ///
+    /// Does not modify the database, i.e. does not clear it.
     pub fn size_distribution(&self, adjustment: usize) -> HashMap<usize, u32> {
         let mut chunk_map = HashMap::new();
         for chunk in self
