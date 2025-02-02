@@ -82,9 +82,9 @@ use chunkfs::hashers::SimpleHasher;
 
 fn main() -> io::Result<()> {
     let base = HashMap::default();
-    let mut fs = create_cdc_filesystem(base, SimpleHasher, 0);
+    let mut fs = create_cdc_filesystem(base, SimpleHasher);
 
-    let mut file = fs.create_file("file", LeapChunker::default(), true)?;
+    let mut file = fs.create_file("file", LeapChunker::default())?;
     let data = vec![10; 1024 * 1024];
     fs.write_to_file(&mut file, &data)?;
     let measurements = fs.close_file(file)?;
