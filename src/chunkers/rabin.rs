@@ -33,8 +33,11 @@ impl Debug for RabinChunker {
 
 impl Chunker for RabinChunker {
     fn chunk_data(&mut self, data: &[u8], empty: Vec<Chunk>) -> Vec<Chunk> {
-        let mut chunker =
-            cdc_chunkers::rabin::Chunker::with_params(data, self.params.take().unwrap(), self.sizes);
+        let mut chunker = cdc_chunkers::rabin::Chunker::with_params(
+            data,
+            self.params.take().unwrap(),
+            self.sizes,
+        );
         let mut chunks = empty;
         loop {
             match chunker.next() {
