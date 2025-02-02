@@ -1,14 +1,16 @@
-pub use chunking::SizeParams;
+pub use cdc_chunkers::SizeParams;
 
 pub use fixed_size::FSChunker;
 pub use leap::LeapChunker;
 pub use rabin::RabinChunker;
+pub use seq::SeqChunker;
 pub use supercdc::SuperChunker;
 pub use ultra::UltraChunker;
 
 mod fixed_size;
 mod leap;
 mod rabin;
+mod seq;
 mod supercdc;
 mod ultra;
 

@@ -6,26 +6,42 @@ resolver = "2"
 name = "chunkfs"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/Piletskii-Oleg/chunkfs"
+readme = "README.md"
+description = "An in-memory file system that can be used to compare different deduplication algorithms"
+categories = ["algorithms", "filesystem"]
+keywords = ["filesystem", "cdc", "chunking", "deduplication"]
 
 [profile.release-deb]
 inherits = "release"
 debug = true
 
 [dependencies]
-chunking = { git = "https://github.com/Piletskii-Oleg/rust-chunking.git", optional = true }
+cdc-chunkers = { version = "0.1.0", optional = true }
 sha2 = { version = "0.10", optional = true }
+uuid = { version = "1", features = ["fast-rng", "v4"], optional = true }
+rand = { version = "0.8", optional = true }
 
 [features]
-chunkers = ["chunking"]
+chunkers = ["cdc-chunkers"]
 hashers = ["sha2"]
+bench = ["uuid", "rand"]
 
 [dev-dependencies]
-chunkfs = { path = ".", features = ["chunkers", "hashers"] }
+chunkfs = { path = ".", features = ["chunkers", "hashers", "bench"] }
 criterion = "0.5"
 sha3 = "0.10"
 approx = "0.5"
 tempfile = "3.14"
+itertools = "0.13"
+serde = "1"
+serde_json = "1"
 
 [[bench]]
 name = "write_read"
+harness = false
+
+[[bench]]
+name = "chunker_sizes"
 harness = false

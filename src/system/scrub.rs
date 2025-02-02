@@ -1,9 +1,10 @@
 use std::io;
 use std::time::{Duration, Instant};
 
-use crate::map::{Database, IterableDatabase};
-use crate::storage::DataContainer;
 use crate::{ChunkHash, Data};
+
+use super::database::{Database, IterableDatabase};
+use super::storage::DataContainer;
 
 /// Basic functionality for implementing algorithms which process chunks provided by the [Chunker][crate::Chunker]. The implementations should encapsulate
 /// algorithm logic (write part) inside themselves and not delegate it to `database`. The read part of the algorithm should be encapsulated in `target_map`.

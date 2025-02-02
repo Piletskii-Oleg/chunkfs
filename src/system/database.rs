@@ -66,6 +66,9 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
     {
         Box::new(self.iterator_mut().map(|(_, v)| v))
     }
+
+    /// Clears the database, removing all contained key-value pairs.
+    fn clear(&mut self) -> io::Result<()>;
 }
 
 impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
@@ -90,5 +93,10 @@ impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
 
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {
         Box::new(self.iter_mut())
+    }
+
+    fn clear(&mut self) -> io::Result<()> {
+        HashMap::clear(self);
+        Ok(())
     }
 }

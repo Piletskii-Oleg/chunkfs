@@ -2,13 +2,12 @@ use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
 
-use crate::storage::SpansInfo;
-use crate::ChunkHash;
-use crate::Chunker;
+use crate::system::storage::SpansInfo;
+use crate::{ChunkHash, ChunkerRef};
 use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
-#[derive(Debug, PartialEq, Eq, Default)]
+#[derive(Debug, PartialEq, Eq, Default, Clone)]
 pub struct FileSpan<Hash: ChunkHash> {
     hash: Hash,
     offset: usize,
@@ -16,6 +15,7 @@ pub struct FileSpan<Hash: ChunkHash> {
 
 /// A named file, doesn't store actual contents,
 /// but rather hashes for them.
+#[derive(Clone)]
 pub struct File<Hash: ChunkHash> {
     name: String,
     spans: Vec<FileSpan<Hash>>,
@@ -36,7 +36,7 @@ pub struct FileHandle {
     offset: usize,
     measurements: WriteMeasurements,
     // maybe not pub(crate) but something else? cannot think of anything
-    pub(crate) chunker: Option<Box<dyn Chunker>>,
+    pub(crate) chunker: Option<ChunkerRef>,
 }
 
 impl<Hash: ChunkHash> File<Hash> {
@@ -49,7 +49,7 @@ impl<Hash: ChunkHash> File<Hash> {
 }
 
 impl FileHandle {
-    fn new<Hash: ChunkHash>(file: &File<Hash>, chunker: Box<dyn Chunker>) -> Self {
+    fn new<Hash: ChunkHash>(file: &File<Hash>, chunker: ChunkerRef) -> Self {
         FileHandle {
             file_name: file.name.clone(),
             offset: 0,
@@ -83,7 +83,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     pub fn create(
         &mut self,
         name: impl Into<String>,
-        chunker: Box<dyn Chunker>,
+        chunker: ChunkerRef,
         create_new: bool,
     ) -> io::Result<FileHandle> {
         let name = name.into();
@@ -98,7 +98,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     }
 
     /// Opens a [`file`][File] based on its name and returns its [`FileHandle`]
-    pub fn open(&self, name: &str, chunker: Box<dyn Chunker>) -> io::Result<FileHandle> {
+    pub fn open(&self, name: &str, chunker: ChunkerRef) -> io::Result<FileHandle> {
         self.files
             .get(name)
             .map(|file| FileHandle::new(file, chunker))
@@ -173,6 +173,32 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     pub fn file_exists(&self, name: &str) -> bool {
         self.files.contains_key(name)
     }
+
+    /// Deletes all file data.
+    pub fn clear(&mut self) {
+        self.files.clear()
+    }
+
+    /// Gives out a distribution of the chunks with the same hash for the given file.
+    pub fn chunk_count_distribution(&self, handle: &FileHandle) -> HashMap<Hash, (u32, usize)> {
+        let file = self.find_file(handle);
+
+        let mut distribution = HashMap::new();
+
+        let lengths = file
+            .spans
+            .iter()
+            .zip(file.spans.iter().skip(1))
+            .map(|(first, second)| second.offset - first.offset);
+
+        for (span, length) in file.spans.iter().zip(lengths) {
+            distribution
+                .entry(span.hash.clone())
+                .and_modify(|(count, _)| *count += 1)
+                .or_insert((1, length));
+        }
+        distribution
+    }
 }
 
 #[cfg(test)]
@@ -180,14 +206,13 @@ mod tests {
     use std::io::ErrorKind;
 
     use crate::chunkers::FSChunker;
-    use crate::file_layer::FileLayer;
-    use crate::Chunker;
+    use crate::system::file_layer::FileLayer;
 
     #[test]
     fn file_layer_create_file() {
         let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
         let name = "hello";
-        let chunker: Box<dyn Chunker> = FSChunker::default().into();
+        let chunker = FSChunker::default().into();
         fl.create(name, chunker, true).unwrap();
 
         assert_eq!(fl.files.get(name).unwrap().name, "hello");
@@ -197,10 +222,10 @@ mod tests {
     #[test]
     fn cant_create_two_files_with_same_name() {
         let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
-        fl.create("hello".to_string(), Box::new(FSChunker::new(4096)), false)
+        fl.create("hello".to_string(), FSChunker::new(4096).into(), false)
             .unwrap();
 
-        let result = fl.create("hello".to_string(), Box::new(FSChunker::new(4096)), false);
+        let result = fl.create("hello".to_string(), FSChunker::new(4096).into(), false);
         assert!(result.is_err());
         assert_eq!(result.err().unwrap().kind(), ErrorKind::AlreadyExists);
     }
