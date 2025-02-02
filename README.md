@@ -1,3 +1,11 @@
+[![Crates.io][crates-badge]][crates-url]
+[![MIT licensed][mit-badge]][mit-url]
+
+[crates-badge]: https://img.shields.io/crates/v/chunkfs.svg
+[crates-url]: https://crates.io/crates/chunkfs
+[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
+[mit-url]: https://github.com/Piletskii-Oleg/chunkfs/blob/main/LICENSE
+
 # ChunkFS
 
 **Chunkfs** is a file system that can be used to benchmark different chunking algorithms, utilizing different hashing
