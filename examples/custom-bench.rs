@@ -1,6 +1,6 @@
 use chunkfs::bench::generator::fio;
-use chunkfs::bench::{CDCFixture, Dataset};
-use chunkfs::chunkers::SeqChunker;
+use chunkfs::bench::CDCFixture;
+use chunkfs::chunkers::{SeqChunker, SuperChunker};
 use chunkfs::hashers::Sha256Hasher;
 use chunking::seq::{Config, OperationMode};
 use chunking::SizeParams;
@@ -12,22 +12,17 @@ fn main() -> io::Result<()> {
 
     let dataset = fio("a", 100000, 30)?;
 
-    //let measurements = fixture.measure_multi(FSChunker::default().into(), &dataset, 100)?;
-    //let avg = avg_measurement(measurements);
-    //println!("Avg measurements for FSChunker: {:?}", avg);
+    let seq = SeqChunker::new(
+        OperationMode::Increasing,
+        SizeParams::new(8192, 16384, 65536),
+        Config::default(),
+    );
 
-    // let measurements = fixture.measure_multi::<SuperChunker>(&dataset, 100)?;
-    // let avg = avg_measurement(measurements);
-    // println!("Avg measurements for SuperChunker: {:?}", avg);
-
-    let kernel = Dataset::new("kernel.tar", "kernel")?;
-
-    let seq = SeqChunker::new(OperationMode::Increasing, SizeParams::new(8192, 16384, 65536), Config::default());
-    let dedup = fixture.dedup_ratio(&kernel, seq.into())?;
+    let dedup = fixture.dedup_ratio(&dataset, seq)?;
     println!("Dedup ratio: {:?}", dedup);
 
-    let mes = fixture.measure::<SeqChunker>(&kernel)?;
-    println!("{mes:?}");
+    let mes = fixture.measure(&dataset, SuperChunker::default())?;
+    println!("One run using SuperChunker: {mes:?}");
 
     Ok(())
 }

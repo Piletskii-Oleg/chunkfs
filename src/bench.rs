@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use crate::system::file_layer::FileHandle;
 use crate::{
-    create_cdc_filesystem, ChunkHash, Chunker, ChunkerRef, DataContainer, FileSystem, Hasher,
+    create_cdc_filesystem, ChunkHash, ChunkerRef, DataContainer, FileSystem, Hasher,
     IterableDatabase, WriteMeasurements,
 };
 
@@ -22,7 +22,7 @@ use crate::{
 pub struct CDCFixture<B, H, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
     pub fs: FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>,
@@ -31,7 +31,7 @@ where
 impl<B, H, Hash> CDCFixture<B, H, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash=Hash>,
+    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
     /// Creates a fixture, opening a database with given base and hasher.
@@ -41,9 +41,13 @@ where
     }
 
     /// Conducts a measurement on a given dataset using given chunker.
-    pub fn measure(&mut self, dataset: &Dataset, chunker: ChunkerRef) -> io::Result<TimeMeasurement>
+    pub fn measure<C>(&mut self, dataset: &Dataset, chunker: C) -> io::Result<TimeMeasurement>
+    where
+        C: Into<ChunkerRef>,
     {
-        let (mut file, uuid) = self.init_file_with(chunker)?;
+        let chunker = chunker.into();
+
+        let (mut file, uuid) = self.init_file(chunker)?;
 
         let mut dataset_file = dataset.open()?;
 
@@ -64,13 +68,22 @@ where
         Ok(measurement)
     }
 
-    pub fn measure_multi(
+    /// Conducts n measurements on a given dataset using given chunker.
+    ///
+    /// Clears database after each successful dataset write and before the first one.
+    pub fn measure_multi<C>(
         &mut self,
         dataset: &Dataset,
-        chunker: ChunkerRef,
+        chunker: C,
         n: usize,
     ) -> io::Result<Vec<TimeMeasurement>>
+    where
+        C: Into<ChunkerRef>,
     {
+        self.fs.clear_database()?;
+
+        let chunker = chunker.into();
+
         (0..n)
             .map(|_| {
                 self.fs.clear_database()?;
@@ -79,24 +92,40 @@ where
             .collect()
     }
 
+    /// Conducts m measurements on a given dataset using given chunker.
+    ///
+    /// Does not clear database after each successful dataset write,
+    /// but clears it before the first one.
     pub fn measure_repeated<C>(
         &mut self,
         dataset: &Dataset,
-        chunker: ChunkerRef,
+        chunker: C,
         m: usize,
     ) -> io::Result<Vec<TimeMeasurement>>
+    where
+        C: Into<ChunkerRef>,
     {
-        (0..m).map(|_| self.measure(dataset, chunker.clone())).collect()
-    }
-
-    pub fn dedup_ratio(
-        &mut self,
-        dataset: &Dataset,
-        chunker: ChunkerRef,
-    ) -> io::Result<DedupMeasurement> {
         self.fs.clear_database()?;
 
-        let (mut file, uuid) = self.init_file_with(chunker)?;
+        let chunker = chunker.into();
+
+        (0..m)
+            .map(|_| self.measure(dataset, chunker.clone()))
+            .collect()
+    }
+
+    /// Calculates deduplication ratio of the given dataset using given chunker.
+    ///
+    /// Clears database on call.
+    pub fn dedup_ratio<C>(&mut self, dataset: &Dataset, chunker: C) -> io::Result<DedupMeasurement>
+    where
+        C: Into<ChunkerRef>,
+    {
+        self.fs.clear_database()?;
+
+        let chunker = chunker.into();
+
+        let (mut file, uuid) = self.init_file(chunker)?;
         let mut dataset_file = dataset.open()?;
 
         self.fs.write_from_stream(&mut file, &mut dataset_file)?;
@@ -156,24 +185,15 @@ where
         Ok(read_time)
     }
 
-    fn init_file<C>(&mut self) -> io::Result<(FileHandle, String)>
-    where
-        C: Chunker + Default + 'static,
-    {
-        let uuid = Uuid::new_v4().to_string();
-
-        let chunker: ChunkerRef = C::default().into();
-
-        self.fs.create_file(&uuid, chunker).map(|file| (file, uuid))
-    }
-
-    fn init_file_with(&mut self, chunker: ChunkerRef) -> io::Result<(FileHandle, String)> {
+    /// Creates a file with a random name and a given chunker, then returns it and its name.
+    fn init_file(&mut self, chunker: ChunkerRef) -> io::Result<(FileHandle, String)> {
         let uuid = Uuid::new_v4().to_string();
 
         self.fs.create_file(&uuid, chunker).map(|file| (file, uuid))
     }
 }
 
+/// Calculates an average measurement out of a vector of measurements.
 pub fn avg_measurement(measurements: Vec<TimeMeasurement>) -> TimeMeasurement {
     let n = measurements.len();
     let sum = measurements.into_iter().sum::<TimeMeasurement>();
@@ -274,7 +294,7 @@ impl Debug for TimeMeasurement {
 }
 
 impl Sum for TimeMeasurement {
-    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(TimeMeasurement::default(), |acc, next| acc + next)
     }
 }
