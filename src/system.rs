@@ -220,7 +220,7 @@ where
     /// Completely clears the chunk database, invalidating already created file handles. Doesn't touch the target map.
     ///
     /// **WARNING**: Since it invalidates all file handles, data contained in target map will not be valid too.
-    /// If the target map is iterable, it can be cleared with [`clear_target_map`][Self::clear_target_map].
+    /// Use [`Self::clear_file_system`] if you want to clear the target map too.
     pub fn clear_database(&mut self) -> io::Result<()> {
         self.file_layer.clear();
         self.storage.clear_database()
@@ -240,8 +240,9 @@ where
         self.storage.total_dedup_ratio()
     }
 
-    /// Clears the contained target map. Doesn't remove the info about file handles.
-    pub fn clear_target_map(&mut self) -> io::Result<()> {
-        self.storage.clear_target_map()
+    /// Completely clears the whole file system.
+    pub fn clear_file_system(&mut self) -> io::Result<()> {
+        self.file_layer.clear();
+        self.storage.clear_database_full()
     }
 }

@@ -217,14 +217,7 @@ where
 
     /// Removes all stored data in the database and sets written size to 0.
     pub fn clear_database(&mut self) -> io::Result<()> {
-        let size_to_remove =
-            self.database
-                .iterator()
-                .fold(0, |acc, (_, data)| match data.extract() {
-                    Data::Chunk(chunk) => acc + chunk.len(),
-                    Data::TargetChunk(_) => acc,
-                });
-        self.size_written -= size_to_remove;
+        self.size_written = 0;
         self.database.clear()
     }
 }
@@ -250,15 +243,9 @@ where
     }
 
     /// Removes all stored data in the target map and sets written size to 0.
-    pub fn clear_target_map(&mut self) -> io::Result<()> {
-        let size_to_remove =
-            self.database
-                .iterator()
-                .fold(0, |acc, (_, data)| match data.extract() {
-                    Data::Chunk(_) => acc,
-                    Data::TargetChunk(chunk) => acc + chunk.len(),
-                });
-        self.size_written -= size_to_remove;
+    pub fn clear_database_full(&mut self) -> io::Result<()> {
+        self.size_written = 0;
+        self.database.clear()?;
         self.target_map.clear()
     }
 }
