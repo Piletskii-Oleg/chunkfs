@@ -1,9 +1,7 @@
 use std::fmt::{Debug, Formatter};
 
-use cdc_chunkers::{
-    seq::{self, Config, OperationMode},
-    SizeParams,
-};
+pub use cdc_chunkers::seq::{Config, OperationMode};
+use cdc_chunkers::{seq, SizeParams};
 
 use crate::{Chunk, Chunker};
 
