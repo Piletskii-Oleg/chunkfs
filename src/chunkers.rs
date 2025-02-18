@@ -8,13 +8,13 @@ pub use seq::SeqChunker;
 pub use supercdc::SuperChunker;
 pub use ultra::UltraChunker;
 
+mod fast;
 mod fixed_size;
 mod leap;
 mod rabin;
 mod seq;
 mod supercdc;
 mod ultra;
-mod fast;
 
 #[cfg(test)]
 mod tests {

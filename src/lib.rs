@@ -25,10 +25,16 @@ pub trait ChunkHash: hash::Hash + Clone + Eq + PartialEq + Default {}
 
 impl<T: hash::Hash + Clone + Eq + PartialEq + Default> ChunkHash for T {}
 
+/// One kilobyte.
+pub const KB: usize = 1024;
+
+/// One megabyte.
+pub const MB: usize = 1024 * KB;
+
 /// Block size, used by [`read`][crate::FileSystem::read_from_file]
 /// and [`write`][crate::FileSystem::write_to_file] methods in the [`FileSystem`].
 /// Blocks given to the user or by them must be of this size.
-const SEG_SIZE: usize = 1024 * 1024; // 1MB
+const SEG_SIZE: usize = MB; // 1MB
 
 /// A chunk of the processed data. Doesn't store any data,
 /// only contains offset and length of the chunk.
@@ -77,6 +83,7 @@ pub trait Chunker: Debug {
     fn estimate_chunk_count(&self, data: &[u8]) -> usize;
 }
 
+/// Reference to a chunker that can be re-used.
 #[derive(Clone)]
 pub struct ChunkerRef(Rc<RefCell<dyn Chunker>>);
 
