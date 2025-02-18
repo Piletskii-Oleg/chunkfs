@@ -1,5 +1,6 @@
 pub use cdc_chunkers::SizeParams;
 
+pub use fast::FastChunker;
 pub use fixed_size::FSChunker;
 pub use leap::LeapChunker;
 pub use rabin::RabinChunker;
@@ -13,6 +14,7 @@ mod rabin;
 mod seq;
 mod supercdc;
 mod ultra;
+mod fast;
 
 #[cfg(test)]
 mod tests {
