@@ -12,7 +12,7 @@ mod fast;
 mod fixed_size;
 mod leap;
 mod rabin;
-mod seq;
+pub mod seq;
 mod supercdc;
 mod ultra;
 
