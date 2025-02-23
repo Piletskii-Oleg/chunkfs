@@ -207,7 +207,15 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     pub fn get_to_dedup_ratio(&mut self, name: &str, dedup_ratio: f64) -> io::Result<String> {
         use itertools::Itertools as _;
 
-        let file = self.files.get(name).ok_or(ErrorKind::NotFound)?;
+        if dedup_ratio < 1.0 {
+            let msg = "dedup ratio must be bigger than 1";
+            return Err(io::Error::new(ErrorKind::InvalidInput, msg));
+        }
+
+        let file = self.files.get(name).ok_or_else(|| {
+            let msg = format!("file with name `{name}` not found");
+            io::Error::new(ErrorKind::NotFound, msg)
+        })?;
 
         let unique_spans = file
             .spans
@@ -225,8 +233,6 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
         let num_repeating = (unique_spans.len() as f64 * dedup_percentage) as usize;
 
         let mut to_add = 0;
-        // take first `num_repeating` elements, then cycle and add them until... idk
-        // btw: they're enumerated! enumeration works correctly
         let repeating_spans =
             unique_spans
                 .iter()
@@ -255,6 +261,11 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
         self.files.insert(name.clone(), file);
 
         Ok(name)
+    }
+
+    /// Returns a list of all file names present in the system.
+    pub fn list_files(&self) -> Vec<String> {
+        self.files.keys().cloned().collect()
     }
 }
 
