@@ -227,10 +227,9 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
 
         let unique_length = unique_spans.iter().map(|(_, length)| length).sum::<usize>();
         let total_size = ((unique_length as f64) * dedup_ratio) as usize;
-        let remaining = total_size - unique_length;
 
         let dedup_percentage = dedup_ratio.recip();
-        let num_repeating = (unique_spans.len() as f64 * dedup_percentage) as usize;
+        let num_repeating = (unique_spans.len() as f64 * dedup_percentage).ceil() as usize;
 
         let mut to_add = 0;
         let repeating_spans =
@@ -240,7 +239,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
                 .cycle()
                 .take_while(|(_, length)| {
                     to_add += *length;
-                    to_add < remaining
+                    to_add <= total_size
                 });
 
         let remaining_spans = unique_spans.iter().skip(num_repeating);

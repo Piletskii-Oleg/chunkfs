@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::io;
-use std::io::Write;
 use std::path::Path;
 
 use database::{Database, IterableDatabase};
@@ -181,9 +180,8 @@ where
         let handle = self.open_file_readonly(name)?;
 
         let data = self.read_file_complete(&handle)?;
-        let mut file = std::fs::File::create(path)?;
 
-        file.write_all(&data)
+        std::fs::write(path, data)
     }
 
     /// Returns a list of all file names present in the system.

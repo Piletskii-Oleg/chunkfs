@@ -13,8 +13,9 @@ fn main() -> io::Result<()> {
     fixture.fs.write_to_file(&mut handle, &[3; 100 * MB])?;
     fixture.fs.close_file(handle)?;
 
-    let new = fixture.fs.get_to_dedup_ratio("file", 3.0)?;
+    let new = fixture.fs.get_to_dedup_ratio("file", 4.0)?;
     fixture.fs.write_file_to_disk(&new, "../new")?;
+    fixture.fs.clear_database()?;
 
     let dataset = Dataset::new("../new", "dataset")?;
     let measurement = fixture.measure(&dataset, SuperChunker::default())?;
