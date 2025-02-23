@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::io;
+use std::io::Write;
+use std::path::Path;
 
 use database::{Database, IterableDatabase};
 use file_layer::{FileHandle, FileLayer};
@@ -170,13 +172,18 @@ where
     /// Generate a new dataset with set deduplication ratio from the existing one.
     ///
     /// Returns the name of the new file.
-    pub fn get_to_dedup_ratio(
-        &mut self,
-        name: &str,
-        dedup_ratio: f64,
-    ) -> io::Result<String> {
-        self.file_layer
-            .get_to_dedup_ratio(name, dedup_ratio)
+    pub fn get_to_dedup_ratio(&mut self, name: &str, dedup_ratio: f64) -> io::Result<String> {
+        self.file_layer.get_to_dedup_ratio(name, dedup_ratio)
+    }
+
+    /// Writes a file from the file system to the disk by the specified path.
+    pub fn write_file_to_disk<P: AsRef<Path>>(&self, name: &str, path: P) -> io::Result<()> {
+        let handle = self.open_file_readonly(name)?;
+
+        let data = self.read_file_complete(&handle)?;
+        let mut file = std::fs::File::create(path)?;
+
+        file.write_all(&data)
     }
 
     /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
