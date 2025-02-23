@@ -7,7 +7,7 @@ use crate::{ChunkHash, ChunkerRef};
 use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
-#[derive(Debug, PartialEq, Eq, Default, Clone)]
+#[derive(Debug, PartialEq, Eq, Default, Clone, Hash)]
 pub struct FileSpan<Hash: ChunkHash> {
     hash: Hash,
     offset: usize,
@@ -198,6 +198,63 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
                 .or_insert((1, length));
         }
         distribution
+    }
+
+    #[cfg(feature = "bench")]
+    /// Generate a new dataset with set deduplication ratio from the existing one.
+    ///
+    /// Returns the name of the new file.
+    pub fn get_to_dedup_ratio(&mut self, name: &str, dedup_ratio: f64) -> io::Result<String> {
+        use itertools::Itertools as _;
+
+        let file = self.files.get(name).ok_or(ErrorKind::NotFound)?;
+
+        let unique_spans = file
+            .spans
+            .iter()
+            .zip(file.spans.iter().skip(1))
+            .map(|(first, second)| (first, second.offset - first.offset))
+            .unique_by(|(span, _)| &span.hash)
+            .collect::<Vec<(&FileSpan<Hash>, usize)>>();
+
+        let unique_length = unique_spans.iter().map(|(_, length)| length).sum::<usize>();
+        let total_size = ((unique_length as f64) * dedup_ratio) as usize;
+        let remaining = total_size - unique_length;
+
+        let dedup_percentage = dedup_ratio.recip();
+        let num_repeating = (unique_spans.len() as f64 * dedup_percentage) as usize;
+
+        let mut to_add = 0;
+        // take first `num_repeating` elements, then cycle and add them until... idk
+        // btw: they're enumerated! enumeration works correctly
+        let repeating_spans =
+            unique_spans
+                .iter()
+                .take(num_repeating)
+                .cycle()
+                .take_while(|(_, length)| {
+                    to_add += *length;
+                    to_add < remaining
+                });
+
+        let remaining_spans = unique_spans.iter().skip(num_repeating);
+
+        let spans = repeating_spans
+            .chain(remaining_spans)
+            .map(|(span, _)| span)
+            .cloned()
+            .cloned()
+            .collect();
+        let name = format!("{name}.{dedup_ratio:.2}");
+
+        let file = File {
+            name: name.clone(),
+            spans,
+        };
+
+        self.files.insert(name.clone(), file);
+
+        Ok(name)
     }
 }
 

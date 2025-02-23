@@ -167,6 +167,18 @@ where
         self.file_layer.chunk_count_distribution(handle)
     }
 
+    /// Generate a new dataset with set deduplication ratio from the existing one.
+    ///
+    /// Returns the name of the new file.
+    pub fn get_to_dedup_ratio(
+        &mut self,
+        name: &str,
+        dedup_ratio: f64,
+    ) -> io::Result<String> {
+        self.file_layer
+            .get_to_dedup_ratio(name, dedup_ratio)
+    }
+
     /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
     /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
     fn new(base: B, hasher: H, target_map: T) -> Self {
