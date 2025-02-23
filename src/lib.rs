@@ -31,6 +31,9 @@ pub const KB: usize = 1024;
 /// One megabyte.
 pub const MB: usize = 1024 * KB;
 
+/// One gigabyte.
+pub const GB: usize = 1024 * MB;
+
 /// Block size, used by [`read`][crate::FileSystem::read_from_file]
 /// and [`write`][crate::FileSystem::write_to_file] methods in the [`FileSystem`].
 /// Blocks given to the user or by them must be of this size.

@@ -24,11 +24,14 @@ uuid = { version = "1", features = ["fast-rng", "v4"], optional = true }
 rand = { version = "0.8", optional = true }
 itertools = { version = "0.14", optional = true }
 fastcdc = { version = "3", optional = true }
+csv = { version = "1", optional = true }
+serde = { version = "1", optional = true, features = ["derive"] }
+serde_with = { version = "3", optional = true }
 
 [features]
 chunkers = ["cdc-chunkers", "fastcdc"]
 hashers = ["sha2"]
-bench = ["uuid", "rand", "itertools"]
+bench = ["uuid", "rand", "itertools", "csv", "serde", "serde_with"]
 
 [dev-dependencies]
 chunkfs = { path = ".", features = ["chunkers", "hashers", "bench"] }
@@ -36,7 +39,7 @@ criterion = "0.5"
 sha3 = "0.10"
 approx = "0.5"
 tempfile = "3.14"
-serde = "1"
+
 serde_json = "1"
 
 [[bench]]

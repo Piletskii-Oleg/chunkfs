@@ -7,6 +7,7 @@ use std::io;
 use std::io::Read;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign};
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use uuid::Uuid;
@@ -57,14 +58,18 @@ where
         self.fs.write_from_stream(&mut file, &mut dataset_file)?;
         let write_time = now.elapsed();
 
-        let write_measurements = self.fs.close_file(file)?;
+        let WriteMeasurements {
+            chunk_time,
+            hash_time,
+        } = self.fs.close_file(file)?;
         let read_time = self.verify(dataset, &uuid)?;
 
         let measurement = TimeMeasurement {
             name: dataset.name.to_string(),
             write_time,
             read_time,
-            write_measurements,
+            chunk_time,
+            hash_time,
         };
 
         Ok(measurement)
@@ -197,30 +202,55 @@ where
     }
 }
 
+#[serde_with::serde_as]
+#[derive(Default, serde::Serialize)]
+pub struct TimeMeasurement {
+    pub name: String,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub write_time: Duration,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub read_time: Duration,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub chunk_time: Duration,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub hash_time: Duration,
+}
+
+impl TimeMeasurement {
+    /// Writes the measurement to a csv file specified by path.
+    /// Measurement units are seconds.
+    ///
+    /// # Behavior
+    /// * If the file does not exist, creates it and writes the measurements.
+    /// * If it exists, appends the measurements.
+    pub fn write_to_csv<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
+        let mut writer = match File::options().append(true).open(&path) {
+            Ok(file) => csv::WriterBuilder::new()
+                .has_headers(false)
+                .from_writer(file),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => csv::Writer::from_path(&path)?,
+            Err(e) => return Err(e),
+        };
+
+        writer.serialize(self)?;
+        writer.flush()?;
+
+        Ok(())
+    }
+}
+
 /// Calculates an average measurement out of a vector of measurements.
 pub fn avg_measurement(measurements: Vec<TimeMeasurement>) -> TimeMeasurement {
     let n = measurements.len();
     let sum = measurements.into_iter().sum::<TimeMeasurement>();
 
-    let write_measurements = WriteMeasurements {
-        chunk_time: sum.write_measurements.chunk_time / n as u32,
-        hash_time: sum.write_measurements.hash_time / n as u32,
-    };
-
     TimeMeasurement {
         name: sum.name,
         write_time: sum.write_time / n as u32,
         read_time: sum.read_time / n as u32,
-        write_measurements,
+        chunk_time: sum.chunk_time / n as u32,
+        hash_time: sum.hash_time / n as u32,
     }
-}
-
-#[derive(Default)]
-pub struct TimeMeasurement {
-    pub name: String,
-    pub write_time: Duration,
-    pub read_time: Duration,
-    pub write_measurements: WriteMeasurements,
 }
 
 #[derive(Debug)]
@@ -270,7 +300,8 @@ impl Add for TimeMeasurement {
         let mut measurement = self;
         measurement.read_time += rhs.read_time;
         measurement.write_time += rhs.write_time;
-        measurement.write_measurements += rhs.write_measurements;
+        measurement.chunk_time += rhs.chunk_time;
+        measurement.hash_time += rhs.hash_time;
         measurement
     }
 }
@@ -279,7 +310,8 @@ impl AddAssign for TimeMeasurement {
     fn add_assign(&mut self, rhs: Self) {
         self.read_time += rhs.read_time;
         self.write_time += rhs.write_time;
-        self.write_measurements += rhs.write_measurements;
+        self.chunk_time += rhs.chunk_time;
+        self.hash_time += rhs.hash_time;
     }
 }
 
@@ -288,11 +320,7 @@ impl Debug for TimeMeasurement {
         write!(
             f,
             "Dataset: {}\nRead time: {:?}\nWrite time: {:?}\nChunk time: {:?}\nHash time: {:?}",
-            self.name,
-            self.read_time,
-            self.write_time,
-            self.write_measurements.chunk_time,
-            self.write_measurements.hash_time,
+            self.name, self.read_time, self.write_time, self.chunk_time, self.hash_time,
         )
     }
 }
