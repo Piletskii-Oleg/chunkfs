@@ -179,6 +179,11 @@ where
             .get_to_dedup_ratio(name, dedup_ratio)
     }
 
+    /// Returns a list of all file names present in the system.
+    pub fn list_files(&self) -> Vec<String> {
+        self.file_layer.list_files()
+    }
+
     /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
     /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
     fn new(base: B, hasher: H, target_map: T) -> Self {
