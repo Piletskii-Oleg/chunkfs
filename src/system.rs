@@ -235,6 +235,12 @@ where
         self.storage.cdc_dedup_ratio()
     }
 
+    /// Calculates full deduplication ratio of the storage, not accounting for chunks processed with scrubber,
+    /// if there had been any.
+    pub fn full_cdc_dedup_ratio(&self) -> f64 {
+        self.storage.full_cdc_dedup_ratio()
+    }
+
     pub fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
         self.storage.iterator()
     }

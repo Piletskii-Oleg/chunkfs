@@ -12,6 +12,10 @@ impl Hasher for SimpleHasher {
     fn hash(&mut self, data: &[u8]) -> Vec<u8> {
         data.to_vec()
     }
+
+    fn len(&self, hash: Self::Hash) -> usize {
+        hash.len()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -25,5 +29,9 @@ impl Hasher for Sha256Hasher {
     fn hash(&mut self, data: &[u8]) -> Self::Hash {
         Digest::update(&mut self.hasher, data);
         Digest::finalize_reset(&mut self.hasher)
+    }
+
+    fn len(&self, hash: Self::Hash) -> usize {
+        hash.len()
     }
 }
