@@ -168,6 +168,7 @@ where
         self.file_layer.chunk_count_distribution(handle)
     }
 
+    #[cfg(feature = "bench")]
     /// Generate a new dataset with set deduplication ratio from the existing one.
     ///
     /// Returns the name of the new file.

@@ -131,7 +131,7 @@ pub trait Hasher {
     fn hash(&mut self, data: &[u8]) -> Self::Hash;
 
     /// Returns length of the given hash.
-    fn len(&self, hash: Self::Hash) -> usize;
+    fn len(&self, hash: &Self::Hash) -> usize;
 }
 
 /// Measurements that are received after writing data to a file.

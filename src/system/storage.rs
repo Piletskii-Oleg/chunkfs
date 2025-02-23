@@ -213,10 +213,10 @@ where
 
     pub fn full_cdc_dedup_ratio(&self) -> f64 {
         let key_size = self
-                .database
-                .keys()
-                .map(|key| self.hasher.len(key))
-                .sum::<usize>();
+            .database
+            .keys()
+            .map(|key| self.hasher.len(key))
+            .sum::<usize>();
 
         (self.size_written as f64) / (self.total_cdc_size() as f64 + key_size as f64)
     }
