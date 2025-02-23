@@ -16,6 +16,8 @@ pub mod bench;
 pub mod chunkers;
 #[cfg(feature = "hashers")]
 pub mod hashers;
+#[cfg(feature = "storages")]
+mod storages;
 mod system;
 
 /// Trait for a CDC hash, combining several other traits: [hash::Hash], [Clone], [Eq], [PartialEq], [Default].

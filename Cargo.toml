@@ -24,11 +24,15 @@ uuid = { version = "1", features = ["fast-rng", "v4"], optional = true }
 rand = { version = "0.8", optional = true }
 itertools = { version = "0.14", optional = true }
 fastcdc = { version = "3", optional = true }
+diesel = { version = "2", features = ["sqlite"], optional = true }
+sled = { version = "0.34", optional = true }
 
 [features]
 chunkers = ["cdc-chunkers", "fastcdc"]
 hashers = ["sha2"]
 bench = ["uuid", "rand", "itertools"]
+storages = ["diesel", "sled"]
+full = ["chunkers", "hashers", "storages", "bench"]
 
 [dev-dependencies]
 chunkfs = { path = ".", features = ["chunkers", "hashers", "bench"] }

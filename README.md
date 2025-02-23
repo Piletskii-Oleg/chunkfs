@@ -74,11 +74,11 @@ To use it in your code, add the following dependency to your `Cargo.toml`:
 chunkfs = "0.1"
 ```
 
-To use provided chunkers and hashers, use the corresponding features:
+To use provided chunkers, storages and hashers, use the corresponding features:
 
 ```toml
 [dependencies]
-chunkfs = { version = "0.1", features = ["chunkers", "hashers"] }
+chunkfs = { version = "0.1", features = ["chunkers", "storages", "hashers"] }
 ```
 
 Chunkfs provides methods to analyse chunking algorithms efficiency using different metrics. 
@@ -86,6 +86,12 @@ To access them, use the corresponding feature:
 ```toml
 [dependencies]
 chunkfs = { version = "0.1", features = ["bench"] }
+```
+
+To activate all features at once, use the `full` feature:
+```toml
+[dependencies]
+chunkfs = { version = "0.1", features = ["full"] }
 ```
 
 ## Examples
