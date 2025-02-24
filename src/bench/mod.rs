@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::system::file_layer::FileHandle;
 use crate::{
     create_cdc_filesystem, ChunkHash, ChunkerRef, DataContainer, FileSystem, Hasher,
-    IterableDatabase, WriteMeasurements,
+    IterableDatabase, WriteMeasurements, MB,
 };
 
 /// A file system fixture that allows user to do measurements and carry out benchmarks
@@ -187,13 +187,25 @@ where
             return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
         }
 
-        let mut dataset_file = dataset.open()?;
-        let mut buffer = Vec::with_capacity(dataset.size);
-        dataset_file.read_to_end(&mut buffer)?;
+        drop(read);
 
-        if read != buffer {
-            let msg = "contents of dataset and written file are different";
-            return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
+        let mut fs_file = self.fs.open_file_readonly(uuid)?;
+        let mut dataset_file = dataset.open()?;
+        let mut buffer = Vec::with_capacity(MB);
+
+        loop {
+            let read = self.fs.read_from_file(&mut fs_file)?;
+            if read.is_empty() {
+                break;
+            }
+
+            buffer.clear();
+            Read::take(&mut dataset_file, read.len() as u64).read_to_end(&mut buffer)?;
+
+            if read != buffer {
+                let msg = "contents of dataset and written file are different";
+                return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
+            }
         }
 
         Ok(read_time)

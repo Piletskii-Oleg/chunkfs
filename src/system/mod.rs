@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io;
+use std::io::Write;
 use std::path::Path;
 
 use database::{Database, IterableDatabase};
@@ -152,10 +153,10 @@ where
         Ok(self.storage.retrieve(&hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 
-    /// Reads 1 MB of data from a file and returns it.
+    /// Reads at most 1 MB of data from a file and returns it.
     ///
     /// **Careful:** it modifies internal `FileHandle` data. After using this `write_to_file` should not be used on the same FileHandle.
-    pub fn read_from_file(&mut self, handle: &mut FileHandle) -> io::Result<Vec<u8>> {
+    pub fn read_from_file(&self, handle: &mut FileHandle) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(&hashes)?.concat())
     }
@@ -177,12 +178,27 @@ where
     }
 
     /// Writes a file from the file system to the disk by the specified path.
+    ///
+    /// Will fail if the file already exists by the specified path.
     pub fn write_file_to_disk<P: AsRef<Path>>(&self, name: &str, path: P) -> io::Result<()> {
-        let handle = self.open_file_readonly(name)?;
+        let mut handle = self.open_file_readonly(name)?;
 
-        let data = self.read_file_complete(&handle)?;
+        let mut file = std::fs::File::options()
+            .create_new(true)
+            .write(true)
+            .open(path)?;
 
-        std::fs::write(path, data)
+        loop {
+            let data = self.read_from_file(&mut handle)?;
+
+            if data.is_empty() {
+                break;
+            }
+
+            file.write_all(&data)?;
+        }
+
+        Ok(())
     }
 
     /// Returns a list of all file names present in the system.

@@ -1,9 +1,13 @@
-use super::Dataset;
-use rand::distributions::Distribution;
 use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::process::{Command, Stdio};
+
+use rand::distributions::Distribution;
+
+use crate::MB;
+
+use super::Dataset;
 
 /// Trait for structures that generate datasets.
 pub trait DatasetGenerator {
@@ -80,7 +84,6 @@ pub fn random(name: &str, size: usize, distribution: impl Distribution<u8>) -> i
 
     let mut rng = rand::thread_rng();
     let mut written = 0;
-    const MB: usize = 1024 * 1024 * 1024;
 
     while written < size {
         let to_write = std::cmp::min(MB, size - written);
