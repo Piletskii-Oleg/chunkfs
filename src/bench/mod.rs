@@ -1,7 +1,7 @@
 pub mod generator;
 
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::fs::File;
 use std::io;
 use std::io::Read;
@@ -62,6 +62,7 @@ where
             chunk_time,
             hash_time,
         } = self.fs.close_file(file)?;
+
         let read_time = self.verify(dataset, &uuid)?;
 
         let measurement = TimeMeasurement {
@@ -75,6 +76,8 @@ where
             name: dataset.name.to_string(),
             file_name: uuid,
             measurement,
+            dedup_ratio: self.fs.cdc_dedup_ratio(),
+            size: dataset.size,
         };
 
         Ok(result)
@@ -220,16 +223,18 @@ where
 }
 
 #[serde_with::serde_as]
-#[derive(Default, serde::Serialize)]
+#[derive(Default, Clone, serde::Serialize)]
 pub struct MeasureResult {
     pub name: String,
+    pub size: usize,
     pub measurement: TimeMeasurement,
+    pub dedup_ratio: f64,
     #[serde(skip_serializing)]
     pub file_name: String,
 }
 
 #[serde_with::serde_as]
-#[derive(Default, serde::Serialize)]
+#[derive(Default, Copy, Clone, serde::Serialize)]
 pub struct TimeMeasurement {
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     pub write_time: Duration,
@@ -281,6 +286,38 @@ pub fn avg_measurement(measurements: Vec<TimeMeasurement>) -> TimeMeasurement {
 pub struct DedupMeasurement {
     pub name: String,
     pub dedup_ratio: f64,
+}
+
+pub struct Throughput {
+    pub chunk: f64,
+    pub hash: f64,
+    pub write: f64,
+    pub read: f64,
+}
+
+impl Throughput {
+    pub fn new(result: &MeasureResult) -> Self {
+        let measurement = result.measurement;
+        Self {
+            chunk: (result.size / MB) as f64 / measurement.chunk_time.as_secs_f64(),
+            hash: (result.size / MB) as f64 / measurement.hash_time.as_secs_f64(),
+            write: (result.size / MB) as f64 / measurement.write_time.as_secs_f64(),
+            read: (result.size / MB) as f64 / measurement.read_time.as_secs_f64(),
+        }
+    }
+}
+
+impl Display for Throughput {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Chunk throughput: {:.3} MB/s\
+        \nHash throughput: {:.3} MB/s\
+        \nWrite throughput: {:.3} MB/s\
+        \nRead throughput: {:.3} MB/s",
+            self.chunk, self.hash, self.write, self.read
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -341,7 +378,11 @@ impl AddAssign for TimeMeasurement {
 
 impl Debug for MeasureResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Dataset: {}\n{:?}", self.name, self.measurement)
+        write!(
+            f,
+            "Dataset: {}\n{:?}\nDedup ratio: {:.3}",
+            self.name, self.measurement, self.dedup_ratio
+        )
     }
 }
 
