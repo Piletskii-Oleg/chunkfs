@@ -44,7 +44,7 @@ where
     }
 
     /// Conducts a measurement on a given dataset using given chunker.
-    pub fn measure<C>(&mut self, dataset: &Dataset, chunker: C) -> io::Result<TimeMeasurement>
+    pub fn measure<C>(&mut self, dataset: &Dataset, chunker: C) -> io::Result<MeasureResult>
     where
         C: Into<ChunkerRef>,
     {
@@ -65,14 +65,19 @@ where
         let read_time = self.verify(dataset, &uuid)?;
 
         let measurement = TimeMeasurement {
-            name: dataset.name.to_string(),
             write_time,
             read_time,
             chunk_time,
             hash_time,
         };
 
-        Ok(measurement)
+        let result = MeasureResult {
+            name: dataset.name.to_string(),
+            file_name: uuid,
+            measurement,
+        };
+
+        Ok(result)
     }
 
     /// Conducts n measurements on a given dataset using given chunker.
@@ -83,7 +88,7 @@ where
         dataset: &Dataset,
         chunker: C,
         n: usize,
-    ) -> io::Result<Vec<TimeMeasurement>>
+    ) -> io::Result<Vec<MeasureResult>>
     where
         C: Into<ChunkerRef>,
     {
@@ -108,7 +113,7 @@ where
         dataset: &Dataset,
         chunker: C,
         m: usize,
-    ) -> io::Result<Vec<TimeMeasurement>>
+    ) -> io::Result<Vec<MeasureResult>>
     where
         C: Into<ChunkerRef>,
     {
@@ -204,8 +209,16 @@ where
 
 #[serde_with::serde_as]
 #[derive(Default, serde::Serialize)]
-pub struct TimeMeasurement {
+pub struct MeasureResult {
     pub name: String,
+    pub measurement: TimeMeasurement,
+    #[serde(skip_serializing)]
+    pub file_name: String,
+}
+
+#[serde_with::serde_as]
+#[derive(Default, serde::Serialize)]
+pub struct TimeMeasurement {
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     pub write_time: Duration,
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
@@ -216,7 +229,7 @@ pub struct TimeMeasurement {
     pub hash_time: Duration,
 }
 
-impl TimeMeasurement {
+impl MeasureResult {
     /// Writes the measurement to a csv file specified by path.
     /// Measurement units are seconds.
     ///
@@ -245,7 +258,6 @@ pub fn avg_measurement(measurements: Vec<TimeMeasurement>) -> TimeMeasurement {
     let sum = measurements.into_iter().sum::<TimeMeasurement>();
 
     TimeMeasurement {
-        name: sum.name,
         write_time: sum.write_time / n as u32,
         read_time: sum.read_time / n as u32,
         chunk_time: sum.chunk_time / n as u32,
@@ -315,12 +327,18 @@ impl AddAssign for TimeMeasurement {
     }
 }
 
+impl Debug for MeasureResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Dataset: {}\n{:?}", self.name, self.measurement)
+    }
+}
+
 impl Debug for TimeMeasurement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Dataset: {}\nRead time: {:?}\nWrite time: {:?}\nChunk time: {:?}\nHash time: {:?}",
-            self.name, self.read_time, self.write_time, self.chunk_time, self.hash_time,
+            "Read time: {:?}\nWrite time: {:?}\nChunk time: {:?}\nHash time: {:?}",
+            self.read_time, self.write_time, self.chunk_time, self.hash_time,
         )
     }
 }
