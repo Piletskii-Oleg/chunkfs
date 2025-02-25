@@ -65,17 +65,13 @@ where
 
         let read_time = self.verify(dataset, &uuid)?;
 
-        let measurement = TimeMeasurement {
+        let result = MeasureResult {
+            name: dataset.name.to_string(),
+            file_name: uuid,
             write_time,
             read_time,
             chunk_time,
             hash_time,
-        };
-
-        let result = MeasureResult {
-            name: dataset.name.to_string(),
-            file_name: uuid,
-            measurement,
             dedup_ratio: self.fs.cdc_dedup_ratio(),
             size: dataset.size,
         };
@@ -227,8 +223,15 @@ where
 pub struct MeasureResult {
     pub name: String,
     pub size: usize,
-    pub measurement: TimeMeasurement,
     pub dedup_ratio: f64,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub write_time: Duration,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub read_time: Duration,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub chunk_time: Duration,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub hash_time: Duration,
     #[serde(skip_serializing)]
     pub file_name: String,
 }
@@ -267,6 +270,15 @@ impl MeasureResult {
 
         Ok(())
     }
+
+    pub fn measurements(&self) -> TimeMeasurement {
+        TimeMeasurement {
+            write_time: self.write_time,
+            read_time: self.read_time,
+            chunk_time: self.chunk_time,
+            hash_time: self.hash_time,
+        }
+    }
 }
 
 /// Calculates an average measurement out of a vector of measurements.
@@ -297,7 +309,7 @@ pub struct Throughput {
 
 impl Throughput {
     pub fn new(result: &MeasureResult) -> Self {
-        let measurement = result.measurement;
+        let measurement = result.measurements();
         Self {
             chunk: (result.size / MB) as f64 / measurement.chunk_time.as_secs_f64(),
             hash: (result.size / MB) as f64 / measurement.hash_time.as_secs_f64(),
@@ -381,7 +393,9 @@ impl Debug for MeasureResult {
         write!(
             f,
             "Dataset: {}\n{:?}\nDedup ratio: {:.3}",
-            self.name, self.measurement, self.dedup_ratio
+            self.name,
+            self.measurements(),
+            self.dedup_ratio
         )
     }
 }
