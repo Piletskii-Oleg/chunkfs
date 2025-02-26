@@ -258,7 +258,13 @@ where
         self.storage.full_cdc_dedup_ratio()
     }
 
-    pub fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
+    /// Returns average chunk size in the storage.
+    pub fn average_chunk_size(&self) -> usize {
+        self.storage.average_chunk_size()
+    }
+
+    /// Returns an immutable iterator over storage chunks.
+    pub fn storage_iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
         self.storage.iterator()
     }
 

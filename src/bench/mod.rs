@@ -49,6 +49,7 @@ where
         C: Into<ChunkerRef>,
     {
         let chunker = chunker.into();
+        let chunker_name = format!("{:?}", chunker);
 
         let (mut file, uuid) = self.init_file(chunker)?;
 
@@ -65,14 +66,24 @@ where
 
         let read_time = self.verify(dataset, &uuid)?;
 
-        let result = MeasureResult {
-            name: dataset.name.to_string(),
-            file_name: uuid,
+        let measurement = TimeMeasurement {
             write_time,
             read_time,
             chunk_time,
             hash_time,
+        };
+
+        let throughput = Throughput::new(dataset.size, measurement);
+
+        let result = MeasureResult {
+            name: dataset.name.to_string(),
+            file_name: uuid,
+            chunker: chunker_name,
+            measurement,
+            throughput,
             dedup_ratio: self.fs.cdc_dedup_ratio(),
+            full_dedup_ratio: self.fs.full_cdc_dedup_ratio(),
+            avg_chunk_size: self.fs.average_chunk_size(),
             size: dataset.size,
         };
 
@@ -159,7 +170,7 @@ where
         let mut chunk_map = HashMap::new();
         for chunk in self
             .fs
-            .iterator()
+            .storage_iterator()
             .map(|(_, container)| container.unwrap_chunk())
         {
             chunk_map
@@ -218,27 +229,36 @@ where
     }
 }
 
-#[serde_with::serde_as]
-#[derive(Default, Clone, serde::Serialize)]
+#[derive(Default, Clone)]
 pub struct MeasureResult {
     pub name: String,
+    pub chunker: String,
     pub size: usize,
     pub dedup_ratio: f64,
-    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
-    pub write_time: Duration,
-    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
-    pub read_time: Duration,
-    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
-    pub chunk_time: Duration,
-    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
-    pub hash_time: Duration,
-    #[serde(skip_serializing)]
+    pub full_dedup_ratio: f64,
+    pub avg_chunk_size: usize,
+    pub measurement: TimeMeasurement,
+    pub throughput: Throughput,
     pub file_name: String,
 }
 
-#[serde_with::serde_as]
-#[derive(Default, Copy, Clone, serde::Serialize)]
+#[derive(Default, Copy, Clone)]
 pub struct TimeMeasurement {
+    pub write_time: Duration,
+    pub read_time: Duration,
+    pub chunk_time: Duration,
+    pub hash_time: Duration,
+}
+
+#[serde_with::serde_as]
+#[derive(serde::Serialize)]
+struct SerializableResult {
+    pub name: String,
+    pub chunker: String,
+    pub size: usize,
+    pub dedup_ratio: f64,
+    pub full_dedup_ratio: f64,
+    pub avg_chunk_size: usize,
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     pub write_time: Duration,
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
@@ -247,6 +267,31 @@ pub struct TimeMeasurement {
     pub chunk_time: Duration,
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     pub hash_time: Duration,
+    pub chunk_throughput: f64,
+    pub hash_throughput: f64,
+    pub write_throughput: f64,
+    pub read_throughput: f64,
+}
+
+impl SerializableResult {
+    fn new(result: &MeasureResult) -> SerializableResult {
+        Self {
+            name: result.name.clone(),
+            chunker: result.chunker.clone(),
+            size: result.size,
+            dedup_ratio: result.dedup_ratio,
+            full_dedup_ratio: result.full_dedup_ratio,
+            avg_chunk_size: result.avg_chunk_size,
+            write_time: result.measurement.write_time,
+            read_time: result.measurement.read_time,
+            chunk_time: result.measurement.chunk_time,
+            hash_time: result.measurement.hash_time,
+            chunk_throughput: result.throughput.chunk,
+            hash_throughput: result.throughput.hash,
+            write_throughput: result.throughput.write,
+            read_throughput: result.throughput.read,
+        }
+    }
 }
 
 impl MeasureResult {
@@ -265,19 +310,12 @@ impl MeasureResult {
             Err(e) => return Err(e),
         };
 
-        writer.serialize(self)?;
+        let serializable = SerializableResult::new(self);
+
+        writer.serialize(serializable)?;
         writer.flush()?;
 
         Ok(())
-    }
-
-    pub fn measurements(&self) -> TimeMeasurement {
-        TimeMeasurement {
-            write_time: self.write_time,
-            read_time: self.read_time,
-            chunk_time: self.chunk_time,
-            hash_time: self.hash_time,
-        }
     }
 }
 
@@ -300,6 +338,7 @@ pub struct DedupMeasurement {
     pub dedup_ratio: f64,
 }
 
+#[derive(Copy, Clone, Default)]
 pub struct Throughput {
     pub chunk: f64,
     pub hash: f64,
@@ -308,13 +347,12 @@ pub struct Throughput {
 }
 
 impl Throughput {
-    pub fn new(result: &MeasureResult) -> Self {
-        let measurement = result.measurements();
+    pub fn new(size: usize, measurement: TimeMeasurement) -> Self {
         Self {
-            chunk: (result.size / MB) as f64 / measurement.chunk_time.as_secs_f64(),
-            hash: (result.size / MB) as f64 / measurement.hash_time.as_secs_f64(),
-            write: (result.size / MB) as f64 / measurement.write_time.as_secs_f64(),
-            read: (result.size / MB) as f64 / measurement.read_time.as_secs_f64(),
+            chunk: (size / MB) as f64 / measurement.chunk_time.as_secs_f64(),
+            hash: (size / MB) as f64 / measurement.hash_time.as_secs_f64(),
+            write: (size / MB) as f64 / measurement.write_time.as_secs_f64(),
+            read: (size / MB) as f64 / measurement.read_time.as_secs_f64(),
         }
     }
 }
@@ -393,9 +431,7 @@ impl Debug for MeasureResult {
         write!(
             f,
             "Dataset: {}\n{:?}\nDedup ratio: {:.3}",
-            self.name,
-            self.measurements(),
-            self.dedup_ratio
+            self.name, self.measurement, self.dedup_ratio
         )
     }
 }

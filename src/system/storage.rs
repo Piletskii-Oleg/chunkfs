@@ -211,6 +211,22 @@ where
         (self.size_written as f64) / (self.total_cdc_size() as f64)
     }
 
+    /// Returns average chunk size in the storage.
+    pub fn average_chunk_size(&self) -> usize {
+        let (count, size) = self
+            .database
+            .values()
+            .fold((0, 0), |(count, size), container| {
+                let chunk_size = match container.extract() {
+                    Data::Chunk(chunk) => chunk.len(),
+                    Data::TargetChunk(_) => 0,
+                };
+                (count + 1, size + chunk_size)
+            });
+
+        size / count
+    }
+
     pub fn full_cdc_dedup_ratio(&self) -> f64 {
         let key_size = self
             .database
