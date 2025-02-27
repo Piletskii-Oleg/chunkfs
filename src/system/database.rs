@@ -73,7 +73,7 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
 
 impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
     fn insert(&mut self, key: Hash, value: V) -> io::Result<()> {
-        self.insert(key, value);
+        self.entry(key).or_insert(value);
         Ok(())
     }
 
