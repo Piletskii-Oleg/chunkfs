@@ -48,9 +48,9 @@ fn write_read_blocks_test() {
 
     let complete = ones
         .into_iter()
-        .chain(twos.into_iter())
-        .chain(threes.into_iter())
-        .chain(extra.into_iter())
+        .chain(twos)
+        .chain(threes)
+        .chain(extra)
         .collect::<Vec<_>>();
 
     let mut handle = fs.open_file("file", LeapChunker::default()).unwrap();
@@ -105,10 +105,10 @@ fn scrub_compiles_on_cdc_map_but_returns_error() {
 fn two_file_handles_to_one_file() {
     let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
     let mut handle1 = fs.create_file("file", LeapChunker::default()).unwrap();
-    let mut handle2 = fs.open_file("file", LeapChunker::default()).unwrap();
+    let handle2 = fs.open_file_readonly("file").unwrap();
     fs.write_to_file(&mut handle1, &[1; MB]).unwrap();
     fs.close_file(handle1).unwrap();
-    assert_eq!(fs.read_file_complete(&mut handle2).unwrap().len(), MB)
+    assert_eq!(fs.read_file_complete(&handle2).unwrap().len(), MB)
 }
 
 #[test]
