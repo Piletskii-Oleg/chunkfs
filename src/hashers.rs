@@ -1,4 +1,3 @@
-use sha2::digest::Output;
 use sha2::{Digest, Sha256};
 
 use crate::Hasher;
@@ -24,11 +23,11 @@ pub struct Sha256Hasher {
 }
 
 impl Hasher for Sha256Hasher {
-    type Hash = Output<Sha256>;
+    type Hash = [u8; 32];
 
     fn hash(&mut self, data: &[u8]) -> Self::Hash {
         Digest::update(&mut self.hasher, data);
-        Digest::finalize_reset(&mut self.hasher)
+        Digest::finalize_reset(&mut self.hasher).into()
     }
 
     fn len(&self, hash: &Self::Hash) -> usize {
