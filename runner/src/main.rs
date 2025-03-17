@@ -12,14 +12,13 @@ use chunkfs::{ChunkHash, ChunkerRef, DataContainer, Hasher, IterableDatabase, KB
 use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::Commands::{DedupRatio, Measure};
-use runner::measure_datasets;
 
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
 
     match cli.hasher {
         CliHasher::Sha256 => do_stuff(cli, Sha256Hasher::default().into()),
-        CliHasher::Simple => do_stuff(cli, SimpleHasher::default().into()),
+        CliHasher::Simple => do_stuff(cli, SimpleHasher.into()),
     }
 }
 
@@ -200,33 +199,4 @@ enum Commands {
         #[arg(long)]
         dataset_name: String,
     },
-}
-
-fn example() -> io::Result<()> {
-    let datasets = vec![
-        Dataset::new("/home/opiletskiy/Documents/datasets/vm.tar", "VM")?,
-        Dataset::new("/home/opiletskiy/Documents/datasets/osm.tar", "OSM")?,
-        Dataset::new("/home/opiletskiy/Documents/datasets/linux/linux.tar", "LNX")?,
-    ];
-
-    let all_sizes = vec![
-        SizeParams::new(4 * KB, 8 * KB, 16 * KB),
-        SizeParams::new(8 * KB, 16 * KB, 64 * KB),
-        SizeParams::new(4 * KB, 6 * KB, 8 * KB),
-    ];
-
-    let sizes = all_sizes[0];
-    let chunkers: Vec<ChunkerRef> = vec![
-        FSChunker::new(sizes.min).into(),
-        RabinChunker::new(sizes).into(),
-        LeapChunker::new(sizes).into(),
-        FastChunker::new(sizes).into(),
-        UltraChunker::new(sizes).into(),
-        SuperChunker::new(sizes).into(),
-        SeqChunker::new(OperationMode::Increasing, sizes, Default::default()).into(),
-    ];
-
-    measure_datasets(&datasets, &chunkers)?;
-
-    Ok(())
 }
