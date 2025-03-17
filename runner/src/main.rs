@@ -1,15 +1,18 @@
 extern crate chunkfs;
 
-use crate::Commands::{DedupRatio, Measure};
+use std::collections::HashMap;
+use std::io;
+
 use chunkfs::bench::{CDCFixture, Dataset};
 use chunkfs::chunkers::seq::{Config, OperationMode};
 use chunkfs::chunkers::*;
 use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
 use chunkfs::{ChunkHash, ChunkerRef, DataContainer, Hasher, IterableDatabase, KB};
-use clap::{Args, Parser, Subcommand, ValueEnum};
+
+use clap::{Parser, Subcommand, ValueEnum};
+
+use crate::Commands::{DedupRatio, Measure};
 use runner::measure_datasets;
-use std::collections::HashMap;
-use std::io;
 
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
@@ -50,6 +53,10 @@ where
                 fixture.measure_repeated(&dataset, chunker, count)?
             };
 
+            for measurement in measurements {
+                measurement.write_to_csv(&cli.report_path)?;
+            }
+
             Ok(())
         }
 
@@ -58,9 +65,9 @@ where
             dataset_name,
         } => {
             let dataset = Dataset::new(&dataset_path, &dataset_name)?;
-            let measurement = fixture.dedup_ratio(&dataset, chunker)?;
 
-            Ok(())
+            let measurement = fixture.measure(&dataset, chunker)?;
+            measurement.write_to_csv(&cli.report_path)
         }
     }
 }
@@ -93,9 +100,9 @@ enum CliChunker {
 
 fn get_chunker(cli: &Cli) -> ChunkerRef {
     let params = SizeParams {
-        min: cli.min,
-        avg: cli.avg,
-        max: cli.max,
+        min: cli.min * KB,
+        avg: cli.avg * KB,
+        max: cli.max * KB,
     };
 
     match cli.chunker {
@@ -142,19 +149,19 @@ pub struct Cli {
     #[arg(long, required_if_eq("chunker", "seq"), value_name = "MODE")]
     seq_mode: Option<SeqOperationMode>,
 
-    /// Minimum chunk size
+    /// Minimum chunk size (in KB)
     #[arg(long, value_name = "MIN_CHUNK_SIZE")]
     min: usize,
 
-    /// Average chunk size
+    /// Average chunk size (in KB)
     #[arg(long, value_name = "AVG_CHUNK_SIZE")]
     avg: usize,
 
-    /// Maximum chunk size
+    /// Maximum chunk size (in KB)
     #[arg(long, value_name = "MAX_CHUNK_SIZE")]
     max: usize,
 
-    /// Path where report should be saved
+    /// Path where report should be saved in .csv format
     #[arg(long)]
     report_path: String,
 
