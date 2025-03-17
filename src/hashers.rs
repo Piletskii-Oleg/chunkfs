@@ -2,7 +2,7 @@ use sha2::{Digest, Sha256};
 
 use crate::Hasher;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SimpleHasher;
 
 impl Hasher for SimpleHasher {

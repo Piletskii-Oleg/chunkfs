@@ -20,14 +20,13 @@ pub mod storage;
 /// To create a file system that can be used with CDC algorithms only, [`create_cdc_filesystem`] should be used.
 ///
 /// If you want to test scrubber, [`FileSystem::new_with_scrubber`] should be used.
-pub struct FileSystem<B, H, Hash, K, T>
+pub struct FileSystem<B, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
-    storage: ChunkStorage<H, Hash, B, K, T>,
+    storage: ChunkStorage<Hash, B, K, T>,
     file_layer: FileLayer<Hash>,
 }
 
@@ -40,19 +39,18 @@ where
 pub fn create_cdc_filesystem<B, H, Hash>(
     base: B,
     hasher: H,
-) -> FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>
+) -> FileSystem<B, Hash, (), HashMap<(), Vec<u8>>>
 where
     B: Database<Hash, DataContainer<()>>,
-    H: Hasher<Hash = Hash>,
+    H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
     Hash: ChunkHash,
 {
-    FileSystem::new(base, hasher, HashMap::default())
+    FileSystem::new(base, hasher.into(), HashMap::default())
 }
 
-impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
+impl<B, Hash, K, T> FileSystem<B, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
@@ -208,7 +206,7 @@ where
 
     /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
     /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
-    fn new(base: B, hasher: H, target_map: T) -> Self {
+    fn new(base: B, hasher: Box<dyn Hasher<Hash = Hash>>, target_map: T) -> Self {
         Self {
             storage: ChunkStorage::new(base, hasher, target_map),
             file_layer: Default::default(),
@@ -216,24 +214,26 @@ where
     }
 }
 
-impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
+impl<B, Hash, K, T> FileSystem<B, Hash, K, T>
 where
     B: IterableDatabase<Hash, DataContainer<K>>,
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
     /// Creates a file system with the given [`hasher`][Hasher], original [`database`][Database] and target map, and a [`scrubber`][Scrub].
     ///
     /// Provided `database` must implement [`IterableDatabase`].
-    pub fn new_with_scrubber(
+    pub fn new_with_scrubber<H>(
         database: B,
         target_map: T,
         scrubber: Box<dyn Scrub<Hash, B, K, T>>,
         hasher: H,
-    ) -> Self {
+    ) -> Self
+    where
+        H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
+    {
         Self {
-            storage: ChunkStorage::new_with_scrubber(database, target_map, scrubber, hasher),
+            storage: ChunkStorage::new_with_scrubber(database, target_map, scrubber, hasher.into()),
             file_layer: Default::default(),
         }
     }
@@ -278,11 +278,10 @@ where
     }
 }
 
-impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
+impl<B, Hash, K, T> FileSystem<B, Hash, K, T>
 where
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    B: IterableDatabase<H::Hash, DataContainer<K>>,
+    B: IterableDatabase<Hash, DataContainer<K>>,
     T: IterableDatabase<K, Vec<u8>>,
 {
     /// Calculates total deduplication ratio of the storage,

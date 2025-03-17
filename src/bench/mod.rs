@@ -22,24 +22,25 @@ use crate::{
 /// for CDC algorithms.
 ///
 /// Clears the database before each method call.
-pub struct CDCFixture<B, H, Hash>
+pub struct CDCFixture<B, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
-    pub fs: FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>,
+    pub fs: FileSystem<B, Hash, (), HashMap<(), Vec<u8>>>,
 }
 
-impl<B, H, Hash> CDCFixture<B, H, Hash>
+impl<B, Hash> CDCFixture<B, Hash>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
 {
     /// Creates a fixture, opening a database with given base and hasher.
-    pub fn new(base: B, hasher: H) -> Self {
-        let fs = create_cdc_filesystem(base, hasher);
+    pub fn new<H>(base: B, hasher: H) -> Self
+    where
+        H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
+    {
+        let fs = create_cdc_filesystem(base, hasher.into());
         Self { fs }
     }
 

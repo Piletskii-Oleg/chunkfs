@@ -137,6 +137,15 @@ pub trait Hasher {
     fn len(&self, hash: &Self::Hash) -> usize;
 }
 
+impl<H, Hash> From<H> for Box<dyn Hasher<Hash = Hash>>
+where
+    H: Hasher<Hash = Hash> + 'static,
+{
+    fn from(hasher: H) -> Self {
+        Box::new(hasher)
+    }
+}
+
 /// Measurements that are received after writing data to a file.
 /// Contain time spent for chunking and for hashing.
 #[derive(Debug, PartialEq, Default, Clone, Copy)]
