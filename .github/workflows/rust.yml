@@ -21,4 +21,4 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
       - name: Run binary
-        run: cargo run -p runner --verbose --release
+        run: cargo run -p chunkfs-cli --verbose --release

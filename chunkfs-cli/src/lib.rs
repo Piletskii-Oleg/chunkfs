@@ -1,3 +1,5 @@
+pub mod cli;
+
 use chunkfs::bench::{CDCFixture, Dataset};
 use chunkfs::hashers::Sha256Hasher;
 use chunkfs::ChunkerRef;

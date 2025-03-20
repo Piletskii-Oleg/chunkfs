@@ -1,5 +1,5 @@
 [workspace]
-members = ["runner"]
+members = ["chunkfs-cli"]
 resolver = "2"
 
 [package]

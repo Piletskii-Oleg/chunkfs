@@ -1,0 +1,16 @@
+[args]
+database = "hashmap"
+hasher = "sha256"
+chunker = "ultra"
+
+min = 4
+avg = 8
+max = 16
+
+report_path = "report.csv"
+
+[command.measure]
+dataset_path = "Cargo.lock"
+dataset_name = "a"
+count = 1
+cleanup = true
