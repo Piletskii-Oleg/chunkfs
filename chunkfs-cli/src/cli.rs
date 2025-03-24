@@ -51,7 +51,9 @@ fn get_chunker(args: &CliArgs) -> ChunkerRef {
         CliChunker::Super => SuperChunker::new(params).into(),
         CliChunker::Rabin => RabinChunker::new(params).into(),
         CliChunker::Seq => {
-            let mode = args.seq_mode.unwrap();
+            let mode = args
+                .seq_mode
+                .expect("SeqCDC selected but 'seq-mode' parameter is missing");
             SeqChunker::new(mode.into(), params, seq::Config::default()).into()
         }
         CliChunker::Ultra => UltraChunker::new(params).into(),
