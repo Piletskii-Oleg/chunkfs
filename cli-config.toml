@@ -1,0 +1,38 @@
+[args]
+# Underlying database
+database = "hashmap"
+# Hasher used for chunks
+hasher = "sha256"
+# Chunking algorithm
+chunker = "ultra"
+
+# uncomment for SeqCDC usage
+# seq_mode = "increasing"
+
+# Minimum chunk size (in KB)
+min = 4
+# Average chunk size (in KB)
+avg = 8
+# Maximum chunk size (in KB)
+max = 16
+
+# Path where report should be saved in .csv format
+report-path = "report.csv"
+
+# Command to execute. Examples: [command.dedup-ratio], [command.measure]
+[command.measure]
+# Path to dataset to test on
+dataset-path = "Cargo.lock"
+# Name of the dataset
+dataset-name = "a"
+# How many measurements to conduct
+count = 1
+# Whether the system has to be cleaned up after each measurement
+cleanup = true
+
+# Command to execute. Examples: [command.dedup-ratio], [command.measure]
+#[command.dedup-ratio]
+## Path to dataset to test on
+#dataset-path = "Cargo.lock"
+## Name of the dataset
+#dataset-name = "a"

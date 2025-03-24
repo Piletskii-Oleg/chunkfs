@@ -13,7 +13,7 @@ use std::io;
 use std::path::PathBuf;
 
 #[derive(ValueEnum, Deserialize, Debug, Copy, Clone)]
-#[serde(rename_all(deserialize = "snake_case"))]
+#[serde(rename_all(deserialize = "kebab-case"))]
 enum SeqOperationMode {
     Increasing,
     Decreasing,
@@ -29,7 +29,7 @@ impl From<SeqOperationMode> for OperationMode {
 }
 
 #[derive(ValueEnum, Deserialize, Debug, Copy, Clone, PartialEq)]
-#[serde(rename_all(deserialize = "snake_case"))]
+#[serde(rename_all(deserialize = "kebab-case"))]
 enum CliChunker {
     Super,
     Rabin,
@@ -64,20 +64,20 @@ fn get_chunker(args: &CliArgs) -> ChunkerRef {
 }
 
 #[derive(ValueEnum, Deserialize, Debug, Copy, Clone, PartialEq)]
-#[serde(rename_all(deserialize = "snake_case"))]
+#[serde(rename_all(deserialize = "kebab-case"))]
 enum CliDatabase {
     Hashmap,
 }
 
 #[derive(ValueEnum, Deserialize, Debug, Copy, Clone, PartialEq)]
-#[serde(rename_all(deserialize = "snake_case"))]
+#[serde(rename_all(deserialize = "kebab-case"))]
 enum CliHasher {
     Sha256,
     Simple,
 }
 
 #[derive(Args, Deserialize, Clone, Debug)]
-#[serde(rename_all(deserialize = "snake_case"))]
+#[serde(rename_all(deserialize = "kebab-case"))]
 struct CliArgs {
     /// Underlying database
     #[arg(long)]
@@ -127,7 +127,8 @@ pub struct Cli {
 }
 
 #[derive(Subcommand, Deserialize, Debug)]
-#[serde(rename_all(deserialize = "snake_case"))]
+#[serde(rename_all(deserialize = "kebab-case"))]
+#[serde(rename_all_fields(deserialize = "kebab-case"))]
 enum Commands {
     /// Conduct some amount of measurements
     Measure {
