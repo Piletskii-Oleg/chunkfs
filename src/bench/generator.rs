@@ -82,7 +82,7 @@ pub fn random(name: &str, size: usize, distribution: impl Distribution<u8>) -> i
     let file = File::create(&path)?;
     let mut writer = BufWriter::new(file);
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut written = 0;
 
     while written < size {

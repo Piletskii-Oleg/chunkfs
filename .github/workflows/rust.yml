@@ -17,8 +17,8 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets --tests -- -D warnings
       - name: Build
-        run: cargo build --all-features --verbose
+        run: cargo build --all-features --all-targets --verbose
       - name: Run tests
         run: cargo test --verbose
       - name: Run binary
-        run: cargo build -p chunkfs-cli --verbose
+        run: cargo build -p chunkfscli --verbose
