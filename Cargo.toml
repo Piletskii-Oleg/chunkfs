@@ -27,11 +27,12 @@ fastcdc = { version = "3", optional = true }
 csv = { version = "1", optional = true }
 serde = { version = "1", optional = true, features = ["derive"] }
 serde_with = { version = "3", optional = true }
+chrono = { version = "0.4", optional = true, features = ["serde"] }
 
 [features]
 chunkers = ["cdc-chunkers", "fastcdc"]
 hashers = ["sha2"]
-bench = ["uuid", "rand", "itertools", "csv", "serde", "serde_with"]
+bench = ["uuid", "rand", "itertools", "csv", "serde", "serde_with", "chrono"]
 
 [dev-dependencies]
 chunkfs = { path = ".", features = ["chunkers", "hashers", "bench"] }

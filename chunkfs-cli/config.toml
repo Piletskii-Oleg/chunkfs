@@ -1,7 +1,7 @@
 [args]
 database = "hashmap"
 hasher = "sha256"
-chunker = "seq"
+chunker = "ultra"
 
 # uncomment for SeqCDC usage
 # seq_mode = "increasing"

@@ -7,7 +7,6 @@ use std::fs::File;
 use std::io;
 use std::io::Read as _;
 use std::time::{Duration, Instant};
-
 use uuid::Uuid;
 
 use crate::system::file_layer::FileHandle;
@@ -111,6 +110,7 @@ where
         let throughput = Throughput::new(dataset.size, measurement);
 
         let result = MeasureResult {
+            date: chrono::Utc::now(),
             name: dataset.name.to_string(),
             file_name: uuid,
             chunker: chunker_name,
@@ -120,6 +120,7 @@ where
             full_dedup_ratio: self.fs.full_cdc_dedup_ratio(),
             avg_chunk_size: self.fs.average_chunk_size(),
             size: dataset.size,
+            path: dataset.path.clone(),
         };
 
         Ok(result)

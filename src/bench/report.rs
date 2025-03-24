@@ -1,4 +1,5 @@
 use crate::MB;
+use chrono::{DateTime, Utc};
 use std::fmt::{Debug, Display, Formatter};
 use std::fs::File;
 use std::io;
@@ -9,6 +10,7 @@ use std::time::Duration;
 
 #[derive(Default, Clone)]
 pub struct MeasureResult {
+    pub date: DateTime<Utc>,
     pub name: String,
     pub chunker: String,
     pub size: usize,
@@ -18,6 +20,7 @@ pub struct MeasureResult {
     pub measurement: TimeMeasurement,
     pub throughput: Throughput,
     pub file_name: String,
+    pub path: String,
 }
 
 impl MeasureResult {
@@ -58,6 +61,8 @@ impl Debug for MeasureResult {
 #[serde_with::serde_as]
 #[derive(serde::Serialize)]
 struct SerializableResult {
+    #[serde_with(as = "serialize_dt")]
+    pub date: DateTime<Utc>,
     pub name: String,
     pub chunker: String,
     pub size: usize,
@@ -76,11 +81,13 @@ struct SerializableResult {
     pub hash_throughput: f64,
     pub write_throughput: f64,
     pub read_throughput: f64,
+    pub path: String,
 }
 
 impl SerializableResult {
     fn new(result: &MeasureResult) -> SerializableResult {
         Self {
+            date: result.date,
             name: result.name.clone(),
             chunker: result.chunker.clone(),
             size: result.size,
@@ -95,6 +102,7 @@ impl SerializableResult {
             hash_throughput: result.throughput.hash,
             write_throughput: result.throughput.write,
             read_throughput: result.throughput.read,
+            path: result.path.clone(),
         }
     }
 }
