@@ -3,7 +3,7 @@ use std::io;
 use std::io::{BufWriter, Write};
 use std::process::{Command, Stdio};
 
-use rand::distributions::Distribution;
+use rand::distr::Distribution;
 
 use crate::MB;
 
