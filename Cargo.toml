@@ -1,5 +1,5 @@
 [workspace]
-members = ["chunkfs-cli", "dataset-loader"]
+members = ["chunkfs-cli"]
 resolver = "2"
 
 [package]
