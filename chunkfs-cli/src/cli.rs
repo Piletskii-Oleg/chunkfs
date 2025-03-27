@@ -164,6 +164,8 @@ enum Commands {
     RunConfig,
 }
 
+enum Scenario {}
+
 #[derive(Deserialize)]
 struct Config {
     args: CliArgs,
