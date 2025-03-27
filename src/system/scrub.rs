@@ -94,15 +94,18 @@ where
     {
         let now = Instant::now();
         let mut processed_data = 0;
-        for (hash, container) in database.iterator_mut() {
+        let keys: Vec<Hash> = database.keys().cloned().collect();
+        for hash in keys {
+            let mut container = database.get(&hash)?;
             match container.extract() {
                 Data::Chunk(chunk) => {
-                    target.insert(hash.clone(), chunk.clone())?;
+                    target.try_insert(hash.clone(), chunk.clone())?;
                     processed_data += chunk.len();
                 }
                 Data::TargetChunk(_) => (),
             }
             container.make_target(vec![hash.clone()]);
+            database.insert(hash.clone(), container)?;
         }
         let running_time = now.elapsed();
         Ok(ScrubMeasurements {

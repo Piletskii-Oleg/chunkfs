@@ -13,7 +13,10 @@ use crate::ChunkHash;
 ///
 /// Supports inserting and getting values by key, checking if the key is present in the storage.
 pub trait Database<K, V> {
-    /// Inserts a key-value pair into the storage.
+    /// Inserts a key-value pair into the storage. If the key is already present, then nothing happens.
+    fn try_insert(&mut self, key: K, value: V) -> io::Result<()>;
+
+    /// Inserts a key-value pair into the storage. If the key is already present, then rewrites it.
     fn insert(&mut self, key: K, value: V) -> io::Result<()>;
 
     /// Retrieves a value by a given key. Note that it returns a value, not a reference.
@@ -26,7 +29,7 @@ pub trait Database<K, V> {
     /// Inserts multiple key-value pairs into the storage.
     fn insert_multi(&mut self, pairs: Vec<(K, V)>) -> io::Result<()> {
         for (key, value) in pairs.into_iter() {
-            self.insert(key, value)?;
+            self.try_insert(key, value)?;
         }
         Ok(())
     }
@@ -42,8 +45,8 @@ pub trait Database<K, V> {
 
 /// Allows iteration over database contents.
 pub trait IterableDatabase<K, V>: Database<K, V> {
-    /// Returns a simple immutable iterator over values.
-    fn iterator(&self) -> Box<dyn Iterator<Item=(&K, &V)> + '_>;
+    /// Returns a simple immutable iterator over copies of (key, value) pairs.
+    fn iterator(&self) -> Box<dyn Iterator<Item=(K, V)> + '_>;
 
     /// Returns an iterator that can mutate values but not keys.
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item=(&K, &mut V)> + '_>;
@@ -51,18 +54,10 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
     /// Returns an immutable iterator over keys.
     fn keys<'a>(&'a self) -> Box<dyn Iterator<Item=&'a K> + 'a>
     where
-        V: 'a,
-    {
-        Box::new(self.iterator().map(|(k, _)| k))
-    }
+        V: 'a;
 
-    /// Returns an immutable iterator over values.
-    fn values<'a>(&'a self) -> Box<dyn Iterator<Item=&'a V> + 'a>
-    where
-        K: 'a,
-    {
-        Box::new(self.iterator().map(|(_, v)| v))
-    }
+    //// Returns an immutable iterator over value copies.
+    fn values(&self) -> Box<dyn Iterator<Item=V> + '_>;
 
     /// Returns a mutable iterator over values.
     fn values_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item=&'a mut V> + 'a>
@@ -77,8 +72,13 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
 }
 
 impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
-    fn insert(&mut self, key: Hash, value: V) -> io::Result<()> {
+    fn try_insert(&mut self, key: Hash, value: V) -> io::Result<()> {
         self.entry(key).or_insert(value);
+        Ok(())
+    }
+
+    fn insert(&mut self, key: Hash, value: V) -> io::Result<()> {
+        self.insert(key, value);
         Ok(())
     }
 
@@ -92,12 +92,23 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
 }
 
 impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
-    fn iterator(&self) -> Box<dyn Iterator<Item=(&Hash, &V)> + '_> {
-        Box::new(self.iter())
+    fn iterator(&self) -> Box<dyn Iterator<Item=(Hash, V)> + '_> {
+        Box::new(self.iter().map(|(k, v)| (k.clone(), v.clone())))
     }
 
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item=(&Hash, &mut V)> + '_> {
         Box::new(self.iter_mut())
+    }
+
+    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item=&'a Hash> + 'a>
+    where
+        V: 'a,
+    {
+        Box::new(self.keys())
+    }
+
+    fn values(&self) -> Box<dyn Iterator<Item=V> + '_> {
+        Box::new(self.values().map(|v| v.clone()))
     }
 
     fn clear(&mut self) -> io::Result<()> {
@@ -273,11 +284,17 @@ where
     K: ChunkHash,
     V: Clone + Encode + Decode<()>,
 {
-    fn insert(&mut self, key: K, data: V) -> io::Result<()> {
+    fn try_insert(&mut self, key: K, value: V) -> io::Result<()> {
         if self.database_map.contains_key(&key) {
             return Ok(());
         }
-        let data_info = self.write(data)?;
+        let data_info = self.write(value)?;
+        self.database_map.insert(key, data_info);
+        Ok(())
+    }
+
+    fn insert(&mut self, key: K, value: V) -> io::Result<()> {
+        let data_info = self.write(value)?;
         self.database_map.insert(key, data_info);
         Ok(())
     }
@@ -297,8 +314,8 @@ where
     K: ChunkHash,
     V: Clone + Encode + Decode<()>,
 {
-    fn iterator(&self) -> Box<dyn Iterator<Item=(&K, &V)> + '_> {
-        unimplemented!()
+    fn iterator(&self) -> Box<dyn Iterator<Item=(K, V)> + '_> {
+        Box::new(self.database_map.keys().map(|k| (k.clone(), self.get(k).unwrap())))
     }
 
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item=(&K, &mut V)> + '_> {
@@ -312,11 +329,9 @@ where
         Box::new(self.database_map.keys())
     }
 
-    fn values<'a>(&'a self) -> Box<dyn Iterator<Item=&'a V> + 'a>
-    where
-        V: 'a,
+    fn values(&self) -> Box<dyn Iterator<Item=V> + '_>
     {
-        unimplemented!()
+        Box::new(self.database_map.keys().map(|k| self.get(k).unwrap()))
     }
 
     fn values_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item=&'a mut V> + 'a>
@@ -353,8 +368,8 @@ mod tests {
         let k1 = hasher.hash(&v1);
         let k2 = hasher.hash(&v2);
 
-        db.insert(k1, v1.clone()).unwrap();
-        db.insert(k2, v2.clone()).unwrap();
+        db.try_insert(k1, v1.clone()).unwrap();
+        db.try_insert(k2, v2.clone()).unwrap();
         let actual1 = db.get(&k1).unwrap();
         let actual2 = db.get(&k2).unwrap();
         assert_eq!(actual1, v1);
