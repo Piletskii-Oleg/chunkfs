@@ -71,7 +71,7 @@ where
     /// Creates a fixture, opening a database with given base and hasher.
     pub fn new<H>(base: B, hasher: H) -> Self
     where
-        H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
+        H: Into<Box<dyn Hasher<Hash=Hash> + 'static>>,
     {
         let fs = create_cdc_filesystem(base, hasher.into());
         Self { fs }
@@ -106,6 +106,7 @@ where
         let write_time = now.elapsed();
 
         let WriteMeasurements {
+            save_time,
             chunk_time,
             hash_time,
         } = self.fs.close_file(file)?;
@@ -115,6 +116,7 @@ where
         let measurement = TimeMeasurement {
             write_time,
             read_time,
+            save_time,
             chunk_time,
             hash_time,
         };

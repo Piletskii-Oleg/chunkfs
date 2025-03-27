@@ -149,16 +149,22 @@ where
 /// Contain time spent for chunking and for hashing.
 #[derive(Debug, PartialEq, Default, Clone, Copy)]
 pub struct WriteMeasurements {
+    save_time: Duration,
     chunk_time: Duration,
     hash_time: Duration,
 }
 
 impl WriteMeasurements {
-    pub(crate) fn new(chunk_time: Duration, hash_time: Duration) -> Self {
+    pub(crate) fn new(save_time: Duration, chunk_time: Duration, hash_time: Duration) -> Self {
         Self {
+            save_time,
             chunk_time,
             hash_time,
         }
+    }
+
+    pub fn save_time(&self) -> Duration {
+        self.save_time
     }
 
     pub fn chunk_time(&self) -> Duration {
@@ -175,6 +181,7 @@ impl Add for WriteMeasurements {
 
     fn add(self, rhs: Self) -> Self::Output {
         Self {
+            save_time: self.save_time + rhs.save_time,
             chunk_time: self.chunk_time + rhs.chunk_time,
             hash_time: self.hash_time + rhs.hash_time,
         }
@@ -183,6 +190,7 @@ impl Add for WriteMeasurements {
 
 impl AddAssign for WriteMeasurements {
     fn add_assign(&mut self, rhs: Self) {
+        self.save_time += rhs.save_time;
         self.chunk_time += rhs.chunk_time;
         self.hash_time += rhs.hash_time;
     }

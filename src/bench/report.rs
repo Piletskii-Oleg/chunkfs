@@ -76,11 +76,14 @@ struct SerializableResult {
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     pub read_time: Duration,
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub save_time: Duration,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     pub chunk_time: Duration,
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     pub hash_time: Duration,
     pub chunk_throughput: f64,
     pub hash_throughput: f64,
+    pub save_throughput: f64,
     pub write_throughput: f64,
     pub read_throughput: f64,
     pub path: String,
@@ -99,10 +102,12 @@ impl SerializableResult {
             chunk_count: result.chunk_count,
             write_time: result.measurement.write_time,
             read_time: result.measurement.read_time,
+            save_time: result.measurement.save_time,
             chunk_time: result.measurement.chunk_time,
             hash_time: result.measurement.hash_time,
             chunk_throughput: result.throughput.chunk,
             hash_throughput: result.throughput.hash,
+            save_throughput: result.throughput.save,
             write_throughput: result.throughput.write,
             read_throughput: result.throughput.read,
             path: result.path.clone(),
@@ -114,6 +119,7 @@ impl SerializableResult {
 pub struct TimeMeasurement {
     pub write_time: Duration,
     pub read_time: Duration,
+    pub save_time: Duration,
     pub chunk_time: Duration,
     pub hash_time: Duration,
 }
@@ -125,6 +131,7 @@ impl Add for TimeMeasurement {
         let mut measurement = self;
         measurement.read_time += rhs.read_time;
         measurement.write_time += rhs.write_time;
+        measurement.save_time += rhs.save_time;
         measurement.chunk_time += rhs.chunk_time;
         measurement.hash_time += rhs.hash_time;
         measurement
@@ -135,6 +142,7 @@ impl AddAssign for TimeMeasurement {
     fn add_assign(&mut self, rhs: Self) {
         self.read_time += rhs.read_time;
         self.write_time += rhs.write_time;
+        self.save_time += rhs.save_time;
         self.chunk_time += rhs.chunk_time;
         self.hash_time += rhs.hash_time;
     }
@@ -144,14 +152,14 @@ impl Debug for TimeMeasurement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Read time: {:?}\nWrite time: {:?}\nChunk time: {:?}\nHash time: {:?}",
-            self.read_time, self.write_time, self.chunk_time, self.hash_time,
+            "Read time: {:?}\nWrite time: {:?}\nSave time: {:?}\nChunk time: {:?}\nHash time: {:?}",
+            self.read_time, self.write_time, self.save_time, self.chunk_time, self.hash_time,
         )
     }
 }
 
 impl Sum for TimeMeasurement {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
         iter.fold(TimeMeasurement::default(), |acc, next| acc + next)
     }
 }
@@ -160,6 +168,7 @@ impl Sum for TimeMeasurement {
 pub struct Throughput {
     pub chunk: f64,
     pub hash: f64,
+    pub save: f64,
     pub write: f64,
     pub read: f64,
 }
@@ -169,6 +178,7 @@ impl Throughput {
         Self {
             chunk: (size / MB) as f64 / measurement.chunk_time.as_secs_f64(),
             hash: (size / MB) as f64 / measurement.hash_time.as_secs_f64(),
+            save: (size / MB) as f64 / measurement.save_time.as_secs_f64(),
             write: (size / MB) as f64 / measurement.write_time.as_secs_f64(),
             read: (size / MB) as f64 / measurement.read_time.as_secs_f64(),
         }
@@ -181,9 +191,10 @@ impl Display for Throughput {
             f,
             "Chunk throughput: {:.3} MB/s\
         \nHash throughput: {:.3} MB/s\
+        \nSave throughput: {:.3} MB/s\
         \nWrite throughput: {:.3} MB/s\
         \nRead throughput: {:.3} MB/s",
-            self.chunk, self.hash, self.write, self.read
+            self.chunk, self.hash, self.save, self.write, self.read
         )
     }
 }
