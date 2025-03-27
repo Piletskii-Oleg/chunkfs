@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
-
+use bincode::{Decode, Encode};
 use crate::{ChunkHash, Hasher, SEG_SIZE};
 use crate::{ChunkerRef, WriteMeasurements};
 
@@ -10,11 +10,11 @@ use super::database::{Database, IterableDatabase};
 use super::scrub::{Scrub, ScrubMeasurements};
 
 /// Container for storage data.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Encode, Decode)]
 pub struct DataContainer<K>(Data<K>);
 
 /// Contains either a chunk produced by [Chunker], or a vector of target keys, using which the initial chunk can be restored.
-#[derive(Clone)]
+#[derive(Clone, Encode, Decode)]
 pub enum Data<K> {
     Chunk(Vec<u8>),
     TargetChunk(Vec<K>),
