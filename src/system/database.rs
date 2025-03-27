@@ -137,7 +137,6 @@ where
     total_size: u64,
     // bitmap_size: u64,
     block_size: u64,
-    blocks_number: u64,
     used_blocks: u64,
     _data_type: PhantomData<V>,
 }
@@ -157,9 +156,6 @@ where
             .open(file_path)?;
         file.set_len(total_size)?;
 
-        let block_size = 512u64;
-        let blocks_number = total_size / block_size;
-
         let database_map = HashMap::new();
 
         Ok(Self {
@@ -167,7 +163,6 @@ where
             database_map,
             total_size,
             block_size: 512,
-            blocks_number,
             used_blocks: 0,
             _data_type: PhantomData,
         })
@@ -191,7 +186,6 @@ where
         if block_size == 0 {
             return Err(Error::new(ErrorKind::InvalidData, "block size cannot be 0"));
         }
-        let blocks_number = total_size / block_size;
 
         let database_map = HashMap::new();
 
@@ -200,7 +194,6 @@ where
             database_map,
             total_size,
             block_size,
-            blocks_number,
             used_blocks: 0,
             _data_type: PhantomData {},
         })
