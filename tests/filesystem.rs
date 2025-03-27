@@ -61,7 +61,8 @@ fn write_read_blocks_test() {
     }
     assert_eq!(buffer.len(), MB * 3 + 50);
     assert!(complete == buffer);
-    assert_eq!(fs.read_from_file(&mut handle).unwrap(), []);
+    let empty: Vec<u8> = vec![];
+    assert_eq!(fs.read_from_file(&mut handle).unwrap(), empty);
 }
 
 #[test]
