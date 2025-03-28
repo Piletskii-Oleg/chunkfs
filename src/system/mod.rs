@@ -42,7 +42,7 @@ pub fn create_cdc_filesystem<B, H, Hash>(
 ) -> FileSystem<B, Hash, (), HashMap<(), Vec<u8>>>
 where
     B: Database<Hash, DataContainer<()>>,
-    H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
+    H: Into<Box<dyn Hasher<Hash=Hash> + 'static>>,
     Hash: ChunkHash,
 {
     FileSystem::new(base, hasher.into(), HashMap::default())
@@ -206,7 +206,7 @@ where
 
     /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
     /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
-    fn new(base: B, hasher: Box<dyn Hasher<Hash = Hash>>, target_map: T) -> Self {
+    fn new(base: B, hasher: Box<dyn Hasher<Hash=Hash>>, target_map: T) -> Self {
         Self {
             storage: ChunkStorage::new(base, hasher, target_map),
             file_layer: Default::default(),
@@ -230,7 +230,7 @@ where
         hasher: H,
     ) -> Self
     where
-        H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
+        H: Into<Box<dyn Hasher<Hash=Hash> + 'static>>,
     {
         Self {
             storage: ChunkStorage::new_with_scrubber(database, target_map, scrubber, hasher.into()),
@@ -264,7 +264,7 @@ where
     }
 
     /// Returns an immutable iterator over storage chunks.
-    pub fn storage_iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
+    pub fn storage_iterator(&self) -> Box<dyn Iterator<Item=(Hash, DataContainer<K>)> + '_> {
         self.storage.iterator()
     }
 

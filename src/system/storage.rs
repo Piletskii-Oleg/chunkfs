@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
-
+use bincode::{Decode, Encode};
 use crate::{ChunkHash, Hasher, SEG_SIZE};
 use crate::{ChunkerRef, WriteMeasurements};
 
@@ -10,11 +10,11 @@ use super::database::{Database, IterableDatabase};
 use super::scrub::{Scrub, ScrubMeasurements};
 
 /// Container for storage data.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Encode, Decode)]
 pub struct DataContainer<K>(Data<K>);
 
 /// Contains either a chunk produced by [Chunker], or a vector of target keys, using which the initial chunk can be restored.
-#[derive(Clone)]
+#[derive(Clone, Encode, Decode)]
 pub enum Data<K> {
     Chunk(Vec<u8>),
     TargetChunk(Vec<K>),
@@ -51,7 +51,7 @@ where
     database: B,
     scrubber: Option<Box<dyn Scrub<Hash, B, K, T>>>,
     target_map: T,
-    hasher: Box<dyn Hasher<Hash = Hash>>,
+    hasher: Box<dyn Hasher<Hash=Hash>>,
     size_written: usize,
 }
 
@@ -61,7 +61,7 @@ where
     B: Database<Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
 {
-    pub fn new(database: B, hasher: Box<dyn Hasher<Hash = Hash>>, target_map: T) -> Self {
+    pub fn new(database: B, hasher: Box<dyn Hasher<Hash=Hash>>, target_map: T) -> Self {
         Self {
             database,
             scrubber: None,
@@ -166,7 +166,7 @@ where
         database: B,
         target_map: T,
         scrubber: Box<dyn Scrub<Hash, B, K, T>>,
-        hasher: Box<dyn Hasher<Hash = Hash>>,
+        hasher: Box<dyn Hasher<Hash=Hash>>,
     ) -> Self {
         Self {
             database,
@@ -230,7 +230,7 @@ where
         (self.size_written as f64) / (self.total_cdc_size() as f64 + key_size as f64)
     }
 
-    pub fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
+    pub fn iterator(&self) -> Box<dyn Iterator<Item=(Hash, DataContainer<K>)> + '_> {
         self.database.iterator()
     }
 
@@ -276,7 +276,7 @@ where
     Hash: ChunkHash,
 {
     chunker: &'handle ChunkerRef,
-    hasher: &'handle mut Box<dyn Hasher<Hash = Hash>>,
+    hasher: &'handle mut Box<dyn Hasher<Hash=Hash>>,
     rest: Vec<u8>,
 }
 
@@ -286,7 +286,7 @@ where
 {
     fn new(
         chunker: &'handle ChunkerRef,
-        hasher: &'handle mut Box<dyn Hasher<Hash = Hash>>,
+        hasher: &'handle mut Box<dyn Hasher<Hash=Hash>>,
     ) -> Self {
         Self {
             chunker,
@@ -347,11 +347,13 @@ where
             .map(|chunk| DataContainer(Data::Chunk(chunk)));
 
         let pairs = hashes.into_iter().zip(converted_chunks).collect(); // we allocate memory for (K, V) pairs, which is not really required
+        let start = Instant::now();
         base.insert_multi(pairs)?;
+        let save_time = start.elapsed();
 
         Ok(SpansInfo {
             spans,
-            measurements: WriteMeasurements::new(chunk_time, hash_time),
+            measurements: WriteMeasurements::new(save_time, chunk_time, hash_time),
             total_length,
         })
     }
@@ -372,12 +374,14 @@ where
         let hash = self.hasher.hash(&remainder);
         let hash_time = start.elapsed();
 
-        base.insert(hash.clone(), DataContainer(Data::Chunk(remainder)))?;
+        let start = Instant::now();
+        base.try_insert(hash.clone(), DataContainer(Data::Chunk(remainder)))?;
+        let save_time = start.elapsed();
 
         let span = Span::new(hash, remainder_length);
         Ok(SpansInfo {
             spans: vec![span],
-            measurements: WriteMeasurements::new(Duration::default(), hash_time),
+            measurements: WriteMeasurements::new(save_time, Duration::default(), hash_time),
             total_length: remainder_length,
         })
     }
@@ -402,9 +406,9 @@ impl<K> DataContainer<K> {
     /// Returns a contained chunk if it is of type `Data::Chunk`.
     ///
     /// Will panic otherwise.
-    pub fn unwrap_chunk(&self) -> &Vec<u8> {
+    pub fn unwrap_chunk(&self) -> Vec<u8> {
         match &self.0 {
-            Data::Chunk(chunk) => chunk,
+            Data::Chunk(chunk) => chunk.clone(),
             Data::TargetChunk(_) => {
                 panic!("Target chunk found in DataContainer; expected simple chunk")
             }
@@ -498,7 +502,7 @@ mod tests {
             vec![16; 1024 * 256],
             vec![32; 1024 * 256],
         ]
-        .concat();
+            .concat();
 
         let chunker = SuperChunker::default().into();
 
