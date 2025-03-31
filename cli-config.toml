@@ -29,6 +29,9 @@ dataset-name = "a"
 count = 1
 # Whether the system has to be cleaned up after each measurement
 cleanup = true
+# Data that would fill the database before measurement is conducted
+# This parameter is optional
+fill-paths = ["index.html", "LICENSE"]
 
 # Command to execute. Examples: [command.dedup-ratio], [command.measure]
 #[command.dedup-ratio]

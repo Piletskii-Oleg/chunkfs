@@ -77,6 +77,18 @@ where
         Self { fs }
     }
 
+    /// Fills the underlying database with some data.
+    pub fn fill_with<R>(&mut self, data: R, chunker: ChunkerRef) -> io::Result<()>
+    where
+        R: io::Read,
+    {
+        let (mut file, _) = self.init_file(chunker.clone())?;
+
+        self.fs.write_from_stream(&mut file, data)?;
+
+        self.fs.close_file(file).map(|_| ())
+    }
+
     /// Conducts a measurement on a given dataset using given chunker.
     pub fn measure<C>(&mut self, dataset: &Dataset, chunker: C) -> io::Result<MeasureResult>
     where

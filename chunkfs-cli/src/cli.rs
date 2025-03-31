@@ -147,6 +147,10 @@ enum Commands {
         #[arg(long, default_value = "true")]
         /// Whether the system has to be cleaned up after each measurement
         cleanup: bool,
+
+        #[arg(long)]
+        /// Paths to data that would fill the database
+        fill_paths: Option<Vec<String>>,
     },
 
     /// Calculate dedup ratio
@@ -237,8 +241,18 @@ impl Cli {
                 dataset_name,
                 count,
                 cleanup,
+                fill_paths,
             } => {
                 let dataset = Dataset::new(dataset_path, dataset_name)?;
+
+                if let Some(fill_paths) = fill_paths {
+                    for fill_path in fill_paths {
+                        let mut reader = io::BufReader::new(std::fs::File::open(fill_path)?);
+
+                        fixture.fill_with(&mut reader, chunker.clone())?
+                    }
+                }
+
                 let measurements = if *cleanup {
                     fixture.measure_multi(&dataset, chunker, *count)?
                 } else {
