@@ -245,17 +245,19 @@ impl Cli {
             } => {
                 let dataset = Dataset::new(dataset_path, dataset_name)?;
 
-                if let Some(fill_paths) = fill_paths {
-                    for fill_path in fill_paths {
-                        let mut reader = io::BufReader::new(std::fs::File::open(fill_path)?);
-
-                        fixture.fill_with(&mut reader, chunker.clone())?
-                    }
-                }
-
                 let measurements = if *cleanup {
-                    fixture.measure_multi(&dataset, chunker, *count)?
+                    (0..*count)
+                        .map(|_| {
+                            fixture.fs.clear_database()?;
+
+                            Self::fill_with(&mut fixture, &chunker, fill_paths)?;
+
+                            fixture.measure(&dataset, chunker.clone())
+                        })
+                        .collect()?
                 } else {
+                    Self::fill_with(&mut fixture, &chunker, fill_paths)?;
+
                     fixture.measure_repeated(&dataset, chunker, *count)?
                 };
 
@@ -277,6 +279,25 @@ impl Cli {
             Commands::RunConfig => println!("should choose another command"),
         };
 
+        Ok(())
+    }
+
+    fn fill_with<B, Hash>(
+        fixture: &mut CDCFixture<B, Hash>,
+        chunker: &ChunkerRef,
+        fill_paths: &Option<Vec<String>>,
+    ) -> io::Result<()>
+    where
+        B: IterableDatabase<Hash, DataContainer<()>>,
+        Hash: ChunkHash,
+    {
+        if let Some(fill_paths) = fill_paths {
+            for fill_path in fill_paths {
+                let mut reader = io::BufReader::new(std::fs::File::open(fill_path)?);
+
+                fixture.fill_with(&mut reader, chunker.clone())?
+            }
+        }
         Ok(())
     }
 }
