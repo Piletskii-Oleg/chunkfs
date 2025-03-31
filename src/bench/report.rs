@@ -17,6 +17,7 @@ pub struct MeasureResult {
     pub dedup_ratio: f64,
     pub full_dedup_ratio: f64,
     pub avg_chunk_size: usize,
+    pub chunk_count: usize,
     pub measurement: TimeMeasurement,
     pub throughput: Throughput,
     pub file_name: String,
@@ -69,6 +70,7 @@ struct SerializableResult {
     pub dedup_ratio: f64,
     pub full_dedup_ratio: f64,
     pub avg_chunk_size: usize,
+    pub chunk_count: usize,
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     pub write_time: Duration,
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
@@ -94,6 +96,7 @@ impl SerializableResult {
             dedup_ratio: result.dedup_ratio,
             full_dedup_ratio: result.full_dedup_ratio,
             avg_chunk_size: result.avg_chunk_size,
+            chunk_count: result.chunk_count,
             write_time: result.measurement.write_time,
             read_time: result.measurement.read_time,
             chunk_time: result.measurement.chunk_time,

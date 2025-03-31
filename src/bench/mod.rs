@@ -133,6 +133,7 @@ where
             avg_chunk_size: self.fs.average_chunk_size(),
             size: dataset.size,
             path: dataset.path.clone(),
+            chunk_count: self.chunk_count(),
         };
 
         Ok(result)
@@ -228,6 +229,10 @@ where
         }
 
         chunk_map
+    }
+
+    pub fn chunk_count(&self) -> usize {
+        self.fs.storage_iterator().count()
     }
 
     /// Verifies that the written dataset contents are valid.
