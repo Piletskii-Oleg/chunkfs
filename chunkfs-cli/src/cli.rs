@@ -107,9 +107,9 @@ struct CliArgs {
     #[arg(long, value_name = "MAX_CHUNK_SIZE")]
     max: usize,
 
-    /// Path where report should be saved in .csv format
+    /// Path to folder where report should be saved
     #[arg(long)]
-    report_path: String,
+    report_path: PathBuf,
 }
 
 #[derive(Parser, Debug)]
@@ -151,6 +151,11 @@ enum Commands {
         #[arg(long)]
         /// Paths to data that would fill the database
         fill_paths: Option<Vec<String>>,
+
+        #[arg(long)]
+        /// Adjustment factor for chunk distribution.
+        /// Chunks smaller than this will be grouped together.
+        adjustment: Option<usize>,
     },
 
     /// Calculate dedup ratio
@@ -189,6 +194,11 @@ impl Cli {
         let args = self.args.as_ref().unwrap();
         let commands = &self.commands;
 
+        if !args.report_path.is_dir() {
+            let msg = "Report path is not a directory";
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, msg));
+        }
+
         Self::choose_hasher(args, commands)
     }
 
@@ -198,6 +208,11 @@ impl Cli {
 
         let config =
             toml::from_str::<Config>(&toml).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        if !config.args.report_path.is_dir() {
+            let msg = "Report path is not a directory";
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, msg));
+        }
 
         Self::choose_hasher(&config.args, &config.command)
     }
@@ -242,27 +257,49 @@ impl Cli {
                 count,
                 cleanup,
                 fill_paths,
+                adjustment,
             } => {
                 let dataset = Dataset::new(dataset_path, dataset_name)?;
 
-                let measurements = if *cleanup {
-                    (0..*count)
-                        .map(|_| {
-                            fixture.fs.clear_database()?;
+                let mut distributions = Vec::with_capacity(*count);
+                let adjustment = adjustment.unwrap_or_else(|| 1000);
 
-                            Self::fill_with(&mut fixture, &chunker, fill_paths)?;
+                let mut measurements = Vec::with_capacity(*count);
 
-                            fixture.measure(&dataset, chunker.clone())
-                        })
-                        .collect()?
+                if *cleanup {
+                    for _ in 0..*count {
+                        fixture.fs.clear_database()?;
+                        Self::fill_with(&mut fixture, &chunker, fill_paths)?;
+
+                        let measurement = fixture.measure(&dataset, chunker.clone())?;
+                        distributions.push(fixture.size_distribution(adjustment));
+
+                        measurements.push(measurement)
+                    }
                 } else {
                     Self::fill_with(&mut fixture, &chunker, fill_paths)?;
 
-                    fixture.measure_repeated(&dataset, chunker, *count)?
+                    for _ in 0..*count {
+                        let measurement = fixture.measure(&dataset, chunker.clone())?;
+                        distributions.push(fixture.size_distribution(adjustment));
+                        measurements.push(measurement)
+                    }
                 };
 
+                let measurement_path = args.report_path.join("report.csv");
+
                 for measurement in measurements {
-                    measurement.write_to_csv(&args.report_path)?;
+                    measurement.write_to_csv(&measurement_path)?;
+                }
+
+                for (index, distribution) in distributions.into_iter().enumerate() {
+                    let pairs = distribution.into_iter().collect::<Vec<(usize, u32)>>();
+
+                    let file_name = format!("distribution.{index}.json");
+                    let path = args.report_path.join(file_name);
+
+                    let mut writer = io::BufWriter::new(std::fs::File::create(path)?);
+                    serde_json::to_writer(&mut writer, &pairs)?;
                 }
             }
 

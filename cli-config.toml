@@ -16,8 +16,8 @@ avg = 8
 # Maximum chunk size (in KB)
 max = 16
 
-# Path where report should be saved in .csv format
-report-path = "report.csv"
+# Path to folder where report should be saved
+report-path = "report"
 
 # Command to execute. Examples: [command.dedup-ratio], [command.measure]
 [command.measure]
@@ -32,6 +32,9 @@ cleanup = true
 # Data that would fill the database before measurement is conducted
 # This parameter is optional
 fill-paths = ["index.html", "LICENSE"]
+# Adjustment factor for chunk distribution. Chunks smaller than this will be grouped together.
+# Optional. Default is 1000
+adjustment = 1000
 
 # Command to execute. Examples: [command.dedup-ratio], [command.measure]
 #[command.dedup-ratio]
