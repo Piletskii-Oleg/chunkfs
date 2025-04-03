@@ -1,8 +1,7 @@
-use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 use std::hash;
 use std::ops::{Add, AddAssign, Deref, DerefMut};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub use system::database::{Database, IterableDatabase};
@@ -88,10 +87,10 @@ pub trait Chunker: Debug {
 
 /// Reference to a chunker that can be re-used.
 #[derive(Clone)]
-pub struct ChunkerRef(Rc<RefCell<dyn Chunker>>);
+pub struct ChunkerRef(Arc<Mutex<dyn Chunker>>);
 
 impl Deref for ChunkerRef {
-    type Target = Rc<RefCell<dyn Chunker>>;
+    type Target = Arc<Mutex<dyn Chunker>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -104,8 +103,8 @@ impl DerefMut for ChunkerRef {
     }
 }
 
-impl From<Rc<RefCell<dyn Chunker>>> for ChunkerRef {
-    fn from(value: Rc<RefCell<dyn Chunker>>) -> Self {
+impl From<Arc<Mutex<dyn Chunker>>> for ChunkerRef {
+    fn from(value: Arc<Mutex<dyn Chunker>>) -> Self {
         Self(value)
     }
 }
@@ -115,13 +114,13 @@ where
     C: Chunker + 'static,
 {
     fn from(chunker: C) -> Self {
-        ChunkerRef(Rc::new(RefCell::new(chunker)))
+        ChunkerRef(Arc::new(Mutex::new(chunker)))
     }
 }
 
 impl Debug for ChunkerRef {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.0.borrow().fmt(f)
+        self.0.lock().unwrap().fmt(f)
     }
 }
 

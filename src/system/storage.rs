@@ -309,10 +309,10 @@ where
         let mut buffer = self.rest.clone();
         buffer.extend_from_slice(data);
 
-        let empty = Vec::with_capacity(self.chunker.borrow().estimate_chunk_count(&buffer));
+        let empty = Vec::with_capacity(self.chunker.lock().unwrap().estimate_chunk_count(&buffer));
 
         let start = Instant::now();
-        let mut chunks = self.chunker.borrow_mut().chunk_data(&buffer, empty);
+        let mut chunks = self.chunker.lock().unwrap().chunk_data(&buffer, empty);
         let chunk_time = start.elapsed();
 
         if chunks.is_empty() {
