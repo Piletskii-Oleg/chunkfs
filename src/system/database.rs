@@ -25,8 +25,8 @@ pub trait Database<K, V> {
     /// was not found in the storage.
     fn get(&self, key: &K) -> io::Result<V>;
 
-    /// Inserts multiple key-value pairs into the storage.
-    fn insert_multi(&mut self, pairs: Vec<(K, V)>) -> io::Result<()> {
+    /// Try inserts multiple key-value pairs into the storage.
+    fn try_insert_multi(&mut self, pairs: Vec<(K, V)>) -> io::Result<()> {
         for (key, value) in pairs.into_iter() {
             self.try_insert(key, value)?;
         }
@@ -44,8 +44,8 @@ pub trait Database<K, V> {
 
 /// Allows iteration over database contents.
 pub trait IterableDatabase<K, V>: Database<K, V> {
-    /// Returns a simple immutable iterator over copies of (key, value) pairs.
-    fn iterator(&self) -> Box<dyn Iterator<Item = (K, V)> + '_>;
+    /// Returns a simple immutable iterator over values.
+    fn iterator(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_>;
 
     /// Returns an iterator that can mutate values but not keys.
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_>;
@@ -91,8 +91,8 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
 }
 
 impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
-    fn iterator(&self) -> Box<dyn Iterator<Item = (Hash, V)> + '_> {
-        Box::new(self.iter().map(|(k, v)| (k.clone(), v.clone())))
+    fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &V)> + '_> {
+        Box::new(self.iter())
     }
 
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {
@@ -279,12 +279,9 @@ where
     K: ChunkHash,
     V: Clone + Encode + Decode<()>,
 {
-    fn iterator(&self) -> Box<dyn Iterator<Item = (K, V)> + '_> {
-        Box::new(
-            self.database_map
-                .keys()
-                .map(|k| (k.clone(), self.get(k).unwrap())),
-        )
+    /// Returns a simple immutable iterator over values.
+    fn iterator(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_> {
+        unimplemented!()
     }
 
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_> {
