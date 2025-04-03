@@ -4,7 +4,8 @@ use std::ops::{Add, AddAssign, Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-pub use system::database::{Database, IterableDatabase, DiskDatabase};
+pub use system::database::{Database, IterableDatabase};
+pub use system::disk_database::DiskDatabase;
 pub use system::scrub::{CopyScrubber, Scrub, ScrubMeasurements};
 pub use system::storage::{Data, DataContainer};
 pub use system::{create_cdc_filesystem, FileSystem};
@@ -136,9 +137,9 @@ pub trait Hasher {
     fn len(&self, hash: &Self::Hash) -> usize;
 }
 
-impl<H, Hash> From<H> for Box<dyn Hasher<Hash=Hash>>
+impl<H, Hash> From<H> for Box<dyn Hasher<Hash = Hash>>
 where
-    H: Hasher<Hash=Hash> + 'static,
+    H: Hasher<Hash = Hash> + 'static,
 {
     fn from(hasher: H) -> Self {
         Box::new(hasher)
