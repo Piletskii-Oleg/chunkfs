@@ -9,15 +9,20 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::{FileExt, OpenOptionsExt};
 use std::path::Path;
 
+/// Information about the location of the data on the disk.
 #[derive(Clone)]
 struct DataInfo {
     start_block: u64,
+    /// Serialized data length
     data_length: u64,
 }
 
+/// Constant for requesting total size of the block device via ioctl
 const BLKGETSIZE64: u64 = 0x80081272;
+/// Constant for requesting size of the block in the block device via ioctl
 const BLKSSZGET: u64 = 0x1268;
 
+/// Database that stores data on a block device
 pub struct DiskDatabase<K, V>
 where
     K: ChunkHash,
@@ -36,6 +41,11 @@ where
     K: ChunkHash,
     V: Clone + Encode + Decode<()>,
 {
+    /// Init database on a regular file.
+    ///
+    /// Sets the size of the file specified in the path. Considers the block size to be 512.
+    ///
+    /// Intended for testing so that it does not require privileges for initialization on the block device.
     pub fn init_on_regular_file<P>(file_path: P, total_size: u64) -> Result<Self, io::Error>
     where
         P: AsRef<Path>,
@@ -61,6 +71,9 @@ where
         })
     }
 
+    /// Init database on a block device.
+    ///
+    /// Takes information about the block device via ioctl.
     pub fn init<P>(blkdev_path: P) -> Result<Self, io::Error>
     where
         P: AsRef<Path>,
@@ -98,6 +111,9 @@ where
         })
     }
 
+    /// Looks for the complement of a number up to a multiple of the block size.
+    ///
+    /// For example, the result for 1000 with a block size of 512 would be 1024.
     fn padding_to_multiple_block_size(&self, length: u64) -> u64 {
         if length % self.block_size == 0 {
             0
@@ -107,6 +123,7 @@ where
         }
     }
 
+    /// Serializes and writes data to disk. Returns `DataInfo` with information about the allocated data.
     fn write<T: Encode>(&mut self, value: T) -> io::Result<DataInfo> {
         let mut encoded = encode_to_vec(&value, bincode::config::standard())
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
@@ -132,6 +149,7 @@ where
         Ok(data_info)
     }
 
+    /// Searches for data by `DataInfo`, returns deserialized data.
     fn read<T: Decode<()>>(&self, data_info: DataInfo) -> io::Result<T> {
         let mut data = vec![0u8; data_info.data_length as usize];
         let padding_size = self.padding_to_multiple_block_size(data.len() as u64);
