@@ -7,6 +7,7 @@ use std::io::{Seek, Write};
 use std::marker::PhantomData;
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::{FileExt, OpenOptionsExt};
+use std::path::Path;
 
 /// Serves as base functionality for storing the actual data as key-value pairs.
 ///
@@ -143,7 +144,10 @@ where
     K: ChunkHash,
     V: Clone + Encode + Decode<()>,
 {
-    pub fn init_on_regular_file(file_path: &str, total_size: u64) -> Result<Self, io::Error> {
+    pub fn init_on_regular_file<P>(file_path: P, total_size: u64) -> Result<Self, io::Error>
+    where
+        P: AsRef<Path>,
+    {
         let file = OpenOptions::new()
             .create(true)
             .truncate(true)
@@ -165,7 +169,10 @@ where
         })
     }
 
-    pub fn init(blkdev_path: &str) -> Result<Self, io::Error> {
+    pub fn init<P>(blkdev_path: P) -> Result<Self, io::Error>
+    where
+        P: AsRef<Path>,
+    {
         let device = OpenOptions::new()
             .read(true)
             .write(true)
