@@ -230,7 +230,7 @@ where
         (self.size_written as f64) / (self.total_cdc_size() as f64 + key_size as f64)
     }
 
-    pub fn iterator(&self) -> Box<dyn Iterator<Item=(Hash, DataContainer<K>)> + '_> {
+    pub fn iterator(&self) -> Box<dyn Iterator<Item=(&Hash, &DataContainer<K>)> + '_> {
         self.database.iterator()
     }
 
@@ -348,7 +348,7 @@ where
 
         let pairs = hashes.into_iter().zip(converted_chunks).collect(); // we allocate memory for (K, V) pairs, which is not really required
         let start = Instant::now();
-        base.insert_multi(pairs)?;
+        base.try_insert_multi(pairs)?;
         let save_time = start.elapsed();
 
         Ok(SpansInfo {
