@@ -12,6 +12,7 @@ use super::{ChunkHash, ChunkerRef, Hasher, WriteMeasurements};
 
 pub mod database;
 pub mod file_layer;
+pub mod fuse_filesystem;
 pub mod scrub;
 pub mod storage;
 
