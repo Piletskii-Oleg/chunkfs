@@ -159,7 +159,7 @@ impl Debug for TimeMeasurement {
 }
 
 impl Sum for TimeMeasurement {
-    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(TimeMeasurement::default(), |acc, next| acc + next)
     }
 }

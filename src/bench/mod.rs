@@ -71,7 +71,7 @@ where
     /// Creates a fixture, opening a database with given base and hasher.
     pub fn new<H>(base: B, hasher: H) -> Self
     where
-        H: Into<Box<dyn Hasher<Hash=Hash> + 'static>>,
+        H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
     {
         let fs = create_cdc_filesystem(base, hasher.into());
         Self { fs }
