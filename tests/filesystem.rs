@@ -4,20 +4,27 @@ use std::io;
 use std::io::{Seek, Write};
 
 use approx::assert_relative_eq;
-use serial_test::serial;
 use chunkfs::chunkers::{FSChunker, LeapChunker, SuperChunker};
 use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
-use chunkfs::{create_cdc_filesystem, ChunkerRef, DataContainer, Database, DiskDatabase, WriteMeasurements};
+use chunkfs::{
+    create_cdc_filesystem, ChunkerRef, DataContainer, Database, DiskDatabase, IterableDatabase,
+    WriteMeasurements,
+};
+use rstest::rstest;
+use std::collections::HashMap;
+use uuid::Uuid;
 
 const MB: usize = 1024 * 1024;
-// const BLOCK_DEV: &str = "/dev/nvme0n1p5";
-const REGULAR_FILE: &str = "pseudo_dev";
 const FILE_SIZE: u64 = 100 * MB as u64;
 
-#[test]
-#[serial]
-fn write_read_complete_test() {
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
+fn generate_unique_filename() -> String {
+    Uuid::new_v4().to_string()
+}
+
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn write_read_complete_test(#[case] db: impl Database<Vec<u8>, DataContainer<()>>) {
     let mut fs = create_cdc_filesystem(db, SimpleHasher);
 
     let mut handle = fs.create_file("file", LeapChunker::default()).unwrap();
@@ -33,10 +40,10 @@ fn write_read_complete_test() {
     assert_eq!(read, [1; MB * 2]);
 }
 
-#[test]
-#[serial]
-fn write_read_blocks_test() {
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn write_read_blocks_test(#[case] db: impl Database<Vec<u8>, DataContainer<()>>) {
     let mut fs = create_cdc_filesystem(db, SimpleHasher);
 
     let mut handle = fs.create_file("file", FSChunker::new(4096)).unwrap();
@@ -66,15 +73,15 @@ fn write_read_blocks_test() {
         buffer.extend_from_slice(&buf);
     }
     assert_eq!(buffer.len(), MB * 3 + 50);
-    assert!(complete == buffer);
+    assert_eq!(complete, buffer);
     let empty: Vec<u8> = vec![];
     assert_eq!(fs.read_from_file(&mut handle).unwrap(), empty);
 }
 
-#[test]
-#[serial]
-fn read_file_with_size_less_than_1mb() {
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn read_file_with_size_less_than_1mb(#[case] db: impl Database<Vec<u8>, DataContainer<()>>) {
     let mut fs = create_cdc_filesystem(db, SimpleHasher);
 
     let mut handle = fs.create_file("file", FSChunker::new(4096)).unwrap();
@@ -88,10 +95,10 @@ fn read_file_with_size_less_than_1mb() {
     assert_eq!(fs.read_from_file(&mut handle).unwrap(), ones);
 }
 
-#[test]
-#[serial]
-fn write_read_big_file_at_once() {
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn write_read_big_file_at_once(#[case] db: impl Database<Vec<u8>, DataContainer<()>>) {
     let mut fs = create_cdc_filesystem(db, SimpleHasher);
 
     let mut handle = fs.create_file("file", FSChunker::new(4096)).unwrap();
@@ -104,20 +111,22 @@ fn write_read_big_file_at_once() {
     assert_eq!(fs.read_file_complete(&handle).unwrap().len(), data.len());
 }
 
-#[test]
-#[serial]
-fn scrub_compiles_on_cdc_map_but_returns_error() {
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn scrub_compiles_on_cdc_map_but_returns_error(
+    #[case] db: impl IterableDatabase<Vec<u8>, DataContainer<()>>,
+) {
     let mut fs = create_cdc_filesystem(db, SimpleHasher);
     let result = fs.scrub();
     assert!(result.is_err());
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput)
 }
 
-#[test]
-#[serial]
-fn two_file_handles_to_one_file() {
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn two_file_handles_to_one_file(#[case] db: impl Database<Vec<u8>, DataContainer<()>>) {
     let mut fs = create_cdc_filesystem(db, SimpleHasher);
     let mut handle1 = fs.create_file("file", LeapChunker::default()).unwrap();
     let handle2 = fs.open_file_readonly("file").unwrap();
@@ -131,7 +140,7 @@ fn non_iterable_database_can_be_used_with_fs() {
     struct DummyDatabase;
 
     impl Database<Vec<u8>, DataContainer<()>> for DummyDatabase {
-        fn try_insert(&mut self, _key: Vec<u8>, _value: DataContainer<()>) -> std::io::Result<()> {
+        fn try_insert(&mut self, _key: Vec<u8>, _value: DataContainer<()>) -> io::Result<()> {
             unimplemented!()
         }
 
@@ -139,7 +148,7 @@ fn non_iterable_database_can_be_used_with_fs() {
             unimplemented!()
         }
 
-        fn get(&self, _key: &Vec<u8>) -> std::io::Result<DataContainer<()>> {
+        fn get(&self, _key: &Vec<u8>) -> io::Result<DataContainer<()>> {
             unimplemented!()
         }
 
@@ -151,10 +160,12 @@ fn non_iterable_database_can_be_used_with_fs() {
     let _ = create_cdc_filesystem(DummyDatabase, SimpleHasher);
 }
 
-#[test]
-#[serial]
-fn dedup_ratio_is_correct_for_fixed_size_chunker() {
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn dedup_ratio_is_correct_for_fixed_size_chunker(
+    #[case] db: impl IterableDatabase<Vec<u8>, DataContainer<()>>,
+) {
     let mut fs = create_cdc_filesystem(db, SimpleHasher);
 
     const MB: usize = 1024 * 1024;
@@ -186,10 +197,12 @@ fn dedup_ratio_is_correct_for_fixed_size_chunker() {
     );
 }
 
-#[test]
-#[serial]
-fn different_chunkers_from_vec_can_be_used_with_same_filesystem() {
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn different_chunkers_from_vec_can_be_used_with_same_filesystem(
+    #[case] db: impl Database<[u8; 32], DataContainer<()>>,
+) {
     let mut fs = create_cdc_filesystem(db, Sha256Hasher::default());
     let chunkers: Vec<ChunkerRef> = vec![
         SuperChunker::default().into(),
@@ -211,10 +224,12 @@ fn different_chunkers_from_vec_can_be_used_with_same_filesystem() {
     }
 }
 
-#[test]
-#[serial]
-fn readonly_file_handle_cannot_write_can_read() {
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn readonly_file_handle_cannot_write_can_read(
+    #[case] db: impl Database<Vec<u8>, DataContainer<()>>,
+) {
     let mut fs = create_cdc_filesystem(db, SimpleHasher);
     let mut fh = fs.create_file("file", FSChunker::default()).unwrap();
     fs.write_to_file(&mut fh, &[1; MB]).unwrap();
@@ -238,10 +253,10 @@ fn readonly_file_handle_cannot_write_can_read() {
     assert_eq!(measurements, WriteMeasurements::default())
 }
 
-#[test]
-#[serial]
-fn write_from_stream_slice() {
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn write_from_stream_slice(#[case] db: impl Database<Vec<u8>, DataContainer<()>>) {
     let mut fs = create_cdc_filesystem(db, SimpleHasher);
     let mut fh = fs.create_file("file", FSChunker::default()).unwrap();
     fs.write_from_stream(&mut fh, &[1; MB * 2][..]).unwrap();
@@ -253,14 +268,14 @@ fn write_from_stream_slice() {
     assert_eq!(fs.read_file_complete(&ro_fh).unwrap(), vec![1; MB * 2]);
 }
 
-#[test]
-#[serial]
-fn write_from_stream_buf_reader() {
+#[rstest]
+#[case(DiskDatabase::init_on_regular_file(generate_unique_filename(), FILE_SIZE).unwrap())]
+#[case(HashMap::default())]
+fn write_from_stream_buf_reader(#[case] db: impl Database<Vec<u8>, DataContainer<()>>) {
     let mut file = tempfile::tempfile().unwrap();
     file.write_all(&[1; MB]).unwrap();
     file.seek(io::SeekFrom::Start(0)).unwrap();
 
-    let db = DiskDatabase::init_on_regular_file(REGULAR_FILE, FILE_SIZE).unwrap();
     let mut fs = create_cdc_filesystem(db, SimpleHasher);
     let mut fh = fs.create_file("file", FSChunker::default()).unwrap();
 
