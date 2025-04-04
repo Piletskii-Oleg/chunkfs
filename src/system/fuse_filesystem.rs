@@ -36,6 +36,9 @@ struct FuseFileHandle {
     inode: u64,
 }
 
+/// Wrap around [`FileSystem`] for implementing [`fuser::Filesystem`] trait.
+///
+/// After creation, it should be passed to [`mount2`][fuser::mount2] or [`spawn_mount2`][fuser::spawn_mount2].
 pub struct FuseFS<B, Hash>
 where
     B: Database<Hash, DataContainer<()>>,
@@ -44,6 +47,7 @@ where
     underlying_fs: FileSystem<B, Hash, (), HashMap<(), Vec<u8>>>,
     files: HashMap<Inode, FuseFile>,
     inodes: HashMap<String, Inode>,
+    /// Number for the next created file handle.
     next_fh: u64,
     file_handles: HashMap<Fh, FuseFileHandle>,
     chunker: ChunkerRef,
@@ -54,6 +58,9 @@ where
     B: Database<Hash, DataContainer<()>>,
     Hash: ChunkHash,
 {
+    /// Creates a file system with the given [`hasher`][Hasher], [`database`][Database] and [`chunker`][ChunkerRef].
+    ///
+    /// After creation, it should be passed to [`mount2`][fuser::mount2] or [`spawn_mount2`][fuser::spawn_mount2].
     pub fn new<H, C>(base: B, hasher: H, chunker: C) -> Self
     where
         H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
@@ -114,6 +121,7 @@ where
     }
 }
 
+/// Checks the request rights for the file with the specified access mask (flags).
 fn check_access(file_attr: &FileAttr, req: &Request, access_mask: i32) -> bool {
     let file_uid = file_attr.uid;
     let file_gid = file_attr.gid;
