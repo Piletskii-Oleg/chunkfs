@@ -12,7 +12,6 @@ use libc::{
     EACCES, EBADF, EEXIST, EINVAL, EIO, ENOENT, EPERM, ESTALE, O_ACCMODE, O_RDONLY, O_RDWR,
     O_WRONLY, R_OK, W_OK, X_OK,
 };
-use std::cmp::min;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::time::{Duration, SystemTime};
@@ -340,19 +339,25 @@ where
             reply.error(EACCES);
             return;
         }
-
-        let file_size = file.attr.size;
-        let _read_size = min(size, file_size as u32);
-        // file_handle.underlying_file_handle.offset = offset;
-        let Ok(_data) = self
-            .underlying_fs
-            .read_1mb_from_file(&mut file_handle.underlying_file_handle)
-        else {
-            reply.error(EIO);
+        if file_handle
+            .underlying_file_handle
+            .set_offset(offset as usize)
+            .is_err()
+        {
+            reply.error(EACCES);
             return;
         };
 
-        todo!()
+        if let Ok(data) = self
+            .underlying_fs
+            .read(&mut file_handle.underlying_file_handle, size as usize)
+        {
+            reply.data(&data);
+            return;
+        } else {
+            reply.error(EIO);
+            return;
+        };
     }
 
     fn write(
