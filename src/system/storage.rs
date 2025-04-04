@@ -1,10 +1,10 @@
+use crate::{ChunkHash, Hasher, SEG_SIZE};
+use crate::{ChunkerRef, WriteMeasurements};
+use bincode::{Decode, Encode};
 use std::cmp::min;
 use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
-use bincode::{Decode, Encode};
-use crate::{ChunkHash, Hasher, SEG_SIZE};
-use crate::{ChunkerRef, WriteMeasurements};
 
 use super::database::{Database, IterableDatabase};
 use super::scrub::{Scrub, ScrubMeasurements};
@@ -51,7 +51,7 @@ where
     database: B,
     scrubber: Option<Box<dyn Scrub<Hash, B, K, T>>>,
     target_map: T,
-    hasher: Box<dyn Hasher<Hash=Hash>>,
+    hasher: Box<dyn Hasher<Hash = Hash>>,
     size_written: usize,
 }
 
@@ -61,7 +61,7 @@ where
     B: Database<Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
 {
-    pub fn new(database: B, hasher: Box<dyn Hasher<Hash=Hash>>, target_map: T) -> Self {
+    pub fn new(database: B, hasher: Box<dyn Hasher<Hash = Hash>>, target_map: T) -> Self {
         Self {
             database,
             scrubber: None,
@@ -166,7 +166,7 @@ where
         database: B,
         target_map: T,
         scrubber: Box<dyn Scrub<Hash, B, K, T>>,
-        hasher: Box<dyn Hasher<Hash=Hash>>,
+        hasher: Box<dyn Hasher<Hash = Hash>>,
     ) -> Self {
         Self {
             database,
@@ -230,7 +230,7 @@ where
         (self.size_written as f64) / (self.total_cdc_size() as f64 + key_size as f64)
     }
 
-    pub fn iterator(&self) -> Box<dyn Iterator<Item=(&Hash, &DataContainer<K>)> + '_> {
+    pub fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
         self.database.iterator()
     }
 
@@ -276,7 +276,7 @@ where
     Hash: ChunkHash,
 {
     chunker: &'handle ChunkerRef,
-    hasher: &'handle mut Box<dyn Hasher<Hash=Hash>>,
+    hasher: &'handle mut Box<dyn Hasher<Hash = Hash>>,
     rest: Vec<u8>,
 }
 
@@ -286,7 +286,7 @@ where
 {
     fn new(
         chunker: &'handle ChunkerRef,
-        hasher: &'handle mut Box<dyn Hasher<Hash=Hash>>,
+        hasher: &'handle mut Box<dyn Hasher<Hash = Hash>>,
     ) -> Self {
         Self {
             chunker,
@@ -502,7 +502,7 @@ mod tests {
             vec![16; 1024 * 256],
             vec![32; 1024 * 256],
         ]
-            .concat();
+        .concat();
 
         let chunker = SuperChunker::default().into();
 
