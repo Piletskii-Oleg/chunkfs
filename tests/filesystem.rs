@@ -11,6 +11,37 @@ use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
 use chunkfs::{create_cdc_filesystem, ChunkerRef, DataContainer, Database, WriteMeasurements};
 
 const MB: usize = 1024 * 1024;
+const KB: usize = 1024;
+
+#[test]
+fn write_read_with_strange_size() {
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
+
+    let mut handle = fs.create_file("file", FSChunker::new(4096)).unwrap();
+
+    let mut data1 = vec![0; 433 * KB];
+    let data2 = vec![1; 2 * MB + 3];
+    let data3 = vec![2; 2 * MB];
+    fs.write_to_file(&mut handle, &data1).unwrap();
+    fs.write_to_file(&mut handle, &data2).unwrap();
+    fs.write_to_file(&mut handle, &data3).unwrap();
+    fs.close_file(handle).unwrap();
+
+    let mut handle = fs.open_file_readonly("file").unwrap();
+
+    data1.append(&mut vec![1; MB]);
+    let actual = fs.read(&mut handle, 433 * KB + MB).unwrap();
+    assert_eq!(actual, data1);
+
+    let mut ones_w_twos = vec![1; MB + 3];
+    ones_w_twos.append(&mut vec![2; MB]);
+    let actual = fs.read(&mut handle, 2 * MB + 3).unwrap();
+    assert_eq!(actual, ones_w_twos);
+
+    handle.set_offset(433 * KB + 2 * MB + 3 + MB / 2).unwrap();
+    let actual = fs.read(&mut handle, 10 * MB).unwrap();
+    assert_eq!(actual, vec![2; MB + MB / 2]);
+}
 
 #[test]
 fn write_read_complete_test() {
@@ -56,12 +87,12 @@ fn write_read_blocks_test() {
     let mut handle = fs.open_file("file", LeapChunker::default()).unwrap();
     let mut buffer = Vec::with_capacity(MB * 3 + 50);
     for _ in 0..4 {
-        let buf = fs.read_from_file(&mut handle).unwrap();
+        let buf = fs.read_1mb_from_file(&mut handle).unwrap();
         buffer.extend_from_slice(&buf);
     }
     assert_eq!(buffer.len(), MB * 3 + 50);
     assert!(complete == buffer);
-    assert_eq!(fs.read_from_file(&mut handle).unwrap(), []);
+    assert_eq!(fs.read_1mb_from_file(&mut handle).unwrap(), []);
 }
 
 #[test]
@@ -76,7 +107,7 @@ fn read_file_with_size_less_than_1mb() {
     println!("{:?}", measurements);
 
     let mut handle = fs.open_file_readonly("file").unwrap();
-    assert_eq!(fs.read_from_file(&mut handle).unwrap(), ones);
+    assert_eq!(fs.read_1mb_from_file(&mut handle).unwrap(), ones);
 }
 
 #[test]
@@ -206,7 +237,7 @@ fn readonly_file_handle_cannot_write_can_read() {
     assert_eq!(read.len(), MB);
     assert_eq!(read, [1; MB]);
 
-    let _ = fs.read_from_file(&mut ro_fh).unwrap();
+    let _ = fs.read_1mb_from_file(&mut ro_fh).unwrap();
 
     // can close
     let measurements = fs.close_file(ro_fh).unwrap();

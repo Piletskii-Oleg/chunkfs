@@ -1,10 +1,12 @@
+use std::cmp::min;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::io;
 use std::io::ErrorKind;
 
 use crate::system::storage::SpansInfo;
+use crate::WriteMeasurements;
 use crate::{ChunkHash, ChunkerRef};
-use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
 #[derive(Debug, PartialEq, Eq, Default, Clone, Hash)]
@@ -12,6 +14,20 @@ pub struct FileSpan<Hash: ChunkHash> {
     hash: Hash,
     offset: usize,
     len: usize,
+}
+
+impl<Hash: ChunkHash> FileSpan<Hash> {
+    pub fn hash(&self) -> &Hash {
+        &self.hash
+    }
+
+    pub fn offset(&self) -> &usize {
+        &self.offset
+    }
+
+    pub fn len(&self) -> &usize {
+        &self.len
+    }
 }
 
 /// A named file, doesn't store actual contents,
@@ -66,6 +82,22 @@ impl FileHandle {
             measurements: Default::default(),
             chunker: None,
         }
+    }
+
+    pub fn offset(&self) -> &usize {
+        &self.offset
+    }
+
+    /// Sets the offset for the read-only file handle.
+    pub fn set_offset(&mut self, offset: usize) -> io::Result<()> {
+        if self.chunker.is_some() {
+            return Err(io::Error::new(
+                ErrorKind::PermissionDenied,
+                "offset can only be set with read-only file handles",
+            ));
+        }
+        self.offset = offset;
+        Ok(())
     }
 
     /// Returns name of the file.
@@ -124,12 +156,9 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     }
 
     /// Reads all hashes of the file, from beginning to end.
-    pub fn read_complete(&self, handle: &FileHandle) -> Vec<Hash> {
+    pub fn read_complete(&self, handle: &FileHandle) -> Vec<&Hash> {
         let file = self.find_file(handle);
-        file.spans
-            .iter()
-            .map(|span| span.hash.clone()) // cloning hashes, takes a lot of time
-            .collect()
+        file.spans.iter().map(|span| span.hash()).collect()
     }
 
     /// Writes spans to the end of the file.
@@ -147,31 +176,28 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
         handle.measurements += info.measurements;
     }
 
-    /// Reads 1 MB of data from the open file and returns received hashes,
-    /// starting point is based on the `FileHandle`'s offset.
-    pub fn read(&self, handle: &mut FileHandle) -> Vec<Hash> {
+    /// Reads the specified amount of data from the open file and
+    /// returns FileSpans in which the necessary data is stored (the side FileSpans may contain it partially).
+    /// Starting point is based on the `FileHandle`'s offset.
+    ///
+    /// If `size` + file handle offset is greater than file size, then returns FileSpans up to the end of the file.
+    pub fn read(&self, handle: &mut FileHandle, size: usize) -> Vec<&FileSpan<Hash>> {
         let file = self.find_file(handle);
 
-        let mut bytes_read = 0;
-        let hashes = file
+        let spans: Vec<_> = file
             .spans
             .iter()
-            .skip_while(|span| span.offset < handle.offset) // find current span in the file
-            .take_while(|span| {
-                bytes_read += span.len;
-                if bytes_read > SEG_SIZE {
-                    bytes_read -= span.len;
-                    false
-                } else {
-                    true
-                }
-            }) // take 1 MB of spans after current one
-            .map(|span| span.hash.clone()) // take their hashes
+            .skip_while(|span| span.offset + span.len < handle.offset) // find the first span that contains required data
+            .take_while(|span| span.offset < handle.offset + size)
             .collect();
 
-        handle.offset += bytes_read;
-
-        hashes
+        if spans.is_empty() {
+            return spans;
+        }
+        let last_span = spans.last().unwrap();
+        let read_size_possible = last_span.offset + last_span.len - handle.offset;
+        handle.offset += min(read_size_possible, size);
+        spans
     }
 
     /// Checks if the file with the given name exists.
