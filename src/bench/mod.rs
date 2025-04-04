@@ -106,6 +106,7 @@ where
         let write_time = now.elapsed();
 
         let WriteMeasurements {
+            save_time,
             chunk_time,
             hash_time,
         } = self.fs.close_file(file)?;
@@ -115,6 +116,7 @@ where
         let measurement = TimeMeasurement {
             write_time,
             read_time,
+            save_time,
             chunk_time,
             hash_time,
         };
