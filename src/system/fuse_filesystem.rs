@@ -346,7 +346,7 @@ where
         // file_handle.underlying_file_handle.offset = offset;
         let Ok(_data) = self
             .underlying_fs
-            .read_from_file(&mut file_handle.underlying_file_handle)
+            .read_1mb_from_file(&mut file_handle.underlying_file_handle)
         else {
             reply.error(EIO);
             return;
