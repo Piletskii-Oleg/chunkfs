@@ -29,6 +29,8 @@ where
     V: Clone + Encode + Decode<()>,
 {
     device: File,
+    /// If Database initialized on a regular file, contains the path to it.
+    file_path: Option<String>,
     database_map: HashMap<K, DataInfo>,
     total_size: u64,
     block_size: u64,
@@ -56,13 +58,14 @@ where
             .read(true)
             .write(true)
             .custom_flags(libc::O_DIRECT)
-            .open(file_path)?;
+            .open(file_path.as_ref())?;
         file.set_len(total_size)?;
 
         let database_map = HashMap::new();
 
         Ok(Self {
             device: file,
+            file_path: Some(file_path.as_ref().to_str().unwrap().to_owned()),
             database_map,
             total_size,
             block_size: 512,
@@ -103,6 +106,7 @@ where
 
         Ok(Self {
             device,
+            file_path: None,
             database_map,
             total_size,
             block_size,
@@ -160,6 +164,18 @@ where
         let (data, _) = decode_from_slice(&data, bincode::config::standard())
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         Ok(data)
+    }
+}
+
+impl<K, V> Drop for DiskDatabase<K, V>
+where
+    K: ChunkHash,
+    V: Clone + Encode + Decode<()>,
+{
+    fn drop(&mut self) {
+        if let Some(file_path) = self.file_path.take() {
+            std::fs::remove_file(&file_path).unwrap()
+        }
     }
 }
 
