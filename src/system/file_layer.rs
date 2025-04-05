@@ -84,8 +84,8 @@ impl FileHandle {
         }
     }
 
-    pub fn offset(&self) -> &usize {
-        &self.offset
+    pub fn offset(&self) -> usize {
+        self.offset.clone()
     }
 
     /// Sets the offset for the read-only file handle.

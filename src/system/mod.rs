@@ -167,7 +167,7 @@ where
     /// If `size` + file handle offset is greater than file size, then returns data starting from the offset to the end of the file
     /// **Careful:** it modifies internal `FileHandle` data. After using this `write_to_file` should not be used on the same FileHandle.
     pub fn read(&self, handle: &mut FileHandle, size: usize) -> io::Result<Vec<u8>> {
-        let original_offset = handle.offset().clone();
+        let original_offset = handle.offset();
         let spans = self.file_layer.read(handle, size);
         if spans.is_empty() {
             return Ok(vec![]);
