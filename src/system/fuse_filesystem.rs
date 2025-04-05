@@ -347,19 +347,10 @@ where
             reply.error(EACCES);
             return;
         }
-        if file_handle
-            .underlying_file_handle
-            .set_offset(offset as usize)
-            .is_err()
-        {
-            reply.error(EACCES);
-            return;
-        };
+        let underlying_fh = &mut file_handle.underlying_file_handle;
+        underlying_fh.set_offset(offset as usize);
 
-        if let Ok(data) = self
-            .underlying_fs
-            .read(&mut file_handle.underlying_file_handle, size as usize)
-        {
+        if let Ok(data) = self.underlying_fs.read(underlying_fh, size as usize) {
             reply.data(&data);
             return;
         } else {
