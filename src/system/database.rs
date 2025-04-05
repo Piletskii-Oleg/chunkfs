@@ -27,7 +27,7 @@ pub trait Database<K, V> {
     }
 
     /// Retrieves a multitude of values, corresponding to the keys, in the correct order.
-    fn get_multi(&self, keys: &[K]) -> io::Result<Vec<V>> {
+    fn get_multi(&self, keys: Vec<&K>) -> io::Result<Vec<V>> {
         keys.iter().map(|key| self.get(key)).collect()
     }
 

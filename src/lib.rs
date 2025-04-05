@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub use system::database::{Database, IterableDatabase};
+pub use system::fuse_filesystem::FuseFS;
 pub use system::scrub::{CopyScrubber, Scrub, ScrubMeasurements};
 pub use system::storage::{Data, DataContainer};
 pub use system::{create_cdc_filesystem, FileSystem};
@@ -71,7 +72,7 @@ impl Chunk {
 /// Chunks that are found are returned by [`chunk_data`][Chunker::chunk_data] method.
 /// If some contents were cut because the end of `data` and not the end of the chunk was reached,
 /// it must be returned with [`rest`][Chunker::rest] instead of storing it in the [`chunk_data`][Chunker::chunk_data]'s output.
-pub trait Chunker: Debug {
+pub trait Chunker: Debug + Send {
     /// Goes through whole `data` and finds chunks. If last chunk is not actually a chunk but a leftover,
     /// it is returned via [`rest`][Chunker::rest] method and is not contained in the vector.
     ///
@@ -125,7 +126,7 @@ impl Debug for ChunkerRef {
 }
 
 /// Functionality for an object that hashes the input.
-pub trait Hasher {
+pub trait Hasher: Send {
     /// Hash type that would be returned by the hasher.
     type Hash: ChunkHash;
 
