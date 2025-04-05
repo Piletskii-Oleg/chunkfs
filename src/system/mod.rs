@@ -20,14 +20,13 @@ pub mod storage;
 /// To create a file system that can be used with CDC algorithms only, [`create_cdc_filesystem`] should be used.
 ///
 /// If you want to test scrubber, [`FileSystem::new_with_scrubber`] should be used.
-pub struct FileSystem<B, H, Hash, K, T>
+pub struct FileSystem<B, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
-    storage: ChunkStorage<H, Hash, B, K, T>,
+    storage: ChunkStorage<Hash, B, K, T>,
     file_layer: FileLayer<Hash>,
 }
 
@@ -40,19 +39,18 @@ where
 pub fn create_cdc_filesystem<B, H, Hash>(
     base: B,
     hasher: H,
-) -> FileSystem<B, H, Hash, (), HashMap<(), Vec<u8>>>
+) -> FileSystem<B, Hash, (), HashMap<(), Vec<u8>>>
 where
     B: Database<Hash, DataContainer<()>>,
-    H: Hasher<Hash = Hash>,
+    H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
     Hash: ChunkHash,
 {
-    FileSystem::new(base, hasher, HashMap::default())
+    FileSystem::new(base, hasher.into(), HashMap::default())
 }
 
-impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
+impl<B, Hash, K, T> FileSystem<B, Hash, K, T>
 where
     B: Database<Hash, DataContainer<K>>,
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
@@ -153,10 +151,10 @@ where
         Ok(self.storage.retrieve(&hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 
-    /// Reads 1 MB of data from a file and returns it.
+    /// Reads at most 1 MB of data from a file and returns it.
     ///
     /// **Careful:** it modifies internal `FileHandle` data. After using this `write_to_file` should not be used on the same FileHandle.
-    pub fn read_from_file(&mut self, handle: &mut FileHandle) -> io::Result<Vec<u8>> {
+    pub fn read_from_file(&self, handle: &mut FileHandle) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read(handle);
         Ok(self.storage.retrieve(&hashes)?.concat())
     }
@@ -169,6 +167,7 @@ where
         self.file_layer.chunk_count_distribution(handle)
     }
 
+    #[cfg(feature = "bench")]
     /// Generate a new dataset with set deduplication ratio from the existing one.
     ///
     /// Returns the name of the new file.
@@ -177,13 +176,27 @@ where
     }
 
     /// Writes a file from the file system to the disk by the specified path.
+    ///
+    /// Will fail if the file already exists by the specified path.
     pub fn write_file_to_disk<P: AsRef<Path>>(&self, name: &str, path: P) -> io::Result<()> {
-        let handle = self.open_file_readonly(name)?;
+        let mut handle = self.open_file_readonly(name)?;
 
-        let data = self.read_file_complete(&handle)?;
-        let mut file = std::fs::File::create(path)?;
+        let mut file = std::fs::File::options()
+            .create_new(true)
+            .write(true)
+            .open(path)?;
 
-        file.write_all(&data)
+        loop {
+            let data = self.read_from_file(&mut handle)?;
+
+            if data.is_empty() {
+                break;
+            }
+
+            file.write_all(&data)?;
+        }
+
+        Ok(())
     }
 
     /// Returns a list of all file names present in the system.
@@ -193,7 +206,7 @@ where
 
     /// Creates a file system with the given [`hasher`][Hasher], `base` and `target_map`. Unlike [`new_with_scrubber`][Self::new_with_scrubber],
     /// doesn't require a database to be iterable. Resulting filesystem cannot be scrubbed using [`scrub`][Self::scrub].
-    fn new(base: B, hasher: H, target_map: T) -> Self {
+    fn new(base: B, hasher: Box<dyn Hasher<Hash = Hash>>, target_map: T) -> Self {
         Self {
             storage: ChunkStorage::new(base, hasher, target_map),
             file_layer: Default::default(),
@@ -201,24 +214,26 @@ where
     }
 }
 
-impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
+impl<B, Hash, K, T> FileSystem<B, Hash, K, T>
 where
     B: IterableDatabase<Hash, DataContainer<K>>,
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     T: Database<K, Vec<u8>>,
 {
     /// Creates a file system with the given [`hasher`][Hasher], original [`database`][Database] and target map, and a [`scrubber`][Scrub].
     ///
     /// Provided `database` must implement [`IterableDatabase`].
-    pub fn new_with_scrubber(
+    pub fn new_with_scrubber<H>(
         database: B,
         target_map: T,
         scrubber: Box<dyn Scrub<Hash, B, K, T>>,
         hasher: H,
-    ) -> Self {
+    ) -> Self
+    where
+        H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
+    {
         Self {
-            storage: ChunkStorage::new_with_scrubber(database, target_map, scrubber, hasher),
+            storage: ChunkStorage::new_with_scrubber(database, target_map, scrubber, hasher.into()),
             file_layer: Default::default(),
         }
     }
@@ -237,7 +252,19 @@ where
         self.storage.cdc_dedup_ratio()
     }
 
-    pub fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
+    /// Calculates full deduplication ratio of the storage, not accounting for chunks processed with scrubber,
+    /// if there had been any.
+    pub fn full_cdc_dedup_ratio(&self) -> f64 {
+        self.storage.full_cdc_dedup_ratio()
+    }
+
+    /// Returns average chunk size in the storage.
+    pub fn average_chunk_size(&self) -> usize {
+        self.storage.average_chunk_size()
+    }
+
+    /// Returns an immutable iterator over storage chunks.
+    pub fn storage_iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
         self.storage.iterator()
     }
 
@@ -251,11 +278,10 @@ where
     }
 }
 
-impl<B, H, Hash, K, T> FileSystem<B, H, Hash, K, T>
+impl<B, Hash, K, T> FileSystem<B, Hash, K, T>
 where
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    B: IterableDatabase<H::Hash, DataContainer<K>>,
+    B: IterableDatabase<Hash, DataContainer<K>>,
     T: IterableDatabase<K, Vec<u8>>,
 {
     /// Calculates total deduplication ratio of the storage,

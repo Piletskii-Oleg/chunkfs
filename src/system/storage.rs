@@ -42,9 +42,8 @@ impl<Hash: ChunkHash> Span<Hash> {
 }
 
 /// Underlying storage for the actual stored data.
-pub struct ChunkStorage<H, Hash, B, K, T>
+pub struct ChunkStorage<Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
     B: Database<Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
@@ -52,18 +51,17 @@ where
     database: B,
     scrubber: Option<Box<dyn Scrub<Hash, B, K, T>>>,
     target_map: T,
-    hasher: H,
+    hasher: Box<dyn Hasher<Hash = Hash>>,
     size_written: usize,
 }
 
-impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
+impl<Hash, B, K, T> ChunkStorage<Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    B: Database<H::Hash, DataContainer<K>>,
+    B: Database<Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
 {
-    pub fn new(database: B, hasher: H, target_map: T) -> Self {
+    pub fn new(database: B, hasher: Box<dyn Hasher<Hash = Hash>>, target_map: T) -> Self {
         Self {
             database,
             scrubber: None,
@@ -77,11 +75,7 @@ where
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    pub fn write(
-        &mut self,
-        data: &[u8],
-        chunker: &ChunkerRef,
-    ) -> io::Result<Vec<SpansInfo<H::Hash>>> {
+    pub fn write(&mut self, data: &[u8], chunker: &ChunkerRef) -> io::Result<Vec<SpansInfo<Hash>>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
 
         let mut current = 0;
@@ -112,7 +106,7 @@ where
         &mut self,
         mut reader: R,
         chunker: &ChunkerRef,
-    ) -> io::Result<Vec<SpansInfo<H::Hash>>>
+    ) -> io::Result<Vec<SpansInfo<Hash>>>
     where
         R: io::Read,
     {
@@ -144,7 +138,7 @@ where
 
     /// Retrieves the data from the storage based on hashes of the data [`segments`][Segment],
     /// or Error(NotFound) if some of the hashes were not present in the base.
-    pub fn retrieve(&self, request: &[H::Hash]) -> io::Result<Vec<Vec<u8>>> {
+    pub fn retrieve(&self, request: &[Hash]) -> io::Result<Vec<Vec<u8>>> {
         let retrieved = self.database.get_multi(request)?;
 
         retrieved
@@ -162,18 +156,17 @@ where
     }
 }
 
-impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
+impl<Hash, B, K, T> ChunkStorage<Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    B: IterableDatabase<H::Hash, DataContainer<K>>,
+    B: IterableDatabase<Hash, DataContainer<K>>,
     T: Database<K, Vec<u8>>,
 {
     pub fn new_with_scrubber(
         database: B,
         target_map: T,
         scrubber: Box<dyn Scrub<Hash, B, K, T>>,
-        hasher: H,
+        hasher: Box<dyn Hasher<Hash = Hash>>,
     ) -> Self {
         Self {
             database,
@@ -211,6 +204,32 @@ where
         (self.size_written as f64) / (self.total_cdc_size() as f64)
     }
 
+    /// Returns average chunk size in the storage.
+    pub fn average_chunk_size(&self) -> usize {
+        let (count, size) = self
+            .database
+            .values()
+            .fold((0, 0), |(count, size), container| {
+                let chunk_size = match container.extract() {
+                    Data::Chunk(chunk) => chunk.len(),
+                    Data::TargetChunk(_) => 0,
+                };
+                (count + 1, size + chunk_size)
+            });
+
+        size / count
+    }
+
+    pub fn full_cdc_dedup_ratio(&self) -> f64 {
+        let key_size = self
+            .database
+            .keys()
+            .map(|key| self.hasher.len(key))
+            .sum::<usize>();
+
+        (self.size_written as f64) / (self.total_cdc_size() as f64 + key_size as f64)
+    }
+
     pub fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
         self.database.iterator()
     }
@@ -222,11 +241,10 @@ where
     }
 }
 
-impl<H, Hash, B, K, T> ChunkStorage<H, Hash, B, K, T>
+impl<Hash, B, K, T> ChunkStorage<Hash, B, K, T>
 where
-    H: Hasher<Hash = Hash>,
     Hash: ChunkHash,
-    B: IterableDatabase<H::Hash, DataContainer<K>>,
+    B: IterableDatabase<Hash, DataContainer<K>>,
     T: IterableDatabase<K, Vec<u8>>,
 {
     fn total_size(&self) -> usize {
@@ -253,20 +271,23 @@ where
 /// Writer that conducts operations on [Storage].
 /// Only exists during [FileSystem::write_to_file][crate::FileSystem::write_to_file].
 /// Receives `buffer` from [FileHandle][crate::file_layer::FileHandle] and gives it back after a successful write.
-struct StorageWriter<'handle, H>
+struct StorageWriter<'handle, Hash>
 where
-    H: Hasher,
+    Hash: ChunkHash,
 {
     chunker: &'handle ChunkerRef,
-    hasher: &'handle mut H,
+    hasher: &'handle mut Box<dyn Hasher<Hash = Hash>>,
     rest: Vec<u8>,
 }
 
-impl<'handle, H> StorageWriter<'handle, H>
+impl<'handle, Hash> StorageWriter<'handle, Hash>
 where
-    H: Hasher,
+    Hash: ChunkHash,
 {
-    fn new(chunker: &'handle ChunkerRef, hasher: &'handle mut H) -> Self {
+    fn new(
+        chunker: &'handle ChunkerRef,
+        hasher: &'handle mut Box<dyn Hasher<Hash = Hash>>,
+    ) -> Self {
         Self {
             chunker,
             hasher,
@@ -278,20 +299,20 @@ where
     ///
     /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
     /// along with amount of time spent on chunking and hashing.
-    fn write<K, B: Database<H::Hash, DataContainer<K>>>(
+    fn write<K, B: Database<Hash, DataContainer<K>>>(
         &mut self,
         data: &[u8],
         base: &mut B,
-    ) -> io::Result<SpansInfo<H::Hash>> {
+    ) -> io::Result<SpansInfo<Hash>> {
         //debug_assert!(data.len() == SEG_SIZE); // we assume that all given data segments are 1MB long for now
 
         let mut buffer = self.rest.clone();
         buffer.extend_from_slice(data);
 
-        let empty = Vec::with_capacity(self.chunker.borrow().estimate_chunk_count(&buffer));
+        let empty = Vec::with_capacity(self.chunker.lock().unwrap().estimate_chunk_count(&buffer));
 
         let start = Instant::now();
-        let mut chunks = self.chunker.borrow_mut().chunk_data(&buffer, empty);
+        let mut chunks = self.chunker.lock().unwrap().chunk_data(&buffer, empty);
         let chunk_time = start.elapsed();
 
         if chunks.is_empty() {
@@ -336,10 +357,10 @@ where
     }
 
     /// Flushes remaining data to the storage and returns its [`span`][Span] with hashing and chunking times.
-    fn flush<K, B: Database<H::Hash, DataContainer<K>>>(
+    fn flush<K, B: Database<Hash, DataContainer<K>>>(
         &mut self,
         base: &mut B,
-    ) -> io::Result<SpansInfo<H::Hash>> {
+    ) -> io::Result<SpansInfo<Hash>> {
         // is this necessary?
         if self.rest.is_empty() {
             return Ok(SpansInfo::default());
@@ -432,7 +453,7 @@ mod tests {
             database: map,
             scrubber: Some(Box::new(DumbScrubber)),
             target_map: HashMap::default(),
-            hasher: SimpleHasher,
+            hasher: Box::new(SimpleHasher),
             size_written: 0,
         };
 
@@ -451,7 +472,7 @@ mod tests {
     fn total_cdc_size_is_calculated_correctly_for_fixed_size_chunker_on_simple_data() {
         let mut chunk_storage = ChunkStorage::new(
             HashMap::<Vec<u8>, DataContainer<()>>::new(),
-            SimpleHasher,
+            SimpleHasher.into(),
             HashMap::default(),
         );
 
@@ -467,7 +488,7 @@ mod tests {
     fn size_written_is_calculated_correctly() {
         let mut chunk_storage = ChunkStorage::new(
             HashMap::<Vec<u8>, DataContainer<()>>::new(),
-            SimpleHasher,
+            SimpleHasher.into(),
             HashMap::default(),
         );
 

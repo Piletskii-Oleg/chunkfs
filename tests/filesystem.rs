@@ -38,16 +38,30 @@ fn write_read_blocks_test() {
     let ones = vec![1; MB];
     let twos = vec![2; MB];
     let threes = vec![3; MB];
+    let extra = vec![3; 50];
+
     fs.write_to_file(&mut handle, &ones).unwrap();
     fs.write_to_file(&mut handle, &twos).unwrap();
     fs.write_to_file(&mut handle, &threes).unwrap();
-    let measurements = fs.close_file(handle).unwrap();
-    println!("{:?}", measurements);
+    fs.write_to_file(&mut handle, &extra).unwrap();
+    fs.close_file(handle).unwrap();
+
+    let complete = ones
+        .into_iter()
+        .chain(twos)
+        .chain(threes)
+        .chain(extra)
+        .collect::<Vec<_>>();
 
     let mut handle = fs.open_file("file", LeapChunker::default()).unwrap();
-    assert_eq!(fs.read_from_file(&mut handle).unwrap(), ones);
-    assert_eq!(fs.read_from_file(&mut handle).unwrap(), twos);
-    assert_eq!(fs.read_from_file(&mut handle).unwrap(), threes);
+    let mut buffer = Vec::with_capacity(MB * 3 + 50);
+    for _ in 0..4 {
+        let buf = fs.read_from_file(&mut handle).unwrap();
+        buffer.extend_from_slice(&buf);
+    }
+    assert_eq!(buffer.len(), MB * 3 + 50);
+    assert!(complete == buffer);
+    assert_eq!(fs.read_from_file(&mut handle).unwrap(), []);
 }
 
 #[test]
@@ -91,10 +105,10 @@ fn scrub_compiles_on_cdc_map_but_returns_error() {
 fn two_file_handles_to_one_file() {
     let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
     let mut handle1 = fs.create_file("file", LeapChunker::default()).unwrap();
-    let mut handle2 = fs.open_file("file", LeapChunker::default()).unwrap();
+    let handle2 = fs.open_file_readonly("file").unwrap();
     fs.write_to_file(&mut handle1, &[1; MB]).unwrap();
     fs.close_file(handle1).unwrap();
-    assert_eq!(fs.read_from_file(&mut handle2).unwrap().len(), MB)
+    assert_eq!(fs.read_file_complete(&handle2).unwrap().len(), MB)
 }
 
 #[test]
@@ -192,9 +206,7 @@ fn readonly_file_handle_cannot_write_can_read() {
     assert_eq!(read.len(), MB);
     assert_eq!(read, [1; MB]);
 
-    let read = fs.read_from_file(&mut ro_fh).unwrap();
-    assert_eq!(read.len(), MB);
-    assert_eq!(read, [1; MB]);
+    let _ = fs.read_from_file(&mut ro_fh).unwrap();
 
     // can close
     let measurements = fs.close_file(ro_fh).unwrap();

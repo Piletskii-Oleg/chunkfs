@@ -20,7 +20,9 @@ fn main() -> io::Result<()> {
         let map = fixture.size_distribution(adjustment);
 
         let pairs = map.into_iter().collect::<Vec<(usize, u32)>>();
+
         let path = format!("distribution-{}-{}.json", dataset.name, adjustment);
+
         let mut writer = BufWriter::new(File::create(path)?);
         serde_json::to_writer(&mut writer, &pairs)?;
     }

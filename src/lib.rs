@@ -1,8 +1,7 @@
-use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 use std::hash;
 use std::ops::{Add, AddAssign, Deref, DerefMut};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub use system::database::{Database, IterableDatabase};
@@ -32,6 +31,9 @@ pub const KB: usize = 1024;
 
 /// One megabyte.
 pub const MB: usize = 1024 * KB;
+
+/// One gigabyte.
+pub const GB: usize = 1024 * MB;
 
 /// Block size, used by [`read`][crate::FileSystem::read_from_file]
 /// and [`write`][crate::FileSystem::write_to_file] methods in the [`FileSystem`].
@@ -87,10 +89,10 @@ pub trait Chunker: Debug {
 
 /// Reference to a chunker that can be re-used.
 #[derive(Clone)]
-pub struct ChunkerRef(Rc<RefCell<dyn Chunker>>);
+pub struct ChunkerRef(Arc<Mutex<dyn Chunker>>);
 
 impl Deref for ChunkerRef {
-    type Target = Rc<RefCell<dyn Chunker>>;
+    type Target = Arc<Mutex<dyn Chunker>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -103,8 +105,8 @@ impl DerefMut for ChunkerRef {
     }
 }
 
-impl From<Rc<RefCell<dyn Chunker>>> for ChunkerRef {
-    fn from(value: Rc<RefCell<dyn Chunker>>) -> Self {
+impl From<Arc<Mutex<dyn Chunker>>> for ChunkerRef {
+    fn from(value: Arc<Mutex<dyn Chunker>>) -> Self {
         Self(value)
     }
 }
@@ -114,13 +116,13 @@ where
     C: Chunker + 'static,
 {
     fn from(chunker: C) -> Self {
-        ChunkerRef(Rc::new(RefCell::new(chunker)))
+        ChunkerRef(Arc::new(Mutex::new(chunker)))
     }
 }
 
 impl Debug for ChunkerRef {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.0.borrow().fmt(f)
+        self.0.lock().unwrap().fmt(f)
     }
 }
 
@@ -131,6 +133,18 @@ pub trait Hasher {
 
     /// Takes some `data` and returns its `hash`.
     fn hash(&mut self, data: &[u8]) -> Self::Hash;
+
+    /// Returns length of the given hash.
+    fn len(&self, hash: &Self::Hash) -> usize;
+}
+
+impl<H, Hash> From<H> for Box<dyn Hasher<Hash = Hash>>
+where
+    H: Hasher<Hash = Hash> + 'static,
+{
+    fn from(hasher: H) -> Self {
+        Box::new(hasher)
+    }
 }
 
 /// Measurements that are received after writing data to a file.

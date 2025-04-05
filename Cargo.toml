@@ -1,5 +1,5 @@
 [workspace]
-members = ["runner"]
+members = ["chunkfs-cli"]
 resolver = "2"
 
 [package]
@@ -21,18 +21,22 @@ debug = true
 cdc-chunkers = { version = "0.1.0", optional = true }
 sha2 = { version = "0.10", optional = true }
 uuid = { version = "1", features = ["fast-rng", "v4"], optional = true }
-rand = { version = "0.8", optional = true }
+rand = { version = "0.9", optional = true }
 itertools = { version = "0.14", optional = true }
 fastcdc = { version = "3", optional = true }
+csv = { version = "1", optional = true }
+serde = { version = "1", optional = true, features = ["derive"] }
+serde_with = { version = "3", optional = true }
+chrono = { version = "0.4", optional = true, features = ["serde"] }
 diesel = { version = "2", features = ["sqlite"], optional = true }
 sled = { version = "0.34", optional = true }
 
 [features]
 chunkers = ["cdc-chunkers", "fastcdc"]
 hashers = ["sha2"]
-bench = ["uuid", "rand", "itertools"]
 storages = ["diesel", "sled"]
 full = ["chunkers", "hashers", "storages", "bench"]
+bench = ["uuid", "rand", "itertools", "csv", "serde", "serde_with", "chrono"]
 
 [dev-dependencies]
 chunkfs = { path = ".", features = ["chunkers", "hashers", "bench"] }
@@ -40,7 +44,6 @@ criterion = "0.5"
 sha3 = "0.10"
 approx = "0.5"
 tempfile = "3.14"
-serde = "1"
 serde_json = "1"
 
 [[bench]]

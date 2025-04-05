@@ -1,0 +1,13 @@
+[package]
+name = "chunkfscli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rand = "0.9"
+itertools = "0.14"
+chunkfs = { path = "../../chunkfs", features = ["chunkers", "hashers", "bench"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+toml = "0.8"
+serde = { version = "1.0.218", features = ["derive"] }
