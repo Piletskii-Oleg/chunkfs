@@ -194,7 +194,7 @@ where
         if self.database_map.contains_key(&key) {
             return Ok(());
         }
-        Self::insert(self, key, value)
+        self.insert(key, value)
     }
 
     fn insert(&mut self, key: K, value: V) -> io::Result<()> {
@@ -281,6 +281,6 @@ mod tests {
 
         db.clear().unwrap();
         let empty = db.get(&k1);
-        assert_eq!(empty.is_err(), true);
+        assert!(empty.is_err());
     }
 }
