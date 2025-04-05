@@ -51,10 +51,33 @@ where
 {
     /// Init database on a regular file.
     ///
-    /// Sets the size of the file specified in the path. Considers the block size to be 512.
+    /// Create file with `create_db_file`. Sets the size of the file specified in the path. Considers the block size to be 512.
     ///
     /// Intended for testing so that it does not require privileges for initialization on the block device.
-    pub fn init_on_regular_file<P>(file_path: P, total_size: u64) -> Result<Self, io::Error>
+    pub fn init_on_regular_file<P>(file_path: P, db_size: u64) -> io::Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let file = Self::create_db_file(&file_path, db_size)?;
+
+        let database_map = HashMap::new();
+        let total_size = file.metadata()?.len();
+
+        Ok(Self {
+            device: file,
+            file_path: Some(file_path.as_ref().to_string_lossy().to_string()),
+            database_map,
+            total_size,
+            block_size: 512,
+            used_blocks: 0,
+            _data_type: PhantomData,
+        })
+    }
+
+    /// Creates a regular file in the specified path with the specified size.
+    ///
+    /// Opens the file with O_DIRECT mode to minimize cache effects and returns file handle.
+    fn create_db_file<P>(file_path: P, db_size: u64) -> io::Result<File>
     where
         P: AsRef<Path>,
     {
@@ -65,19 +88,8 @@ where
             .write(true)
             .custom_flags(libc::O_DIRECT)
             .open(file_path.as_ref())?;
-        file.set_len(total_size)?;
-
-        let database_map = HashMap::new();
-
-        Ok(Self {
-            device: file,
-            file_path: Some(file_path.as_ref().to_str().unwrap().to_owned()),
-            database_map,
-            total_size,
-            block_size: 512,
-            used_blocks: 0,
-            _data_type: PhantomData,
-        })
+        file.set_len(db_size)?;
+        Ok(file)
     }
 
     /// Init database on a block device.
