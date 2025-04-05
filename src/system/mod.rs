@@ -176,11 +176,14 @@ where
             .storage
             .retrieve(spans.iter().map(|span| span.hash()).collect())?;
 
+        // Since we read by offset, which may be somewhere in the middle of the FileSpan offset,
+        // we need to remove the extra at the beginning of the first span
         let first_span = spans.first().unwrap();
         let last_span = spans.last().unwrap();
         let data_extra_start = original_offset - first_span.offset(); // amount of data from start to be removed
         data_vectors.first_mut().unwrap().drain(0..data_extra_start);
 
+        // Same, we need to remove the extra at the end of the last span.
         let read_size_possible = last_span.offset() + last_span.len() - original_offset;
         let read_size_actual = min(size, read_size_possible);
         let data_extra_end = read_size_possible - read_size_actual; // amount of data from end to be removed
