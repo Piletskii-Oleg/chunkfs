@@ -117,7 +117,7 @@ where
 
     /// Looks for the complement of a number up to a multiple of the block size.
     ///
-    /// For example, the result for 1000 with a block size of 512 would be 1024.
+    /// For example, the result for 1000 with a block size of 512 would be 24.
     fn padding_to_multiple_block_size(&self, length: u64) -> u64 {
         if length % self.block_size == 0 {
             0
