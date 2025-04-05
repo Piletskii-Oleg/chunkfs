@@ -21,12 +21,12 @@ impl<Hash: ChunkHash> FileSpan<Hash> {
         &self.hash
     }
 
-    pub fn offset(&self) -> &usize {
-        &self.offset
+    pub fn offset(&self) -> usize {
+        self.offset.clone()
     }
 
-    pub fn len(&self) -> &usize {
-        &self.len
+    pub fn len(&self) -> usize {
+        self.len.clone()
     }
 }
 
