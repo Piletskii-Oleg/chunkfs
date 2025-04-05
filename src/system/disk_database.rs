@@ -28,13 +28,19 @@ where
     K: ChunkHash,
     V: Clone + Encode + Decode<()>,
 {
+    /// Handle for an open block device (or regular file if initialized via `init_on_regular_file`.
     device: File,
     /// If Database initialized on a regular file, contains the path to it.
     file_path: Option<String>,
+    /// A map that maps keys to the location of data on a disk.
     database_map: HashMap<K, DataInfo>,
+    /// Size of the block device (or regular file).
     total_size: u64,
+    /// Block size (when initialized on a regular file, set to 512.
     block_size: u64,
+    /// Number of occupied blocks.
     used_blocks: u64,
+    /// Values data type. Database doesn't actually own them, so this field is necessary.
     _data_type: PhantomData<V>,
 }
 
