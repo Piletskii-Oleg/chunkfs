@@ -38,7 +38,7 @@ fn write_read_with_strange_size() {
     let actual = fs.read(&mut handle, 2 * MB + 3).unwrap();
     assert_eq!(actual, ones_w_twos);
 
-    handle.set_offset(433 * KB + 2 * MB + 3 + MB / 2).unwrap();
+    handle.set_offset(433 * KB + 2 * MB + 3 + MB / 2);
     let actual = fs.read(&mut handle, 10 * MB).unwrap();
     assert_eq!(actual, vec![2; MB + MB / 2]);
 }

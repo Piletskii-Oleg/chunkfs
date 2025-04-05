@@ -88,16 +88,9 @@ impl FileHandle {
         self.offset.clone()
     }
 
-    /// Sets the offset for the read-only file handle.
-    pub fn set_offset(&mut self, offset: usize) -> io::Result<()> {
-        if self.chunker.is_some() {
-            return Err(io::Error::new(
-                ErrorKind::PermissionDenied,
-                "offset can only be set with read-only file handles",
-            ));
-        }
+    /// Sets the offset for the file handle.
+    pub fn set_offset(&mut self, offset: usize) {
         self.offset = offset;
-        Ok(())
     }
 
     /// Returns name of the file.
