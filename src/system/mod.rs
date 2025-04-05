@@ -150,7 +150,7 @@ where
     /// Reads all contents of the file from beginning to end and returns them.
     pub fn read_file_complete(&self, handle: &FileHandle) -> io::Result<Vec<u8>> {
         let hashes = self.file_layer.read_complete(handle);
-        Ok(self.storage.retrieve(hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
+        Ok(self.storage.retrieve(&hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 
     /// Reads 1 MB of data from a file and returns it.
@@ -172,9 +172,8 @@ where
         if spans.is_empty() {
             return Ok(vec![]);
         }
-        let mut data_vectors = self
-            .storage
-            .retrieve(spans.iter().map(|span| span.hash()).collect())?;
+        let hashes: Vec<_> = spans.iter().map(|span| span.hash()).collect();
+        let mut data_vectors = self.storage.retrieve(&hashes)?;
 
         // Since we read by offset, which may be somewhere in the middle of the FileSpan offset,
         // we need to remove the extra at the beginning of the first span

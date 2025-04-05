@@ -138,7 +138,7 @@ where
 
     /// Retrieves the data from the storage based on hashes of the data [`segments`][Segment],
     /// or Error(NotFound) if some of the hashes were not present in the base.
-    pub fn retrieve(&self, request: Vec<&Hash>) -> io::Result<Vec<Vec<u8>>> {
+    pub fn retrieve(&self, request: &[&Hash]) -> io::Result<Vec<Vec<u8>>> {
         let retrieved = self.database.get_multi(request)?;
 
         retrieved
@@ -147,7 +147,7 @@ where
                 Data::Chunk(chunk) => Ok(chunk.clone()),
                 Data::TargetChunk(keys) => Ok(self
                     .target_map
-                    .get_multi(keys.iter().collect())?
+                    .get_multi(&keys.into_iter().collect::<Vec<_>>())?
                     .into_iter()
                     .flatten()
                     .collect()),
