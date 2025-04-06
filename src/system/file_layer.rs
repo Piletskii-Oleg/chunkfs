@@ -22,11 +22,11 @@ impl<Hash: ChunkHash> FileSpan<Hash> {
     }
 
     pub fn offset(&self) -> usize {
-        self.offset.clone()
+        self.offset
     }
 
     pub fn len(&self) -> usize {
-        self.len.clone()
+        self.len
     }
 }
 
@@ -85,7 +85,7 @@ impl FileHandle {
     }
 
     pub fn offset(&self) -> usize {
-        self.offset.clone()
+        self.offset
     }
 
     /// Sets the offset for the file handle.

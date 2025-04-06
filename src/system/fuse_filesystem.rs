@@ -8,10 +8,6 @@ use fuser::{
     FileAttr, FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
     ReplyEntry, ReplyOpen, ReplyWrite, Request, TimeOrNow,
 };
-use libc::{
-    EACCES, EBADF, EEXIST, EINVAL, EIO, ENOENT, EPERM, ESTALE, O_ACCMODE, O_RDONLY, O_RDWR,
-    O_WRONLY, R_OK, W_OK, X_OK,
-};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::time::{Duration, SystemTime};
@@ -19,6 +15,7 @@ use std::time::{Duration, SystemTime};
 type Inode = u64;
 type Fh = u64;
 
+/// File is opened for execution.
 const FMODE_EXEC: i32 = 0x20;
 
 #[derive(Clone)]
@@ -36,7 +33,7 @@ struct FuseFileHandle {
     inode: u64,
 }
 
-/// Wrap around [`FileSystem`] for implementing [`fuser::Filesystem`] trait.
+/// Wrap around [`FileSystem`] for implementing [`Filesystem`] trait.
 ///
 /// After creation, it should be passed to [`mount2`][fuser::mount2] or [`spawn_mount2`][fuser::spawn_mount2].
 pub struct FuseFS<B, Hash>
@@ -139,7 +136,7 @@ fn check_access(file_attr: &FileAttr, req: &Request, access_mask: i32) -> bool {
     // root is allowed to read & write anything
     if uid == 0 {
         // root only allowed to exec if one of the Exec bits is set
-        access_mask &= X_OK;
+        access_mask &= libc::X_OK;
         access_mask -= access_mask & (file_mode >> 6);
         access_mask -= access_mask & (file_mode >> 3);
         access_mask -= access_mask & file_mode;
@@ -165,12 +162,12 @@ where
     fn lookup(&mut self, _req: &Request<'_>, parent: u64, name: &OsStr, reply: ReplyEntry) {
         let name = name.to_str().unwrap().to_owned();
         if parent != 1 {
-            reply.error(EINVAL);
+            reply.error(libc::EINVAL);
             return;
         }
 
         let Some(inode) = self.inodes.get::<String>(&name) else {
-            reply.error(ENOENT);
+            reply.error(libc::ENOENT);
             return;
         };
         let file = self.files.get(inode).unwrap();
@@ -180,7 +177,7 @@ where
     fn getattr(&mut self, _req: &Request<'_>, ino: u64, _fh: Option<u64>, reply: ReplyAttr) {
         match self.files.get(&ino) {
             Some(file) => reply.attr(&Duration::new(0, 0), &file.attr),
-            None => reply.error(ENOENT),
+            None => reply.error(libc::ENOENT),
         }
     }
 
@@ -203,7 +200,7 @@ where
         reply: ReplyAttr,
     ) {
         let Some(file) = self.files.get_mut(&ino) else {
-            reply.error(ENOENT);
+            reply.error(libc::ENOENT);
             return;
         };
 
@@ -211,7 +208,7 @@ where
         let attr = &mut file.attr;
         if let Some(mode) = mode {
             if req.uid() != 0 && req.uid() != attr.uid {
-                reply.error(EPERM);
+                reply.error(libc::EPERM);
                 return;
             } else {
                 attr.perm = mode as u16;
@@ -223,12 +220,12 @@ where
 
         if let Some(atime) = atime {
             if attr.uid != req.uid() && req.uid() != 0 && atime != Now {
-                reply.error(EPERM);
+                reply.error(libc::EPERM);
                 return;
             }
 
-            if attr.uid != req.uid() && !check_access(&attr, req, W_OK) {
-                reply.error(EACCES);
+            if attr.uid != req.uid() && !check_access(&attr, req, libc::W_OK) {
+                reply.error(libc::EACCES);
                 return;
             }
 
@@ -241,12 +238,12 @@ where
 
         if let Some(mtime) = mtime {
             if attr.uid != req.uid() && req.uid() != 0 && mtime != Now {
-                reply.error(EPERM);
+                reply.error(libc::EPERM);
                 return;
             }
 
-            if attr.uid != req.uid() && !check_access(&attr, req, W_OK) {
-                reply.error(EACCES);
+            if attr.uid != req.uid() && !check_access(&attr, req, libc::W_OK) {
+                reply.error(libc::EACCES);
                 return;
             }
 
@@ -263,34 +260,34 @@ where
 
     fn open(&mut self, req: &Request<'_>, ino: u64, flags: i32, reply: ReplyOpen) {
         let Some(file) = self.files.get_mut(&ino) else {
-            reply.error(ENOENT);
+            reply.error(libc::ENOENT);
             return;
         };
 
-        let (access_mask, read, write) = match flags & O_ACCMODE {
-            O_RDONLY => {
+        let (access_mask, read, write) = match flags & libc::O_ACCMODE {
+            libc::O_RDONLY => {
                 if flags & libc::O_TRUNC != 0 {
-                    reply.error(EACCES);
+                    reply.error(libc::EACCES);
                     return;
                 }
                 if flags & FMODE_EXEC != 0 {
                     // Open is from internal exec syscall
-                    (X_OK, true, false)
+                    (libc::X_OK, true, false)
                 } else {
-                    (R_OK, true, false)
+                    (libc::R_OK, true, false)
                 }
             }
-            O_WRONLY => (W_OK, false, true),
-            O_RDWR => (R_OK | W_OK, true, true),
+            libc::O_WRONLY => (libc::W_OK, false, true),
+            libc::O_RDWR => (libc::R_OK | libc::W_OK, true, true),
             // Exactly one access mode flag must be specified
             _ => {
-                reply.error(EINVAL);
+                reply.error(libc::EINVAL);
                 return;
             }
         };
 
         if !check_access(&file.attr, req, access_mask) {
-            reply.error(EACCES);
+            reply.error(libc::EACCES);
             return;
         }
 
@@ -327,24 +324,24 @@ where
         reply: ReplyData,
     ) {
         let Some(file_handle) = self.file_handles.get_mut(&fh) else {
-            reply.error(EBADF);
+            reply.error(libc::EBADF);
             return;
         };
         if file_handle.inode != ino {
-            reply.error(ESTALE);
+            reply.error(libc::ESTALE);
             return;
         }
         let Some(file) = self.files.get(&ino) else {
-            reply.error(ENOENT);
+            reply.error(libc::ENOENT);
             return;
         };
         if offset < 0 {
-            reply.error(EINVAL);
+            reply.error(libc::EINVAL);
             return;
         }
 
-        if !check_access(&file.attr, req, R_OK) || !file_handle.read {
-            reply.error(EACCES);
+        if !check_access(&file.attr, req, libc::R_OK) || !file_handle.read {
+            reply.error(libc::EACCES);
             return;
         }
         let underlying_fh = &mut file_handle.underlying_file_handle;
@@ -354,7 +351,7 @@ where
             reply.data(&data);
             return;
         } else {
-            reply.error(EIO);
+            reply.error(libc::EIO);
             return;
         };
     }
@@ -372,24 +369,24 @@ where
         reply: ReplyWrite,
     ) {
         let Some(file_handle) = self.file_handles.get_mut(&fh) else {
-            reply.error(EBADF);
+            reply.error(libc::EBADF);
             return;
         };
         if file_handle.inode != ino {
-            reply.error(ESTALE);
+            reply.error(libc::ESTALE);
             return;
         }
         let Some(file) = self.files.get_mut(&ino) else {
-            reply.error(ENOENT);
+            reply.error(libc::ENOENT);
             return;
         };
         if offset < 0 || offset as u64 != file.attr.size {
-            reply.error(EINVAL);
+            reply.error(libc::EINVAL);
             return;
         }
 
-        if !check_access(&file.attr, req, R_OK) || !file_handle.write {
-            reply.error(EACCES);
+        if !check_access(&file.attr, req, libc::R_OK) || !file_handle.write {
+            reply.error(libc::EACCES);
             return;
         }
 
@@ -398,7 +395,7 @@ where
             .write_to_file(&mut file_handle.underlying_file_handle, data)
             .is_ok()
         {
-            reply.error(EIO);
+            reply.error(libc::EIO);
             return;
         }
 
@@ -422,15 +419,15 @@ where
         reply: ReplyEmpty,
     ) {
         let Some(file) = self.files.get_mut(&ino) else {
-            reply.error(EINVAL);
+            reply.error(libc::EINVAL);
             return;
         };
         if file.handles <= 0 {
-            reply.error(EINVAL);
+            reply.error(libc::EINVAL);
             return;
         }
         let Some(file_handle) = self.file_handles.remove(&ino) else {
-            reply.error(EINVAL);
+            reply.error(libc::EINVAL);
             return;
         };
         file_handle.underlying_file_handle.close();
@@ -447,12 +444,12 @@ where
         mut reply: ReplyDirectory,
     ) {
         if ino != 1 {
-            reply.error(EINVAL);
+            reply.error(libc::EINVAL);
             return;
         }
         let dir = self.files.get(&ino).unwrap();
-        if !check_access(&dir.attr, req, R_OK) {
-            reply.error(EACCES);
+        if !check_access(&dir.attr, req, libc::R_OK) {
+            reply.error(libc::EACCES);
             return;
         }
 
@@ -482,7 +479,7 @@ where
     ) {
         let name = name.to_str().unwrap().to_owned();
         if parent != 1 {
-            reply.error(EINVAL);
+            reply.error(libc::EINVAL);
             return;
         }
         let fh = self.get_new_fh();
@@ -490,7 +487,7 @@ where
             .underlying_fs
             .create_file(name.clone(), (&self.chunker).clone())
         else {
-            reply.error(EEXIST);
+            reply.error(libc::EEXIST);
             return;
         };
 
@@ -514,13 +511,13 @@ where
             flags: flags as u32,
         };
 
-        let (read, write) = match flags & O_ACCMODE {
-            O_RDONLY => (true, false),
-            O_WRONLY => (false, true),
-            O_RDWR => (true, true),
+        let (read, write) = match flags & libc::O_ACCMODE {
+            libc::O_RDONLY => (true, false),
+            libc::O_WRONLY => (false, true),
+            libc::O_RDWR => (true, true),
             // Exactly one access mode flag must be specified
             _ => {
-                reply.error(EINVAL);
+                reply.error(libc::EINVAL);
                 return;
             }
         };
