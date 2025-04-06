@@ -22,6 +22,13 @@ const BLKGETSIZE64: u64 = 0x80081272;
 /// Constant for requesting size of the block in the block device via ioctl
 const BLKSSZGET: u64 = 0x1268;
 
+enum InitType {
+    /// [`DiskDatabase`] is initialized on a block device.
+    BlockDevice,
+    /// [`DiskDatabase`] is initialized on regular file. Contains path to the file.
+    RegularFile(String),
+}
+
 /// Database that stores data on a block device
 pub struct DiskDatabase<K, V>
 where
@@ -30,8 +37,8 @@ where
 {
     /// Handle for an open block device (or regular file if initialized via `init_on_regular_file`.
     device: File,
-    /// If Database initialized on a regular file, contains the path to it.
-    file_path: Option<String>,
+    /// Type of the database initialization.
+    init_type: InitType,
     /// A map that maps keys to the location of data on a disk.
     database_map: HashMap<K, DataInfo>,
     /// Size of the block device (or regular file).
@@ -65,7 +72,7 @@ where
 
         Ok(Self {
             device: file,
-            file_path: Some(file_path.as_ref().to_string_lossy().to_string()),
+            init_type: InitType::RegularFile(file_path.as_ref().to_string_lossy().to_string()),
             database_map,
             total_size,
             block_size: 512,
@@ -124,7 +131,7 @@ where
 
         Ok(Self {
             device,
-            file_path: None,
+            init_type: InitType::BlockDevice,
             database_map,
             total_size,
             block_size,
@@ -191,7 +198,7 @@ where
     V: Clone + Encode + Decode<()>,
 {
     fn drop(&mut self) {
-        if let Some(file_path) = self.file_path.take() {
+        if let InitType::RegularFile(file_path) = &self.init_type {
             std::fs::remove_file(&file_path).unwrap()
         }
     }
