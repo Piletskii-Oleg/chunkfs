@@ -109,6 +109,7 @@ where
         let device = OpenOptions::new()
             .read(true)
             .write(true)
+            .custom_flags(libc::O_DIRECT)
             .open(blkdev_path)?;
         let _fd = device.as_raw_fd();
 
