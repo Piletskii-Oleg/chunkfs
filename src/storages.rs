@@ -1,31 +1,54 @@
 use std::io;
 use std::path::Path;
-use sled::Error;
+
 use crate::{ChunkHash, Database};
 
-struct SledStorage {
-    db: sled::Db
+pub struct SledStorage {
+    db: sled::Db,
+    config: bincode::config::Configuration,
 }
 
 impl SledStorage {
-    fn new<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+    pub fn new<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let db = sled::open(path)?;
-        Ok(Self { db })
+        let config = bincode::config::Configuration::default();
+        Ok(Self { db, config })
     }
 }
 
-impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for SledStorage {
+impl<Hash, V> Database<Hash, V> for SledStorage
+where
+    Hash: ChunkHash + bincode::Encode,
+    V: Clone + bincode::Encode + bincode::Decode<()>,
+{
     fn insert(&mut self, key: Hash, value: V) -> io::Result<()> {
+        let key = bincode::encode_to_vec(key, self.config).map_err(io::Error::other)?;
+        let value = bincode::encode_to_vec(value, self.config).map_err(io::Error::other)?;
+
         self.db.insert(key, value)?;
 
         Ok(())
     }
 
     fn get(&self, key: &Hash) -> io::Result<V> {
-        self.db.get(key)?
+        let key = bincode::encode_to_vec(key, self.config).map_err(io::Error::other)?;
+
+        match self.db.get(key)? {
+            None => Err(io::Error::from(io::ErrorKind::NotFound)),
+            Some(data) => {
+                let (value, _) =
+                    bincode::decode_from_slice(&data, self.config).map_err(io::Error::other)?;
+
+                Ok(value)
+            }
+        }
     }
 
     fn contains(&self, key: &Hash) -> bool {
-        todo!()
+        let key = bincode::encode_to_vec(key, self.config)
+            .map_err(io::Error::other)
+            .unwrap();
+
+        self.db.contains_key(key).unwrap()
     }
 }
