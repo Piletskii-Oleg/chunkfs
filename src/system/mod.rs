@@ -264,7 +264,7 @@ where
     }
 
     /// Returns an immutable iterator over storage chunks.
-    pub fn storage_iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &DataContainer<K>)> + '_> {
+    pub fn storage_iterator(&self) -> Box<dyn Iterator<Item = (Hash, DataContainer<K>)> + '_> {
         self.storage.iterator()
     }
 

@@ -38,23 +38,25 @@ pub trait Database<K, V> {
 /// Allows iteration over database contents.
 pub trait IterableDatabase<K, V>: Database<K, V> {
     /// Returns a simple immutable iterator over values.
-    fn iterator(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_>;
+    fn iterator(&self) -> Box<dyn Iterator<Item = (K, V)> + '_>;
 
     /// Returns an iterator that can mutate values but not keys.
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_>;
 
     /// Returns an immutable iterator over keys.
-    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &'a K> + 'a>
+    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = K> + 'a>
     where
         V: 'a,
+        K: 'a,
     {
         Box::new(self.iterator().map(|(k, _)| k))
     }
 
     /// Returns an immutable iterator over values.
-    fn values<'a>(&'a self) -> Box<dyn Iterator<Item = &'a V> + 'a>
+    fn values<'a>(&'a self) -> Box<dyn Iterator<Item = V> + 'a>
     where
         K: 'a,
+        V: 'a,
     {
         Box::new(self.iterator().map(|(_, v)| v))
     }
@@ -87,8 +89,8 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
 }
 
 impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
-    fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &V)> + '_> {
-        Box::new(self.iter())
+    fn iterator(&self) -> Box<dyn Iterator<Item = (Hash, V)> + '_> {
+        Box::new(self.iter().map(|(k, v)| (k.clone(), v.clone())))
     }
 
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {

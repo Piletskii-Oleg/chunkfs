@@ -5,12 +5,14 @@ use chunkfs::chunkers::{
     UltraChunker,
 };
 use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
+use chunkfs::storages::SledStorage;
 use chunkfs::{ChunkHash, ChunkerRef, DataContainer, Hasher, IterableDatabase, KB};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 #[derive(ValueEnum, Deserialize, Debug, Copy, Clone)]
 #[serde(rename_all(deserialize = "kebab-case"))]
@@ -67,6 +69,7 @@ fn get_chunker(args: &CliArgs) -> ChunkerRef {
 #[serde(rename_all(deserialize = "kebab-case"))]
 enum CliDatabase {
     Hashmap,
+    Sled,
 }
 
 #[derive(ValueEnum, Deserialize, Debug, Copy, Clone, PartialEq)]
@@ -226,7 +229,7 @@ impl Cli {
         }
     }
 
-    fn choose_database<Hash: ChunkHash>(
+    fn choose_database<Hash: ChunkHash + bincode::Decode<()> + bincode::Encode>(
         args: &CliArgs,
         command: &Commands,
         hasher: Box<dyn Hasher<Hash = Hash>>,
@@ -234,6 +237,11 @@ impl Cli {
         match args.database {
             CliDatabase::Hashmap => {
                 let fixture = CDCFixture::new(HashMap::default(), hasher);
+                Cli::execute_command(args, command, fixture)
+            }
+            CliDatabase::Sled => {
+                let db_path = format!("db-{}", Uuid::new_v4());
+                let fixture = CDCFixture::new(SledStorage::new(db_path)?, hasher);
                 Cli::execute_command(args, command, fixture)
             }
         }
@@ -246,7 +254,7 @@ impl Cli {
     ) -> io::Result<()>
     where
         B: IterableDatabase<Hash, DataContainer<()>>,
-        Hash: ChunkHash,
+        Hash: ChunkHash + bincode::Decode<()> + bincode::Encode,
     {
         let chunker = get_chunker(args);
 
@@ -286,7 +294,10 @@ impl Cli {
                     }
                 };
 
-                let measurement_path = args.report_path.join("report.csv");
+                let date = chrono::offset::Utc::now().to_string();
+                let report_path = args.report_path.join(date);
+                std::fs::create_dir_all(&report_path)?;
+                let measurement_path = report_path.join("report.csv");
 
                 for measurement in measurements {
                     measurement.write_to_csv(&measurement_path)?;
@@ -296,7 +307,7 @@ impl Cli {
                     let pairs = distribution.into_iter().collect::<Vec<(usize, u32)>>();
 
                     let file_name = format!("distribution.{index}.json");
-                    let path = args.report_path.join(file_name);
+                    let path = report_path.join(file_name);
 
                     let mut writer = io::BufWriter::new(std::fs::File::create(path)?);
                     serde_json::to_writer(&mut writer, &pairs)?;
