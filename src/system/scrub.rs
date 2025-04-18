@@ -23,11 +23,11 @@ use super::storage::DataContainer;
 /// # Arguments
 /// The only method [scrub][Scrub::scrub] takes two arguments:
 /// 1. A CDC [Database], which contains `Hash`-[`DataContainer`] pairs. To access the underlying data in the container,
-///     [DataContainer::extract] or [DataContainer::extract_mut] should be used.
+///    [DataContainer::extract] or [DataContainer::extract_mut] should be used.
 ///
 /// 2. A target map, which contains `Key`-`Vec<u8>` pairs, where `Key` is a generic value determined by the implementation.
-///     The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
-///     the target map implements [Database] trait. It should only be used for storage purposes and not contain any algorithm logic.
+///    The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
+///    the target map implements [Database] trait. It should only be used for storage purposes and not contain any algorithm logic.
 pub trait Scrub<Hash: ChunkHash, B, Key, T>
 where
     Hash: ChunkHash,
@@ -47,11 +47,11 @@ where
     /// # Arguments
     /// The method, besides `&mut self`, takes two other arguments:
     /// 1. A CDC [Database], which contains `Hash`-[`DataContainer`] pairs. The [DataContainer] stores either a CDC chunk, that is, a `Vec<u8>`,
-    ///     or a collection of target keys, using which the original chunk could be restored.
+    ///    or a collection of target keys, using which the original chunk could be restored.
     ///
     /// 2. A target map, which contains `Key`-`Vec<u8>` pairs, where `Key` is a generic key determined by the map implementation.
-    ///     The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
-    ///     the target map implements [Database] trait.
+    ///    The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
+    ///    the target map implements [Database] trait.
     ///
     /// # CDC Database
     /// We should be able to iterate over the `database` to process all chunks we had stored before.
