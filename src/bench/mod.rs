@@ -217,13 +217,13 @@ where
     /// Does not modify the database, i.e. does not clear it.
     pub fn size_distribution(&self, adjustment: usize) -> HashMap<usize, u32> {
         let mut chunk_map = HashMap::new();
-        for chunk in self
+        for chunk_len in self
             .fs
             .storage_iterator()
-            .map(|(_, container)| container.unwrap_chunk())
+            .map(|(_, container)| container.unwrap_chunk().len())
         {
             chunk_map
-                .entry(chunk.len() / adjustment * adjustment)
+                .entry(chunk_len / adjustment * adjustment)
                 .and_modify(|count| *count += 1)
                 .or_insert(1);
         }

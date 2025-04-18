@@ -24,7 +24,7 @@ report-path = "report"
 # Path to dataset to test on
 dataset-path = "Cargo.lock"
 # Name of the dataset
-dataset-name = "a"
+dataset-name = "example"
 # How many measurements to conduct
 count = 1
 # Whether the system has to be cleaned up after each measurement

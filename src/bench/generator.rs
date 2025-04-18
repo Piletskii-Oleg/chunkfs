@@ -74,7 +74,7 @@ pub fn fio(name: &str, size: usize, dedup_percentage: u8) -> io::Result<Dataset>
 /// # Parameters
 /// * name -- name of the dataset
 /// * size -- size of the dataset
-/// * distribution -- some distribution that implements rand::Distribution
+/// * distribution -- some distribution that implements `rand::distr::Distribution`
 pub fn random(name: &str, size: usize, distribution: impl Distribution<u8>) -> io::Result<Dataset> {
     let dir = std::env::temp_dir();
     let path = dir.join(name);
