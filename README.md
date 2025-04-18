@@ -137,5 +137,6 @@ It saves each run result to the `csv` file specified by `report-path` parameter,
 * Deduplication ratio
 * Throughput of the chunker and hasher, of the file system; time taken
 * Average chunk size
+
 Besides the metrics, it provides information about the dataset and time when benchmark was finished. 
 
