@@ -406,9 +406,9 @@ impl<K> DataContainer<K> {
     /// Returns a contained chunk if it is of type `Data::Chunk`.
     ///
     /// Will panic otherwise.
-    pub fn unwrap_chunk(&self) -> Vec<u8> {
+    pub fn unwrap_chunk(&self) -> &Vec<u8> {
         match &self.0 {
-            Data::Chunk(chunk) => chunk.clone(),
+            Data::Chunk(chunk) => chunk,
             Data::TargetChunk(_) => {
                 panic!("Target chunk found in DataContainer; expected simple chunk")
             }
