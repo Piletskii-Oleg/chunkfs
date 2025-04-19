@@ -29,9 +29,7 @@ serde = { version = "1", optional = true, features = ["derive"] }
 serde_with = { version = "3", optional = true }
 chrono = { version = "0.4", optional = true, features = ["serde"] }
 bincode = "2.0.1"
-config = "0.15.11"
 libc = "0.2.171"
-rstest = "0.25.0"
 
 [features]
 chunkers = ["cdc-chunkers", "fastcdc"]
@@ -44,6 +42,7 @@ criterion = "0.5"
 sha3 = "0.10"
 approx = "0.5"
 tempfile = "3.14"
+rstest = "0.25.0"
 
 serde_json = "1"
 
