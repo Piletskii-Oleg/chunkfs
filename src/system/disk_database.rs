@@ -59,6 +59,7 @@ where
     /// Init database on a regular file.
     ///
     /// Create file with `create_db_file`. Sets the size of the file specified in the path. Considers the block size to be 512.
+    /// File is removed on a drop() call.
     ///
     /// Intended for testing so that it does not require privileges for initialization on the block device.
     pub fn init_on_regular_file<P>(file_path: P, db_size: u64) -> io::Result<Self>
