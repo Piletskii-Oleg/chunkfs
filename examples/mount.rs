@@ -6,8 +6,9 @@ use std::fs;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::unix::fs::FileExt;
+use std::path::Path;
 
-const MOUNT_POINT: &str = "./mount_point";
+const MOUNT_POINT: &Path = Path::new("./mount_point");
 
 fn main() {
     let db = HashMap::default();
@@ -17,7 +18,7 @@ fn main() {
 
     let session = fuser::spawn_mount2(fuse_fs, MOUNT_POINT, &vec![]).unwrap();
 
-    let file_path = format!("{}/{}", MOUNT_POINT, "file");
+    let file_path = MOUNT_POINT.join("file");
     // careful: writing is sequential only
     let mut file = OpenOptions::new()
         .write(true)

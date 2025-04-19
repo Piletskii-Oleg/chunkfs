@@ -257,7 +257,7 @@ where
         let mut buffer = Vec::with_capacity(MB);
 
         loop {
-            let read = self.fs.read_1mb_from_file(&mut fs_file)?;
+            let read = self.fs.read_from_file(&mut fs_file)?;
             if read.is_empty() {
                 break;
             }
