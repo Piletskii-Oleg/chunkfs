@@ -157,7 +157,7 @@ where
     /// If file handle offset + 1 MB is greater than file size, then returns data starting from the offset to the end of the file
     ///
     /// **Careful:** it modifies internal `FileHandle` data. After using this `write_to_file` should not be used on the same FileHandle.
-    pub fn read_1mb_from_file(&self, handle: &mut FileHandle) -> io::Result<Vec<u8>> {
+    pub fn read_from_file(&self, handle: &mut FileHandle) -> io::Result<Vec<u8>> {
         self.read(handle, SEG_SIZE)
     }
 
@@ -178,11 +178,11 @@ where
         // Since we read by offset, which may be somewhere in the middle of the FileSpan offset,
         // we need to remove the extra at the beginning of the first span
         let first_span = spans.first().unwrap();
-        let last_span = spans.last().unwrap();
         let data_extra_start = original_offset - first_span.offset(); // amount of data from start to be removed
         data_vectors.first_mut().unwrap().drain(0..data_extra_start);
 
         // Same, we need to remove the extra at the end of the last span.
+        let last_span = spans.last().unwrap();
         let read_size_possible = last_span.offset() + last_span.len() - original_offset;
         let read_size_actual = min(size, read_size_possible);
         let data_extra_end = read_size_possible - read_size_actual; // amount of data from end to be removed
@@ -222,7 +222,7 @@ where
             .open(path)?;
 
         loop {
-            let data = self.read_1mb_from_file(&mut handle)?;
+            let data = self.read_from_file(&mut handle)?;
 
             if data.is_empty() {
                 break;

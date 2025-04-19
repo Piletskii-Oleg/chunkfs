@@ -6,18 +6,18 @@ use std::fs;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::unix::fs::FileExt;
-
-const MOUNT_POINT: &str = "./mount_point";
+use std::path::Path;
 
 fn main() {
+    let mount_point = Path::new("./mount_point");
     let db = HashMap::default();
     let fuse_fs = FuseFS::new(db, SimpleHasher, SuperChunker::default());
 
-    fs::create_dir_all(MOUNT_POINT).unwrap();
+    fs::create_dir_all(mount_point).unwrap();
 
-    let session = fuser::spawn_mount2(fuse_fs, MOUNT_POINT, &vec![]).unwrap();
+    let session = fuser::spawn_mount2(fuse_fs, mount_point, &vec![]).unwrap();
 
-    let file_path = format!("{}/{}", MOUNT_POINT, "file");
+    let file_path = mount_point.join("file");
     // careful: writing is sequential only
     let mut file = OpenOptions::new()
         .write(true)
@@ -42,5 +42,5 @@ fn main() {
     assert_eq!(read_size, 7 * MB);
 
     drop(session);
-    fs::remove_dir_all(MOUNT_POINT).unwrap();
+    fs::remove_dir_all(mount_point).unwrap();
 }

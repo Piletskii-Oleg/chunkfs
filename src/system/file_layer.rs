@@ -187,6 +187,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
         if spans.is_empty() {
             return spans;
         }
+
         let last_span = spans.last().unwrap();
         let read_size_possible = last_span.offset + last_span.len - handle.offset;
         handle.offset += min(read_size_possible, size);

@@ -87,12 +87,12 @@ fn write_read_blocks_test() {
     let mut handle = fs.open_file("file", LeapChunker::default()).unwrap();
     let mut buffer = Vec::with_capacity(MB * 3 + 50);
     for _ in 0..4 {
-        let buf = fs.read_1mb_from_file(&mut handle).unwrap();
+        let buf = fs.read_from_file(&mut handle).unwrap();
         buffer.extend_from_slice(&buf);
     }
     assert_eq!(buffer.len(), MB * 3 + 50);
     assert!(complete == buffer);
-    assert_eq!(fs.read_1mb_from_file(&mut handle).unwrap(), []);
+    assert_eq!(fs.read_from_file(&mut handle).unwrap(), []);
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn read_file_with_size_less_than_1mb() {
     println!("{:?}", measurements);
 
     let mut handle = fs.open_file_readonly("file").unwrap();
-    assert_eq!(fs.read_1mb_from_file(&mut handle).unwrap(), ones);
+    assert_eq!(fs.read_from_file(&mut handle).unwrap(), ones);
 }
 
 #[test]
@@ -237,7 +237,7 @@ fn readonly_file_handle_cannot_write_can_read() {
     assert_eq!(read.len(), MB);
     assert_eq!(read, [1; MB]);
 
-    let _ = fs.read_1mb_from_file(&mut ro_fh).unwrap();
+    let _ = fs.read_from_file(&mut ro_fh).unwrap();
 
     // can close
     let measurements = fs.close_file(ro_fh).unwrap();
