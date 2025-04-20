@@ -1,13 +1,16 @@
 use chunkfs::chunkers::SuperChunker;
 use chunkfs::hashers::SimpleHasher;
 use chunkfs::{FuseFS, MB};
+use filetime::FileTime;
 use fuser::BackgroundSession;
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, OpenOptions, Permissions};
 use std::io::{Read, Write};
-use std::os::unix::fs::{FileExt, PermissionsExt};
+use std::os::unix::fs::{FileExt, MetadataExt, PermissionsExt};
 use std::path::Path;
+use std::time::SystemTime;
 use uuid::Uuid;
 
 fn generate_unique_mount_point() -> String {
@@ -46,6 +49,103 @@ impl Drop for FuseFixture {
 
 fn file_size(file: &File) -> u64 {
     file.metadata().unwrap().len()
+}
+
+fn to_unix_secs(time: &SystemTime) -> u64 {
+    time.duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+fn get_metadata_times(file: &File) -> (u64, u64, u64) {
+    let metadata = file.metadata().unwrap();
+    (
+        metadata.atime() as u64,
+        metadata.mtime() as u64,
+        metadata.ctime() as u64,
+    )
+}
+#[test]
+fn metadata_times() {
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+    let file_path = mount_point.join("file");
+
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(&file_path)
+        .unwrap();
+    let (atime_init, mtime_init, ctime_init) = get_metadata_times(&file);
+
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    file.write(&mut vec![0; 512]).unwrap();
+    let (atime1, mtime1, ctime1) = get_metadata_times(&file);
+    assert!(mtime1 > mtime_init);
+    assert!(ctime1 > ctime_init);
+    assert_eq!(atime1, atime_init);
+
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    file.read_at(&mut vec![0; 512], 0).unwrap();
+    let (atime2, mtime2, ctime2) = get_metadata_times(&file);
+    assert!(atime2 > atime1);
+    assert_eq!(mtime2, mtime1);
+    assert!(ctime2 > ctime1);
+}
+
+#[test]
+fn manual_setattr() {
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+    let file_path = mount_point.join("file");
+
+    let before_creation = SystemTime::now();
+    let file = File::create(&file_path).unwrap();
+
+    let (atime1, mtime1, ctime1) = get_metadata_times(&file);
+    assert_eq!(atime1, mtime1);
+    assert_eq!(mtime1, ctime1);
+    let before_creation_in_unix_secs = to_unix_secs(&before_creation);
+    assert!(ctime1 >= before_creation_in_unix_secs);
+
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    let now = SystemTime::now();
+    let now_minus10s = now - std::time::Duration::from_secs(10);
+    let now_minus100s = now - std::time::Duration::from_secs(100);
+
+    let new_atime = FileTime::from_system_time(now_minus10s);
+    let new_mtime = FileTime::from_system_time(now_minus100s);
+
+    filetime::set_file_atime(&file_path, new_atime).unwrap();
+    filetime::set_file_mtime(&file_path, new_mtime).unwrap();
+
+    let (atime2, mtime2, ctime2) = get_metadata_times(&file);
+    assert_eq!(atime2, to_unix_secs(&now_minus10s));
+    assert_eq!(mtime2, to_unix_secs(&now_minus100s));
+    assert!(ctime2 > ctime1);
+}
+#[test]
+fn readdir() {
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    File::create(mount_point.join("file1")).unwrap();
+    File::create(mount_point.join("file2")).unwrap();
+
+    let mut files = vec![];
+    for entry in fs::read_dir(mount_point).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        assert!(path.is_file());
+        files.push(path.file_name().unwrap().to_owned());
+    }
+    assert!(files.contains(&OsString::from("file1")));
+    assert!(files.contains(&OsString::from("file1")));
+    assert_eq!(files.len(), 2)
 }
 
 #[test]
