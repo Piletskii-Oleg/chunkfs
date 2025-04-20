@@ -44,21 +44,18 @@ impl Drop for FuseFixture {
     }
 }
 
+fn file_size(file: &File) -> u64 {
+    file.metadata().unwrap().len()
+}
+
 #[test]
 fn permissions() {
     let fuse_fixture = FuseFixture::default();
     let mount_point = Path::new(&fuse_fixture.mount_point);
 
     let file_path = mount_point.join("file");
-    OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(&file_path)
-        .unwrap();
+    File::create(&file_path).unwrap();
 
-    let perms: Vec<_> = (0o000..=0o777).map(|m| Permissions::from_mode(m)).collect();
-
-    let file_size = |file: &File| file.metadata().unwrap().len();
     let read_ok = || {
         let mut file = OpenOptions::new().read(true).open(&file_path).unwrap();
         let mut buf = vec![];
@@ -78,6 +75,8 @@ fn permissions() {
         let res = OpenOptions::new().write(true).open(&file_path);
         assert!(res.is_err());
     };
+
+    let perms: Vec<_> = (0o000..=0o777).map(|m| Permissions::from_mode(m)).collect();
     for perm in perms {
         fs::set_permissions(&file_path, perm.clone()).unwrap();
         if perm.mode() & 0o400 != 0 {
@@ -95,16 +94,59 @@ fn permissions() {
 }
 
 #[test]
+fn write_not_to_end_fails() {
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    let dir_path = mount_point.join("directory");
+    let res = fs::create_dir(&dir_path);
+    assert!(res.is_err());
+}
+
+#[test]
+fn create_dir_fails() {
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    let file_path = mount_point.join("file");
+    let mut file = File::create(&file_path).unwrap();
+
+    file.write_all(b"Hello, Chunkfs!").unwrap();
+    file.write_all(&vec![0; MB]).unwrap();
+
+    let res1 = file.write_at(&vec![1, 2, 3], 10);
+    let res2 = file.write_at(&vec![1, 2, 3], file_size(&file) + 1);
+    assert!(res1.is_err());
+    assert!(res2.is_err());
+}
+
+#[test]
+fn filehandles_mods() {
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    let file_path = mount_point.join("file");
+    File::create(&file_path).unwrap();
+
+    let mut file = OpenOptions::new().write(true).open(&file_path).unwrap();
+    let res = file.read(&mut vec![0; 512]);
+    assert!(res.is_err());
+
+    let file = OpenOptions::new().read(true).open(&file_path).unwrap();
+    let res = file.write_at(&mut vec![0; 512], file_size(&file));
+    assert!(res.is_err());
+
+    let res = OpenOptions::new().open(&file_path);
+    assert!(res.is_err());
+}
+
+#[test]
 fn write_fuse_fs() {
     let fuse_fixture = FuseFixture::default();
     let mount_point = Path::new(&fuse_fixture.mount_point);
 
     let file_path = mount_point.join("file");
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(&file_path)
-        .unwrap();
+    let mut file = File::create(&file_path).unwrap();
 
     let mut data1 = vec![1u8; 2000];
     let mut data2 = vec![2u8; 5000];
@@ -124,11 +166,7 @@ fn different_data_writes() {
     let mount_point = Path::new(&fuse_fixture.mount_point);
 
     let file_path = mount_point.join("file");
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(&file_path)
-        .unwrap();
+    let mut file = File::create(&file_path).unwrap();
 
     let mut data1 = vec![1u8; 500];
     let mut data2 = vec![2u8; 700];

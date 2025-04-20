@@ -191,7 +191,7 @@ where
         _size: Option<u64>,
         atime: Option<TimeOrNow>,
         mtime: Option<TimeOrNow>,
-        _ctime: Option<SystemTime>,
+        ctime: Option<SystemTime>,
         _fh: Option<u64>,
         _crtime: Option<SystemTime>,
         _chgtime: Option<SystemTime>,
@@ -218,40 +218,47 @@ where
             return;
         }
 
+        let set_time_with_check = |time: TimeOrNow| {
+            if attr.uid != req.uid() && req.uid() != 0 && time != Now {
+                return None;
+            }
+
+            match time {
+                TimeOrNow::SpecificTime(time) => Some(time),
+                Now => Some(now),
+            }
+        };
+
         if let Some(atime) = atime {
-            if attr.uid != req.uid() && req.uid() != 0 && atime != Now {
-                reply.error(libc::EPERM);
-                return;
-            }
-
-            if attr.uid != req.uid() && !check_access(&attr, req, libc::W_OK) {
-                reply.error(libc::EACCES);
-                return;
-            }
-
-            attr.atime = match atime {
-                TimeOrNow::SpecificTime(time) => time,
-                Now => now,
+            match set_time_with_check(atime) {
+                Some(atime) => attr.atime = atime,
+                None => {
+                    reply.error(libc::EPERM);
+                    return;
+                }
             };
             attr.ctime = now;
         }
 
         if let Some(mtime) = mtime {
-            if attr.uid != req.uid() && req.uid() != 0 && mtime != Now {
-                reply.error(libc::EPERM);
-                return;
-            }
-
-            if attr.uid != req.uid() && !check_access(&attr, req, libc::W_OK) {
-                reply.error(libc::EACCES);
-                return;
-            }
-
-            attr.mtime = match mtime {
-                TimeOrNow::SpecificTime(time) => time,
-                Now => now,
+            match set_time_with_check(mtime) {
+                Some(mtime) => attr.mtime = mtime,
+                None => {
+                    reply.error(libc::EPERM);
+                    return;
+                }
             };
             attr.ctime = now;
+        }
+
+        if let Some(ctime) = ctime {
+            match set_time_with_check(TimeOrNow::SpecificTime(ctime)) {
+                Some(ctime) => attr.ctime = ctime,
+                None => {
+                    reply.error(libc::EPERM);
+                    return;
+                }
+            };
         }
 
         reply.attr(&Duration::new(0, 0), &attr);
@@ -482,7 +489,6 @@ where
             reply.error(libc::EINVAL);
             return;
         }
-        let fh = self.get_new_fh();
         let Ok(underlying_file_handle) = self
             .underlying_fs
             .create_file(name.clone(), (&self.chunker).clone())
@@ -535,6 +541,7 @@ where
             handles: 1,
         };
 
+        let fh = self.get_new_fh();
         reply.created(
             &Duration::new(0, 0),
             &file.attr,
