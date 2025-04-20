@@ -338,7 +338,7 @@ where
             reply.error(libc::ESTALE);
             return;
         }
-        let Some(file) = self.files.get(&ino) else {
+        let Some(file) = self.files.get_mut(&ino) else {
             reply.error(libc::ENOENT);
             return;
         };
@@ -354,6 +354,9 @@ where
         let underlying_fh = &mut file_handle.underlying_file_handle;
         underlying_fh.set_offset(offset as usize);
 
+        let now = SystemTime::now();
+        file.attr.atime = now;
+        file.attr.ctime = now;
         if let Ok(data) = self.underlying_fs.read(underlying_fh, size as usize) {
             reply.data(&data);
             return;
