@@ -422,7 +422,7 @@ where
         &mut self,
         _req: &Request<'_>,
         ino: u64,
-        _fh: u64,
+        fh: u64,
         _flags: i32,
         _lock_owner: Option<u64>,
         _flush: bool,
@@ -436,7 +436,7 @@ where
             reply.error(libc::EINVAL);
             return;
         }
-        let Some(file_handle) = self.file_handles.remove(&ino) else {
+        let Some(file_handle) = self.file_handles.remove(&fh) else {
             reply.error(libc::EINVAL);
             return;
         };
