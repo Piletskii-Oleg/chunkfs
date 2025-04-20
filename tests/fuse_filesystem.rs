@@ -1,28 +1,105 @@
 use chunkfs::chunkers::SuperChunker;
 use chunkfs::hashers::SimpleHasher;
 use chunkfs::{FuseFS, MB};
+use fuser::BackgroundSession;
 use std::collections::HashMap;
 use std::fs;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions, Permissions};
 use std::io::{Read, Write};
-use std::os::unix::fs::FileExt;
+use std::os::unix::fs::{FileExt, PermissionsExt};
+use std::path::Path;
 use uuid::Uuid;
 
 fn generate_unique_mount_point() -> String {
     Uuid::new_v4().to_string()
 }
 
+struct FuseFixture {
+    mount_point: String,
+    fuse_session: Option<BackgroundSession>,
+}
+
+impl FuseFixture {
+    fn default() -> Self {
+        let mount_point = generate_unique_mount_point();
+        let db = HashMap::default();
+        let fuse_fs = FuseFS::new(db, SimpleHasher, SuperChunker::default());
+        fs::create_dir_all(&mount_point).unwrap();
+
+        let fuse_session = fuser::spawn_mount2(fuse_fs, &mount_point, &vec![]).unwrap();
+
+        Self {
+            mount_point,
+            fuse_session: Some(fuse_session),
+        }
+    }
+}
+
+impl Drop for FuseFixture {
+    fn drop(&mut self) {
+        if let Some(session) = self.fuse_session.take() {
+            drop(session)
+        }
+        fs::remove_dir(&self.mount_point).unwrap();
+    }
+}
+
+#[test]
+fn permissions() {
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    let file_path = mount_point.join("file");
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(&file_path)
+        .unwrap();
+
+    let perms: Vec<_> = (0o000..=0o777).map(|m| Permissions::from_mode(m)).collect();
+
+    let file_size = |file: &File| file.metadata().unwrap().len();
+    let read_ok = || {
+        let mut file = OpenOptions::new().read(true).open(&file_path).unwrap();
+        let mut buf = vec![];
+        file.read_to_end(&mut buf).unwrap();
+        assert_eq!(file_size(&file), buf.len() as u64);
+    };
+    let read_denied = || {
+        let res = OpenOptions::new().read(true).open(&file_path);
+        assert!(res.is_err());
+    };
+    let write_ok = || {
+        let file = OpenOptions::new().write(true).open(&file_path).unwrap();
+        let write_len = file.write_at(&mut vec![0; 512], file_size(&file)).unwrap();
+        assert_eq!(write_len, 512);
+    };
+    let write_denied = || {
+        let res = OpenOptions::new().write(true).open(&file_path);
+        assert!(res.is_err());
+    };
+    for perm in perms {
+        fs::set_permissions(&file_path, perm.clone()).unwrap();
+        if perm.mode() & 0o400 != 0 {
+            read_ok();
+        } else {
+            read_denied();
+        }
+
+        if perm.mode() & 0o200 != 0 {
+            write_ok();
+        } else {
+            write_denied();
+        }
+    }
+}
+
 #[test]
 fn write_fuse_fs() {
-    let db = HashMap::default();
-    let fuse_fs = FuseFS::new(db, SimpleHasher, SuperChunker::default());
-    let mount_point = generate_unique_mount_point();
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
 
-    fs::create_dir_all(&mount_point).unwrap();
-
-    let session = fuser::spawn_mount2(fuse_fs, &mount_point, &vec![]).unwrap();
-
-    let file_path = format!("{}/{}", &mount_point, "file");
+    let file_path = mount_point.join("file");
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
@@ -39,22 +116,14 @@ fn write_fuse_fs() {
     let mut actual = Vec::new();
     file.read_to_end(&mut actual).unwrap();
     assert_eq!(actual, data1);
-
-    drop(session);
-    fs::remove_dir_all(&mount_point).unwrap();
 }
 
 #[test]
 fn different_data_writes() {
-    let db = HashMap::default();
-    let fuse_fs = FuseFS::new(db, SimpleHasher, SuperChunker::default());
-    let mount_point = generate_unique_mount_point();
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
 
-    fs::create_dir_all(&mount_point).unwrap();
-
-    let session = fuser::spawn_mount2(fuse_fs, &mount_point, &vec![]).unwrap();
-
-    let file_path = format!("{}/{}", &mount_point, "file");
+    let file_path = mount_point.join("file");
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
@@ -84,7 +153,4 @@ fn different_data_writes() {
     file.read_exact_at(&mut actual, (first_read_len + MB) as u64)
         .unwrap();
     assert_eq!(actual, expected);
-
-    drop(session);
-    fs::remove_dir_all(&mount_point).unwrap();
 }
