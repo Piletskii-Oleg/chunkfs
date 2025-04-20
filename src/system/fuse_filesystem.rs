@@ -385,7 +385,7 @@ where
             return;
         }
 
-        if !check_access(&file.attr, req, libc::R_OK) || !file_handle.write {
+        if !check_access(&file.attr, req, libc::W_OK) || !file_handle.write {
             reply.error(libc::EACCES);
             return;
         }
