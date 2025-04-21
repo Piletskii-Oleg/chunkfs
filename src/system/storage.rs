@@ -147,7 +147,7 @@ where
                 Data::Chunk(chunk) => Ok(chunk.clone()),
                 Data::TargetChunk(keys) => Ok(self
                     .target_map
-                    .get_multi(&keys.into_iter().collect::<Vec<_>>())?
+                    .get_multi(&keys.iter().collect::<Vec<_>>())?
                     .into_iter()
                     .flatten()
                     .collect()),

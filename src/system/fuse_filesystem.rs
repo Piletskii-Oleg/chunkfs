@@ -261,8 +261,7 @@ where
             };
         }
 
-        reply.attr(&Duration::new(0, 0), &attr);
-        return;
+        reply.attr(&Duration::new(0, 0), attr);
     }
 
     fn open(&mut self, req: &Request<'_>, ino: u64, flags: i32, reply: ReplyOpen) {
@@ -359,10 +358,8 @@ where
         file.attr.ctime = now;
         if let Ok(data) = self.underlying_fs.read(underlying_fh, size as usize) {
             reply.data(&data);
-            return;
         } else {
             reply.error(libc::EIO);
-            return;
         };
     }
 
@@ -400,10 +397,10 @@ where
             return;
         }
 
-        if !self
+        if self
             .underlying_fs
             .write_to_file(&mut file_handle.underlying_file_handle, data)
-            .is_ok()
+            .is_err()
         {
             reply.error(libc::EIO);
             return;
@@ -432,7 +429,7 @@ where
             reply.error(libc::EINVAL);
             return;
         };
-        if file.handles <= 0 {
+        if file.handles == 0 {
             reply.error(libc::EINVAL);
             return;
         }
@@ -469,7 +466,7 @@ where
             .map(|(inode, file)| (inode, file.attr.kind, &file.name));
         for (i, entry) in entries.enumerate().skip(offset as usize) {
             let (inode, kind, name) = entry;
-            if reply.add(inode.clone(), offset + i as i64 + 1, kind, name) {
+            if reply.add(*inode, offset + i as i64 + 1, kind, name) {
                 break;
             }
         }
@@ -494,7 +491,7 @@ where
         }
         let Ok(underlying_file_handle) = self
             .underlying_fs
-            .create_file(name.clone(), (&self.chunker).clone())
+            .create_file(name.clone(), (self.chunker).clone())
         else {
             reply.error(libc::EEXIST);
             return;
@@ -545,13 +542,7 @@ where
         };
 
         let fh = self.get_new_fh();
-        reply.created(
-            &Duration::new(0, 0),
-            &file.attr,
-            0,
-            fh.clone(),
-            flags as u32,
-        );
+        reply.created(&Duration::new(0, 0), &file.attr, 0, fh, flags as u32);
 
         self.files.insert(ino, file);
         self.inodes.insert(name, ino);
