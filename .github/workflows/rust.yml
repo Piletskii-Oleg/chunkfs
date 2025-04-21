@@ -12,13 +12,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Install FUSE dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y fuse3 libfuse3-dev
+
       - name: Formatting
         run: cargo fmt -- --check
+
       - name: Clippy
         run: cargo clippy --all-targets --tests -- -D warnings
+
       - name: Build
         run: cargo build --all-features --all-targets --verbose
+
       - name: Run tests
         run: cargo test --verbose
+
       - name: Run binary
         run: cargo build -p chunkfscli --verbose
