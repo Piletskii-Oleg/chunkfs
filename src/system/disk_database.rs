@@ -201,7 +201,7 @@ where
 {
     fn drop(&mut self) {
         if let InitType::RegularFile(file_path) = &self.init_type {
-            std::fs::remove_file(&file_path).unwrap()
+            std::fs::remove_file(file_path).unwrap()
         }
     }
 }

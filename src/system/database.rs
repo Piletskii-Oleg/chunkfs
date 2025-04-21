@@ -101,7 +101,7 @@ impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
     }
 
     fn values(&self) -> Box<dyn Iterator<Item = V> + '_> {
-        Box::new(self.values().map(|v| v.clone()))
+        Box::new(self.values().cloned())
     }
 
     fn clear(&mut self) -> io::Result<()> {
