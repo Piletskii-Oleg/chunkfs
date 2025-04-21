@@ -26,8 +26,8 @@ use super::storage::DataContainer;
 ///    [DataContainer::extract] or [DataContainer::extract_mut] should be used.
 ///
 /// 2. A target map, which contains `Key`-`Vec<u8>` pairs, where `Key` is a generic value determined by the implementation.
-///     The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
-///     the target map implements [Database] trait. It should only be used for storage purposes and not contain any algorithm logic.
+///    The way data is stored is determined by the target map implementation, the only information known to the scrubber is that
+///    the target map implements [Database] trait. It should only be used for storage purposes and not contain any algorithm logic.
 pub trait Scrub<Hash: ChunkHash, B, Key, T>: Send
 where
     Hash: ChunkHash,

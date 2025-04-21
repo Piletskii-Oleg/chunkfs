@@ -29,7 +29,7 @@ impl FuseFixture {
         let fuse_fs = FuseFS::new(db, SimpleHasher, SuperChunker::default());
         fs::create_dir_all(&mount_point).unwrap();
 
-        let fuse_session = fuser::spawn_mount2(fuse_fs, &mount_point, &vec![]).unwrap();
+        let fuse_session = fuser::spawn_mount2(fuse_fs, &mount_point, &[]).unwrap();
 
         Self {
             mount_point,
@@ -75,13 +75,14 @@ fn metadata_times() {
         .read(true)
         .write(true)
         .create(true)
+        .truncate(true)
         .open(&file_path)
         .unwrap();
     let (atime_init, mtime_init, ctime_init) = get_metadata_times(&file);
 
     std::thread::sleep(std::time::Duration::from_secs(1));
 
-    file.write(&mut vec![0; 512]).unwrap();
+    file.write_all(&vec![0; 512]).unwrap();
     let (atime1, mtime1, ctime1) = get_metadata_times(&file);
     assert!(mtime1 > mtime_init);
     assert!(ctime1 > ctime_init);
@@ -168,7 +169,7 @@ fn permissions() {
     };
     let write_ok = || {
         let file = OpenOptions::new().write(true).open(&file_path).unwrap();
-        let write_len = file.write_at(&mut vec![0; 512], file_size(&file)).unwrap();
+        let write_len = file.write_at(&vec![0; 512], file_size(&file)).unwrap();
         assert_eq!(write_len, 512);
     };
     let write_denied = || {
@@ -176,7 +177,7 @@ fn permissions() {
         assert!(res.is_err());
     };
 
-    let perms: Vec<_> = (0o000..=0o777).map(|m| Permissions::from_mode(m)).collect();
+    let perms: Vec<_> = (0o000..=0o777).map(Permissions::from_mode).collect();
     for perm in perms {
         fs::set_permissions(&file_path, perm.clone()).unwrap();
         if perm.mode() & 0o400 != 0 {
@@ -214,8 +215,8 @@ fn create_dir_fails() {
     file.write_all(b"Hello, Chunkfs!").unwrap();
     file.write_all(&vec![0; MB]).unwrap();
 
-    let res1 = file.write_at(&vec![1, 2, 3], 10);
-    let res2 = file.write_at(&vec![1, 2, 3], file_size(&file) + 1);
+    let res1 = file.write_at(&[1, 2, 3], 10);
+    let res2 = file.write_at(&[1, 2, 3], file_size(&file) + 1);
     assert!(res1.is_err());
     assert!(res2.is_err());
 }
@@ -233,7 +234,7 @@ fn filehandles_mods() {
     assert!(res.is_err());
 
     let file = OpenOptions::new().read(true).open(&file_path).unwrap();
-    let res = file.write_at(&mut vec![0; 512], file_size(&file));
+    let res = file.write_at(&vec![0; 512], file_size(&file));
     assert!(res.is_err());
 
     let res = OpenOptions::new().open(&file_path);

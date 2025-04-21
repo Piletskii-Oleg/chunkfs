@@ -15,7 +15,7 @@ fn main() {
 
     fs::create_dir_all(mount_point).unwrap();
 
-    let session = fuser::spawn_mount2(fuse_fs, mount_point, &vec![]).unwrap();
+    let session = fuser::spawn_mount2(fuse_fs, mount_point, &[]).unwrap();
 
     let file_path = mount_point.join("file");
     // careful: writing is sequential only
@@ -23,6 +23,7 @@ fn main() {
         .write(true)
         .read(true)
         .create(true)
+        .truncate(true)
         .open(&file_path)
         .unwrap();
 
