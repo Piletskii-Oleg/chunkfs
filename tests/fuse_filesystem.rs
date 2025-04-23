@@ -195,7 +195,7 @@ fn permissions() {
 }
 
 #[test]
-fn write_not_to_end_fails() {
+fn create_dir_fails() {
     let fuse_fixture = FuseFixture::default();
     let mount_point = Path::new(&fuse_fixture.mount_point);
 
@@ -205,7 +205,7 @@ fn write_not_to_end_fails() {
 }
 
 #[test]
-fn create_dir_fails() {
+fn write_not_to_end_fails() {
     let fuse_fixture = FuseFixture::default();
     let mount_point = Path::new(&fuse_fixture.mount_point);
 
