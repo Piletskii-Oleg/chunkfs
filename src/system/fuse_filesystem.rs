@@ -275,35 +275,29 @@ where
         };
 
         if let Some(atime) = atime {
-            match set_time_with_check(atime) {
-                Some(atime) => attr.atime = atime,
-                None => {
-                    reply.error(libc::EPERM);
-                    return;
-                }
+            let Some(atime) = set_time_with_check(atime) else {
+                reply.error(libc::EPERM);
+                return;
             };
+            attr.atime = atime;
             attr.ctime = now;
         }
 
         if let Some(mtime) = mtime {
-            match set_time_with_check(mtime) {
-                Some(mtime) => attr.mtime = mtime,
-                None => {
-                    reply.error(libc::EPERM);
-                    return;
-                }
+            let Some(mtime) = set_time_with_check(mtime) else {
+                reply.error(libc::EPERM);
+                return;
             };
+            attr.mtime = mtime;
             attr.ctime = now;
         }
 
         if let Some(ctime) = ctime {
-            match set_time_with_check(TimeOrNow::SpecificTime(ctime)) {
-                Some(ctime) => attr.ctime = ctime,
-                None => {
-                    reply.error(libc::EPERM);
-                    return;
-                }
+            let Some(ctime) = set_time_with_check(TimeOrNow::SpecificTime(ctime)) else {
+                reply.error(libc::EPERM);
+                return;
             };
+            attr.ctime = ctime;
         }
 
         reply.attr(&Duration::new(0, 0), attr);
@@ -404,35 +398,38 @@ where
         file.attr.atime = now;
         file.attr.ctime = now;
 
-        if let Ok(mut data) = self.underlying_fs.read(underlying_fh, size) {
-            let read_size = data.len();
-            let new_offset = offset + read_size;
-            underlying_fh.set_offset(new_offset);
-            if read_size > size || file.cache.len() > file.attr.size as usize {
-                reply.error(libc::EIO);
-                return;
-            }
-            if read_size == size || new_offset >= file.attr.size as usize {
-                reply.data(&data);
-                return;
-            }
-            let missing_size = size - read_size;
-            let disk_data_size = file.attr.size as usize - file.cache.len();
-            if new_offset < disk_data_size {
-                reply.error(libc::EIO);
-                return;
-            }
-
-            let cache_start_offset = new_offset - disk_data_size;
-            let cache_end_offset = min(file.cache.len(), cache_start_offset + missing_size);
-            data.extend_from_slice(&file.cache[cache_start_offset..cache_end_offset]);
-            let new_offset = offset + data.len();
-
-            underlying_fh.set_offset(new_offset);
-            reply.data(&data);
-        } else {
+        let Ok(mut data) = self.underlying_fs.read(underlying_fh, size) else {
             reply.error(libc::EIO);
+            return;
         };
+
+        let read_size = data.len();
+        let new_offset = offset + read_size;
+        underlying_fh.set_offset(new_offset);
+
+        if read_size > size || file.cache.len() > file.attr.size as usize {
+            reply.error(libc::EIO);
+            return;
+        }
+        if read_size == size || new_offset >= file.attr.size as usize {
+            reply.data(&data);
+            return;
+        }
+
+        let missing_size = size - read_size;
+        let disk_data_size = file.attr.size as usize - file.cache.len();
+        if new_offset < disk_data_size {
+            reply.error(libc::EIO);
+            return;
+        }
+
+        let cache_start_offset = new_offset - disk_data_size;
+        let cache_end_offset = min(file.cache.len(), cache_start_offset + missing_size);
+        data.extend_from_slice(&file.cache[cache_start_offset..cache_end_offset]);
+        let new_offset = offset + data.len();
+
+        underlying_fh.set_offset(new_offset);
+        reply.data(&data);
     }
 
     fn write(
