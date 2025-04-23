@@ -1,6 +1,6 @@
 use crate::system::file_layer::FileHandle;
 use crate::{
-    create_cdc_filesystem, ChunkHash, ChunkerRef, DataContainer, Database, FileSystem, Hasher,
+    create_cdc_filesystem, ChunkHash, ChunkerRef, DataContainer, Database, FileSystem, Hasher, MB,
 };
 use fuser::FileType::RegularFile;
 use fuser::TimeOrNow::Now;
@@ -8,8 +8,10 @@ use fuser::{
     FileAttr, FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
     ReplyEntry, ReplyOpen, ReplyWrite, Request, TimeOrNow,
 };
+use std::cmp::min;
 use std::collections::HashMap;
 use std::ffi::OsStr;
+use std::io;
 use std::time::{Duration, SystemTime};
 
 type Inode = u64;
@@ -17,9 +19,12 @@ type Fh = u64;
 
 /// File is opened for execution.
 const FMODE_EXEC: i32 = 0x20;
+const FILESYSTEM_CACHE_MAX_SIZE: usize = 500 * MB;
+const FILE_CACHE_MAX_SIZE: usize = 200 * MB;
 
 #[derive(Clone)]
 struct FuseFile {
+    cache: Vec<u8>,
     attr: FileAttr,
     name: String,
     generation: u64,
@@ -48,6 +53,7 @@ where
     next_fh: u64,
     file_handles: HashMap<Fh, FuseFileHandle>,
     chunker: ChunkerRef,
+    total_cache: usize,
 }
 
 impl<B, Hash> FuseFS<B, Hash>
@@ -86,6 +92,7 @@ where
             blksize: 512,
         };
         let root_dir = FuseFile {
+            cache: Vec::new(),
             attr: root_attr,
             name: ".".to_string(),
             generation: 0,
@@ -104,6 +111,7 @@ where
             file_handles: HashMap::default(),
             next_fh: 0,
             chunker: chunker.into(),
+            total_cache: 0,
         }
     }
 
@@ -115,6 +123,43 @@ where
         let next_fh = self.next_fh;
         self.next_fh += 1;
         next_fh
+    }
+
+    fn drop_and_shrink_cache(&mut self, file: Inode, handle: Fh) -> io::Result<()> {
+        self.drop_cache(file, handle)?;
+
+        let file = self.files.get_mut(&file).ok_or(io::ErrorKind::NotFound)?;
+        self.total_cache -= file.cache.len();
+        file.cache = vec![];
+        Ok(())
+    }
+
+    fn drop_cache(&mut self, file: Inode, handle: Fh) -> io::Result<()> {
+        let file = self.files.get_mut(&file).ok_or(io::ErrorKind::NotFound)?;
+        let handle = self
+            .file_handles
+            .get_mut(&handle)
+            .ok_or(io::ErrorKind::NotFound)?;
+        self.underlying_fs
+            .write_to_file(&mut handle.underlying_file_handle, &file.cache)?;
+
+        file.cache.clear();
+        Ok(())
+    }
+
+    fn drop_and_shrink_caches(&mut self) -> io::Result<()> {
+        for handle in self.file_handles.values_mut() {
+            let file = self
+                .files
+                .get_mut(&handle.inode)
+                .ok_or(io::ErrorKind::NotFound)?;
+            self.underlying_fs
+                .write_to_file(&mut handle.underlying_file_handle, &file.cache)?;
+
+            self.total_cache -= file.cache.len();
+            file.cache = vec![];
+        }
+        Ok(())
     }
 }
 
@@ -297,13 +342,13 @@ where
             return;
         }
 
-        let underlying_file_handle = if write {
-            self.underlying_fs
-                .open_file(&file.name, self.chunker.clone())
-        } else {
-            self.underlying_fs.open_file_readonly(&file.name)
-        }
-        .unwrap();
+        let Ok(underlying_file_handle) = self
+            .underlying_fs
+            .open_file(&file.name, self.chunker.clone())
+        else {
+            reply.error(libc::EBADF);
+            return;
+        };
 
         let file_handle = FuseFileHandle {
             underlying_file_handle,
@@ -345,18 +390,45 @@ where
             reply.error(libc::EINVAL);
             return;
         }
+        let offset = offset as usize;
+        let size = size as usize;
 
         if !check_access(&file.attr, req, libc::R_OK) || !file_handle.read {
             reply.error(libc::EACCES);
             return;
         }
         let underlying_fh = &mut file_handle.underlying_file_handle;
-        underlying_fh.set_offset(offset as usize);
+        underlying_fh.set_offset(offset);
 
         let now = SystemTime::now();
         file.attr.atime = now;
         file.attr.ctime = now;
-        if let Ok(data) = self.underlying_fs.read(underlying_fh, size as usize) {
+
+        if let Ok(mut data) = self.underlying_fs.read(underlying_fh, size) {
+            let read_size = data.len();
+            let new_offset = offset + read_size;
+            underlying_fh.set_offset(new_offset);
+            if read_size > size || file.cache.len() > file.attr.size as usize {
+                reply.error(libc::EIO);
+                return;
+            }
+            if read_size == size || new_offset >= file.attr.size as usize {
+                reply.data(&data);
+                return;
+            }
+            let missing_size = size - read_size;
+            let disk_data_size = file.attr.size as usize - file.cache.len();
+            if new_offset < disk_data_size {
+                reply.error(libc::EIO);
+                return;
+            }
+
+            let cache_start_offset = new_offset - disk_data_size;
+            let cache_end_offset = min(file.cache.len(), cache_start_offset + missing_size);
+            data.extend_from_slice(&file.cache[cache_start_offset..cache_end_offset]);
+            let new_offset = offset + data.len();
+
+            underlying_fh.set_offset(new_offset);
             reply.data(&data);
         } else {
             reply.error(libc::EIO);
@@ -397,16 +469,18 @@ where
             return;
         }
 
-        if self
-            .underlying_fs
-            .write_to_file(&mut file_handle.underlying_file_handle, data)
-            .is_err()
-        {
+        file.cache.extend_from_slice(data);
+        if file.cache.len() > FILE_CACHE_MAX_SIZE && self.drop_cache(ino, fh).is_err() {
+            reply.error(libc::EIO);
+            return;
+        }
+        if self.total_cache > FILESYSTEM_CACHE_MAX_SIZE && self.drop_and_shrink_caches().is_err() {
             reply.error(libc::EIO);
             return;
         }
 
         let now = SystemTime::now();
+        let file = self.files.get_mut(&ino).unwrap();
         file.attr.ctime = now;
         file.attr.mtime = now;
         file.attr.size += data.len() as u64;
@@ -425,7 +499,7 @@ where
         _flush: bool,
         reply: ReplyEmpty,
     ) {
-        let Some(file) = self.files.get_mut(&ino) else {
+        let Some(file) = self.files.get(&ino) else {
             reply.error(libc::EINVAL);
             return;
         };
@@ -437,7 +511,14 @@ where
             reply.error(libc::EINVAL);
             return;
         };
+
+        if self.drop_and_shrink_cache(ino, fh).is_err() {
+            reply.error(libc::EIO);
+            return;
+        }
+
         file_handle.underlying_file_handle.close();
+        let file = self.files.get_mut(&ino).unwrap();
         file.handles -= 1;
         reply.ok()
     }
@@ -491,7 +572,7 @@ where
         }
         let Ok(underlying_file_handle) = self
             .underlying_fs
-            .create_file(name.clone(), (self.chunker).clone())
+            .create_file(name.clone(), self.chunker.clone())
         else {
             reply.error(libc::EEXIST);
             return;
@@ -535,6 +616,7 @@ where
             write,
         };
         let file = FuseFile {
+            cache: Vec::new(),
             attr,
             name: name.clone(),
             generation: 0,
