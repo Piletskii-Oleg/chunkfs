@@ -1,6 +1,7 @@
 use chunkfs::chunkers::SuperChunker;
 use chunkfs::hashers::SimpleHasher;
 use chunkfs::{FuseFS, MB};
+use fuser::MountOption::AutoUnmount;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::OpenOptions;
@@ -15,7 +16,7 @@ fn main() {
 
     fs::create_dir_all(mount_point).unwrap();
 
-    let session = fuser::spawn_mount2(fuse_fs, mount_point, &[]).unwrap();
+    let session = fuser::spawn_mount2(fuse_fs, mount_point, &[AutoUnmount]).unwrap();
 
     let file_path = mount_point.join("file");
     // careful: writing is sequential only

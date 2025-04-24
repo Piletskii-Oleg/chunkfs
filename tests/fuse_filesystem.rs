@@ -3,6 +3,7 @@ use chunkfs::hashers::SimpleHasher;
 use chunkfs::{FuseFS, MB};
 use filetime::FileTime;
 use fuser::BackgroundSession;
+use fuser::MountOption::AutoUnmount;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
@@ -29,7 +30,7 @@ impl FuseFixture {
         let fuse_fs = FuseFS::new(db, SimpleHasher, SuperChunker::default());
         fs::create_dir_all(&mount_point).unwrap();
 
-        let fuse_session = fuser::spawn_mount2(fuse_fs, &mount_point, &[]).unwrap();
+        let fuse_session = fuser::spawn_mount2(fuse_fs, &mount_point, &[AutoUnmount]).unwrap();
 
         Self {
             mount_point,
