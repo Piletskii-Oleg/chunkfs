@@ -504,16 +504,20 @@ where
             reply.error(libc::EINVAL);
             return;
         }
-        let Some(file_handle) = self.file_handles.remove(&fh) else {
+        if !self.file_handles.contains_key(&fh) {
             reply.error(libc::EINVAL);
             return;
-        };
+        }
 
         if self.drop_and_shrink_cache(ino, fh).is_err() {
             reply.error(libc::EIO);
             return;
         }
 
+        let Some(file_handle) = self.file_handles.remove(&fh) else {
+            reply.error(libc::EINVAL);
+            return;
+        };
         file_handle.underlying_file_handle.close();
         let file = self.files.get_mut(&ino).unwrap();
         file.handles -= 1;
