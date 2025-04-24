@@ -302,6 +302,7 @@ fn read_dropped_cache() {
     let file_path = mount_point.join("file");
     let mut file = OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .open(&file_path)
         .unwrap();
@@ -345,6 +346,7 @@ fn read_cache() {
     let file_path = mount_point.join("file");
     let mut file = OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .open(&file_path)
         .unwrap();
