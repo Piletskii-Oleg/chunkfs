@@ -19,8 +19,8 @@ type Fh = u64;
 
 /// File is opened for execution.
 const FMODE_EXEC: i32 = 0x20;
-const FILESYSTEM_CACHE_MAX_SIZE: usize = 500 * MB;
-const FILE_CACHE_MAX_SIZE: usize = 200 * MB;
+const FILESYSTEM_CACHE_MAX_SIZE: usize = 25 * MB;
+const FILE_CACHE_MAX_SIZE: usize = 5 * MB;
 
 #[derive(Clone)]
 struct FuseFile {
