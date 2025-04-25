@@ -53,3 +53,7 @@ harness = false
 [[bench]]
 name = "chunker_sizes"
 harness = false
+
+[[bench]]
+name = "fuse_write_read"
+harness = false
