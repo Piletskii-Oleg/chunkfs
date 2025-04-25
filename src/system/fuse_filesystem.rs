@@ -213,6 +213,32 @@ where
         };
         Ok(())
     }
+
+    fn flush(&mut self, _req: &Request<'_>, ino: u64, fh: u64, lock_owner: u64, reply: ReplyEmpty) {
+        let Some(file_handle) = self.file_handles.get_mut(&fh) else {
+            reply.error(libc::EBADF);
+            return;
+        };
+        if file_handle.inode != ino {
+            reply.error(libc::ESTALE);
+            return;
+        }
+        let Some(_) = self.files.get_mut(&ino) else {
+            reply.error(libc::ENOENT);
+            return;
+        };
+        if !file_handle.write && !file_handle.read {
+            reply.error(libc::EACCES);
+            return;
+        }
+
+        if self.drop_cache(ino, fh).is_err() {
+            reply.error(libc::EIO);
+            return;
+        }
+        reply.ok()
+    }
+
     fn lookup(&mut self, _req: &Request<'_>, parent: u64, name: &OsStr, reply: ReplyEntry) {
         let name = name.to_str().unwrap().to_owned();
         if parent != 1 {
