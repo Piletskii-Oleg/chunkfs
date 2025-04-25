@@ -2,12 +2,14 @@ use crate::system::file_layer::FileHandle;
 use crate::{
     create_cdc_filesystem, ChunkHash, ChunkerRef, DataContainer, Database, FileSystem, Hasher, MB,
 };
+use fuser::consts::FUSE_BIG_WRITES;
 use fuser::FileType::RegularFile;
 use fuser::TimeOrNow::Now;
 use fuser::{
-    FileAttr, FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
-    ReplyEntry, ReplyOpen, ReplyWrite, Request, TimeOrNow,
+    FileAttr, FileType, Filesystem, KernelConfig, ReplyAttr, ReplyCreate, ReplyData,
+    ReplyDirectory, ReplyEmpty, ReplyEntry, ReplyOpen, ReplyWrite, Request, TimeOrNow,
 };
+use libc::c_int;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -204,6 +206,13 @@ where
     B: Database<Hash, DataContainer<()>>,
     Hash: ChunkHash,
 {
+    fn init(&mut self, _req: &Request<'_>, config: &mut KernelConfig) -> Result<(), c_int> {
+        let _ = config.add_capabilities(FUSE_BIG_WRITES);
+        if let Err(nearest) = config.set_max_write(128 * MB as u32) {
+            let _ = config.set_max_write(nearest);
+        };
+        Ok(())
+    }
     fn lookup(&mut self, _req: &Request<'_>, parent: u64, name: &OsStr, reply: ReplyEntry) {
         let name = name.to_str().unwrap().to_owned();
         if parent != 1 {
