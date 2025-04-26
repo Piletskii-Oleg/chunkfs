@@ -10,7 +10,7 @@ use std::fs;
 use std::fs::{File, OpenOptions, Permissions};
 use std::io::{Read, Write};
 use std::os::unix::fs::{FileExt, MetadataExt, PermissionsExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use uuid::Uuid;
 
@@ -19,13 +19,14 @@ fn generate_unique_mount_point() -> String {
 }
 
 struct FuseFixture {
-    mount_point: String,
+    mount_point: PathBuf,
     fuse_session: Option<BackgroundSession>,
 }
 
 impl FuseFixture {
     fn default() -> Self {
-        let mount_point = generate_unique_mount_point();
+        let mount_dir = Path::new("mount_dir");
+        let mount_point = mount_dir.join(generate_unique_mount_point());
         let db = HashMap::default();
         let fuse_fs = FuseFS::new(db, SimpleHasher, SuperChunker::default());
         fs::create_dir_all(&mount_point).unwrap();
