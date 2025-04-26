@@ -4,12 +4,13 @@ use chunkfs::{FuseFS, MB};
 use filetime::FileTime;
 use fuser::BackgroundSession;
 use fuser::MountOption::AutoUnmount;
+use libc::O_DIRECT;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, OpenOptions, Permissions};
 use std::io::{Read, Write};
-use std::os::unix::fs::{FileExt, MetadataExt, PermissionsExt};
+use std::os::unix::fs::{FileExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use uuid::Uuid;
@@ -78,6 +79,7 @@ fn metadata_times() {
         .write(true)
         .create(true)
         .truncate(true)
+        .custom_flags(O_DIRECT)
         .open(&file_path)
         .unwrap();
     let (atime_init, mtime_init, ctime_init) = get_metadata_times(&file);
@@ -106,7 +108,13 @@ fn manual_setattr() {
     let file_path = mount_point.join("file");
 
     let before_creation = SystemTime::now();
-    let file = File::create(&file_path).unwrap();
+    let file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .custom_flags(O_DIRECT)
+        .open(&file_path)
+        .unwrap();
 
     let (atime1, mtime1, ctime1) = get_metadata_times(&file);
     assert_eq!(atime1, mtime1);
@@ -249,14 +257,24 @@ fn write_fuse_fs() {
     let mount_point = Path::new(&fuse_fixture.mount_point);
 
     let file_path = mount_point.join("file");
-    let mut file = File::create(&file_path).unwrap();
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .custom_flags(O_DIRECT)
+        .open(&file_path)
+        .unwrap();
 
     let mut data1 = vec![1u8; 2000];
     let mut data2 = vec![2u8; 5000];
     file.write_all(&data1).unwrap();
     file.write_at(&data2, data1.len() as u64).unwrap();
 
-    let mut file = OpenOptions::new().read(true).open(&file_path).unwrap();
+    let mut file = OpenOptions::new()
+        .custom_flags(O_DIRECT)
+        .read(true)
+        .open(&file_path)
+        .unwrap();
     data1.append(&mut data2);
     let mut actual = Vec::new();
     file.read_to_end(&mut actual).unwrap();
@@ -269,7 +287,13 @@ fn different_data_writes() {
     let mount_point = Path::new(&fuse_fixture.mount_point);
 
     let file_path = mount_point.join("file");
-    let mut file = File::create(&file_path).unwrap();
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .custom_flags(O_DIRECT)
+        .open(&file_path)
+        .unwrap();
 
     let mut data1 = vec![1u8; 500];
     let mut data2 = vec![2u8; 700];
@@ -280,7 +304,11 @@ fn different_data_writes() {
     file.write_all(&data3).unwrap();
     file.write_all(&data4).unwrap();
 
-    let mut file = OpenOptions::new().read(true).open(&file_path).unwrap();
+    let mut file = OpenOptions::new()
+        .custom_flags(O_DIRECT)
+        .read(true)
+        .open(&file_path)
+        .unwrap();
     data1.append(&mut data2);
     data1.append(&mut vec![3u8; MB + 11]);
     let mut actual = vec![0u8; 500 + 700 + MB + 11];
