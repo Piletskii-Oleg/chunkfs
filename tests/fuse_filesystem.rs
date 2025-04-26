@@ -341,6 +341,7 @@ fn read_dropped_cache() {
     let mut file = OpenOptions::new()
         .create(true)
         .truncate(true)
+        .custom_flags(O_DIRECT)
         .write(true)
         .read(true)
         .open(&file_path)
@@ -400,6 +401,7 @@ fn read_cache() {
         .create(true)
         .truncate(true)
         .write(true)
+        .custom_flags(O_DIRECT)
         .read(true)
         .open(&file_path)
         .unwrap();
@@ -455,9 +457,21 @@ fn concurrent_file_handles() {
     let file_path = mount_point.join("file");
     File::create(&file_path).unwrap();
 
-    let handle1 = OpenOptions::new().append(true).open(&file_path).unwrap();
-    let handle2 = OpenOptions::new().append(true).open(&file_path).unwrap();
-    let handle3 = OpenOptions::new().append(true).open(&file_path).unwrap();
+    let handle1 = OpenOptions::new()
+        .append(true)
+        .custom_flags(O_DIRECT)
+        .open(&file_path)
+        .unwrap();
+    let handle2 = OpenOptions::new()
+        .append(true)
+        .custom_flags(O_DIRECT)
+        .open(&file_path)
+        .unwrap();
+    let handle3 = OpenOptions::new()
+        .append(true)
+        .custom_flags(O_DIRECT)
+        .open(&file_path)
+        .unwrap();
     for _ in 0..12 {
         handle1
             .write_all_at(&vec![1; MB], file_size(&handle1))
@@ -480,6 +494,39 @@ fn concurrent_file_handles() {
     assert_eq!(file.read(&mut actual).unwrap(), 12 * 3 * MB);
     assert_eq!(actual, expected);
     assert_eq!(file.metadata().unwrap().len(), 12 * 3 * MB as u64);
+}
+
+#[test]
+fn offset_change_not_affects_cache_drop() {
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    let file_path = mount_point.join("file");
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .custom_flags(O_DIRECT)
+        .write(true)
+        .read(true)
+        .open(&file_path)
+        .unwrap();
+    file.write_all(&[0; 3 * MB]).unwrap();
+    assert_eq!(MB, file.read_at(&mut [0; MB], 2 * MB as u64).unwrap());
+    drop(file);
+
+    let mut file = OpenOptions::new()
+        .custom_flags(O_DIRECT)
+        .read(true)
+        .append(true)
+        .open(&file_path)
+        .unwrap();
+    file.write_all(&[0; 3 * MB]).unwrap();
+    file.flush().unwrap();
+
+    let mut actual = vec![10; 6 * MB];
+    assert_eq!(file.read_at(&mut actual, 0).unwrap(), 6 * MB);
+    assert_eq!(actual, [0; 6 * MB]);
+    assert_eq!(file.metadata().unwrap().len(), 6 * MB as u64);
 }
 
 #[test]
