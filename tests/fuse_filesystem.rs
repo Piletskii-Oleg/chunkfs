@@ -1,6 +1,6 @@
 use chunkfs::chunkers::SuperChunker;
-use chunkfs::hashers::SimpleHasher;
-use chunkfs::{FuseFS, MB};
+use chunkfs::hashers::Sha256Hasher;
+use chunkfs::{ChunkerRef, FuseFS, MB};
 use filetime::FileTime;
 use fuser::BackgroundSession;
 use fuser::MountOption::AutoUnmount;
@@ -26,10 +26,17 @@ struct FuseFixture {
 
 impl FuseFixture {
     fn default() -> Self {
+        Self::with_chunker(SuperChunker::default())
+    }
+
+    fn with_chunker<C>(chunker: C) -> Self
+    where
+        C: Into<ChunkerRef>,
+    {
         let mount_dir = Path::new("mount_dir");
         let mount_point = mount_dir.join(generate_unique_mount_point());
         let db = HashMap::default();
-        let fuse_fs = FuseFS::new(db, SimpleHasher, SuperChunker::default());
+        let fuse_fs = FuseFS::new(db, Sha256Hasher::default(), chunker);
         fs::create_dir_all(&mount_point).unwrap();
 
         let fuse_session = fuser::spawn_mount2(fuse_fs, &mount_point, &[AutoUnmount]).unwrap();
