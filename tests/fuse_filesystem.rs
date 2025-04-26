@@ -306,38 +306,52 @@ fn read_dropped_cache() {
         .create(true)
         .truncate(true)
         .write(true)
-        .open(&file_path)
-        .unwrap();
-    file.write_all(&[0; 10 * MB]).unwrap();
-    drop(file);
-    let file = OpenOptions::new()
-        .write(true)
         .read(true)
         .open(&file_path)
         .unwrap();
-    file.write_all_at(&[1; 10 * MB], file_size(&file)).unwrap();
+    file.write_all(&[0; 10 * MB]).unwrap();
+    file.flush().unwrap();
+    file.write_all(&[1; 3 * MB]).unwrap();
 
-    // read dropped cache from start to end - epsilon
-    let mut actual = vec![10; 7 * MB];
+    let mut actual = vec![10; 14 * MB];
+    assert_eq!(file.read_at(&mut actual, 0).unwrap(), 13 * MB);
+    let expected = [vec![0; 10 * MB], vec![1; 3 * MB], vec![10; MB]].concat();
+    assert_eq!(
+        actual, expected,
+        "read entire file with dropped and dirty cache is correct"
+    );
+
+    actual = vec![10; 7 * MB];
     assert_eq!(file.read_at(&mut actual, 0).unwrap(), 7 * MB);
-    assert_eq!(actual, [0; 7 * MB]);
+    assert_eq!(
+        actual,
+        [0; 7 * MB],
+        "read dropped cache from start to end - epsilon is correct"
+    );
 
-    // read dropped cache from start to end + epsilon
-    let mut actual = vec![10; 12 * MB];
+    actual = vec![10; 12 * MB];
     assert_eq!(file.read_at(&mut actual, 0).unwrap(), 12 * MB);
     let expected = [vec![0; 10 * MB], vec![1; 2 * MB]].concat();
-    assert_eq!(actual, expected);
+    assert_eq!(
+        actual, expected,
+        "read dropped cache from start to end + epsilon is correct"
+    );
 
-    // read dropped cache from start + epsilon to end - epsilon
     actual = vec![10; 7 * MB];
-    assert_eq!(file.read_at(&mut actual, 2 * MB as u64).unwrap(), 7 * MB);
-    assert_eq!(actual, [0; 7 * MB]);
+    assert_eq!(file.read_at(&mut actual, MB as u64).unwrap(), 7 * MB);
+    assert_eq!(
+        actual,
+        [0; 7 * MB],
+        "read dropped cache from start + epsilon to end - epsilon is correct"
+    );
 
-    // read dropped cache from start + epsilon to end + epsilon
-    actual = vec![10; 7 * MB];
-    assert_eq!(file.read_at(&mut actual, 7 * MB as u64).unwrap(), 7 * MB);
-    let expected = [vec![0; 3 * MB], vec![1; 4 * MB]].concat();
-    assert_eq!(actual, expected);
+    actual = vec![10; 10 * MB];
+    assert_eq!(file.read_at(&mut actual, 7 * MB as u64).unwrap(), 6 * MB);
+    let expected = [vec![0; 3 * MB], vec![1; 3 * MB], vec![10; 4 * MB]].concat();
+    assert_eq!(
+        actual, expected,
+        "read dropped cache from start + epsilon to end + epsilon is correct"
+    );
 }
 
 #[test]
@@ -350,33 +364,51 @@ fn read_cache() {
         .create(true)
         .truncate(true)
         .write(true)
-        .open(&file_path)
-        .unwrap();
-    file.write_all(&[0; 10 * MB]).unwrap();
-    drop(file);
-    let file = OpenOptions::new()
-        .write(true)
         .read(true)
         .open(&file_path)
         .unwrap();
-    file.write_all_at(&[1; 20 * MB], file_size(&file)).unwrap();
+    file.write_all(&[0; 10 * MB]).unwrap();
+    file.flush().unwrap();
+    file.write_all(&[1; 3 * MB]).unwrap();
 
-    // read cache from start - epsilon to end + epsilon
-    let mut actual = vec![10; 30 * MB];
-    assert_eq!(file.read_at(&mut actual, 5 * MB as u64).unwrap(), 25 * MB);
-    let expected = [vec![0; 5 * MB], vec![1; 20 * MB], vec![10; 5 * MB]].concat();
-    assert_eq!(actual, expected);
+    let mut actual = vec![10; 15 * MB];
+    assert_eq!(file.read_at(&mut actual, 0).unwrap(), 13 * MB);
+    let expected = [vec![0; 10 * MB], vec![1; 3 * MB], vec![10; 2 * MB]].concat();
+    assert_eq!(
+        actual, expected,
+        "read entire file with dropped and dirty cache is correct"
+    );
 
-    // read cache from start to end - epsilon
-    actual = vec![10; 15 * MB];
-    assert_eq!(file.read_at(&mut actual, 10 * MB as u64).unwrap(), 15 * MB);
-    assert_eq!(actual, [1; 15 * MB]);
+    actual = vec![10; 10 * MB];
+    assert_eq!(file.read_at(&mut actual, 5 * MB as u64).unwrap(), 8 * MB);
+    let expected = [vec![0; 5 * MB], vec![1; 3 * MB], vec![10; 2 * MB]].concat();
+    assert_eq!(
+        actual, expected,
+        "read cache from start - epsilon to end + epsilon is correct"
+    );
 
-    // read cache from start + epsilon to end + epsilon
-    actual = vec![10; 40 * MB];
-    assert_eq!(file.read_at(&mut actual, 12 * MB as u64).unwrap(), 18 * MB);
-    let expected = [vec![1; 18 * MB], vec![10; 22 * MB]].concat();
-    assert_eq!(actual, expected);
+    actual = vec![10; 2 * MB];
+    assert_eq!(file.read_at(&mut actual, 10 * MB as u64).unwrap(), 2 * MB);
+    assert_eq!(
+        actual,
+        [1; 2 * MB],
+        "read cache from start to end - epsilon is correct"
+    );
+
+    actual = vec![10; 5 * MB];
+    assert_eq!(file.read_at(&mut actual, 11 * MB as u64).unwrap(), 2 * MB);
+    let expected = [vec![1; 2 * MB], vec![10; 3 * MB]].concat();
+    assert_eq!(
+        actual, expected,
+        "read cache from start + epsilon to end + epsilon is correct"
+    );
+
+    actual = vec![10; MB];
+    assert_eq!(file.read_at(&mut actual, 11 * MB as u64).unwrap(), 1 * MB);
+    assert_eq!(
+        actual, [1; MB],
+        "read cache from start + epsilon to end - epsilon is correct"
+    );
 }
 
 #[test]
