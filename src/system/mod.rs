@@ -186,10 +186,8 @@ where
         let read_size_possible = last_span.offset() + last_span.len() - original_offset;
         let read_size_actual = min(size, read_size_possible);
         let data_extra_end = read_size_possible - read_size_actual; // amount of data from end to be removed
-        data_vectors
-            .last_mut()
-            .unwrap()
-            .truncate(last_span.len() - data_extra_end);
+        let last_vector = data_vectors.last_mut().unwrap();
+        last_vector.truncate(last_vector.len() - data_extra_end);
 
         Ok(data_vectors.concat())
     }
