@@ -142,6 +142,10 @@ where
             .file_handles
             .get_mut(&handle)
             .ok_or(io::ErrorKind::NotFound)?;
+
+        handle
+            .underlying_file_handle
+            .set_offset(file.attr.size as usize - file.cache.len());
         self.underlying_fs
             .write_to_file(&mut handle.underlying_file_handle, &file.cache)?;
 
@@ -502,6 +506,7 @@ where
         }
 
         file.cache.extend_from_slice(data);
+        file.attr.size += data.len() as u64;
         if file.cache.len() > FILE_CACHE_MAX_SIZE && self.drop_cache(ino, fh).is_err() {
             reply.error(libc::EIO);
             return;
@@ -515,7 +520,6 @@ where
         let file = self.files.get_mut(&ino).unwrap();
         file.attr.ctime = now;
         file.attr.mtime = now;
-        file.attr.size += data.len() as u64;
         file.generation += 1;
 
         reply.written(data.len() as u32);
