@@ -211,14 +211,10 @@ where
     K: ChunkHash,
     V: Clone + Encode + Decode<()>,
 {
-    fn try_insert(&mut self, key: K, value: V) -> io::Result<()> {
+    fn insert(&mut self, key: K, value: V) -> io::Result<()> {
         if self.database_map.contains_key(&key) {
             return Ok(());
         }
-        self.insert(key, value)
-    }
-
-    fn insert(&mut self, key: K, value: V) -> io::Result<()> {
         let data_info = self.write(value)?;
         self.database_map.insert(key, data_info);
         Ok(())
@@ -293,8 +289,8 @@ mod tests {
         let k1 = hasher.hash(&v1);
         let k2 = hasher.hash(&v2);
 
-        db.try_insert(k1, v1.clone()).unwrap();
-        db.try_insert(k2, v2.clone()).unwrap();
+        db.insert(k1, v1.clone()).unwrap();
+        db.insert(k2, v2.clone()).unwrap();
         let actual1 = db.get(&k1).unwrap();
         let actual2 = db.get(&k2).unwrap();
         assert_eq!(actual1, v1);

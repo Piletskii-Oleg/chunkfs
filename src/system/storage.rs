@@ -348,7 +348,7 @@ where
 
         let pairs = hashes.into_iter().zip(converted_chunks).collect(); // we allocate memory for (K, V) pairs, which is not really required
         let start = Instant::now();
-        base.try_insert_multi(pairs)?;
+        base.insert_multi(pairs)?;
         let save_time = start.elapsed();
 
         Ok(SpansInfo {
@@ -375,7 +375,7 @@ where
         let hash_time = start.elapsed();
 
         let start = Instant::now();
-        base.try_insert(hash.clone(), DataContainer(Data::Chunk(remainder)))?;
+        base.insert(hash.clone(), DataContainer(Data::Chunk(remainder)))?;
         let save_time = start.elapsed();
 
         let span = Span::new(hash, remainder_length);

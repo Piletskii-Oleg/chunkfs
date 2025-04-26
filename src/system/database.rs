@@ -7,9 +7,6 @@ use std::io;
 /// Supports inserting and getting values by key, checking if the key is present in the storage.
 pub trait Database<K, V> {
     /// Inserts a key-value pair into the storage. If the key is already present, then nothing happens.
-    fn try_insert(&mut self, key: K, value: V) -> io::Result<()>;
-
-    /// Inserts a key-value pair into the storage. If the key is already present, then rewrites it.
     fn insert(&mut self, key: K, value: V) -> io::Result<()>;
 
     /// Retrieves a value by a given key. Note that it returns a value, not a reference.
@@ -20,9 +17,9 @@ pub trait Database<K, V> {
     fn get(&self, key: &K) -> io::Result<V>;
 
     /// Try inserts multiple key-value pairs into the storage.
-    fn try_insert_multi(&mut self, pairs: Vec<(K, V)>) -> io::Result<()> {
+    fn insert_multi(&mut self, pairs: Vec<(K, V)>) -> io::Result<()> {
         for (key, value) in pairs.into_iter() {
-            self.try_insert(key, value)?;
+            self.insert(key, value)?;
         }
         Ok(())
     }
@@ -65,13 +62,8 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
 }
 
 impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
-    fn try_insert(&mut self, key: Hash, value: V) -> io::Result<()> {
-        self.entry(key).or_insert(value);
-        Ok(())
-    }
-
     fn insert(&mut self, key: Hash, value: V) -> io::Result<()> {
-        self.insert(key, value);
+        self.entry(key).or_insert(value);
         Ok(())
     }
 
