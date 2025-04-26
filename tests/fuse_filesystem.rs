@@ -442,7 +442,7 @@ fn read_cache() {
     );
 
     actual = vec![10; MB];
-    assert_eq!(file.read_at(&mut actual, 11 * MB as u64).unwrap(), 1 * MB);
+    assert_eq!(file.read_at(&mut actual, 11 * MB as u64).unwrap(), MB);
     assert_eq!(
         actual, [1; MB],
         "read cache from start + epsilon to end - epsilon is correct"
@@ -627,7 +627,7 @@ fn read_first_chunk_piece() {
     assert_eq!(60, file.read_at(&mut actual, 970).unwrap());
     assert_eq!(
         actual,
-        vec![[0; 30], [1; 30]].concat(),
+        [[0; 30], [1; 30]].concat(),
         "read from start + epsilon to end + epsilon of first chunk is correct"
     );
 
