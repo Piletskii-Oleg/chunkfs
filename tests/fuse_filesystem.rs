@@ -1,4 +1,5 @@
-use chunkfs::chunkers::SuperChunker;
+use cdc_chunkers::SizeParams;
+use chunkfs::chunkers::{LeapChunker, SuperChunker};
 use chunkfs::hashers::Sha256Hasher;
 use chunkfs::{ChunkerRef, FuseFS, MB};
 use filetime::FileTime;
@@ -479,4 +480,238 @@ fn concurrent_file_handles() {
     assert_eq!(file.read(&mut actual).unwrap(), 12 * 3 * MB);
     assert_eq!(actual, expected);
     assert_eq!(file.metadata().unwrap().len(), 12 * 3 * MB as u64);
+}
+
+#[test]
+fn single_chunk_read() {
+    let fuse_fixture = FuseFixture::with_chunker(LeapChunker::new(SizeParams {
+        min: 1000,
+        avg: 1000,
+        max: 1000,
+    }));
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    let file_path = mount_point.join("file");
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .custom_flags(O_DIRECT)
+        .write(true)
+        .read(true)
+        .open(&file_path)
+        .unwrap();
+
+    file.write_all(&[0; 300]).unwrap();
+
+    let mut actual = vec![10; 100];
+    assert_eq!(100, file.read_at(&mut actual, 100).unwrap());
+    assert_eq!(
+        actual, [0; 100],
+        "read from start + epsilon to end - epsilon of a single chunk is correct"
+    );
+
+    actual = vec![10; 200];
+    assert_eq!(200, file.read_at(&mut actual, 100).unwrap());
+    assert_eq!(
+        actual, [0; 200],
+        "read from start + epsilon to end of a single chunk is correct"
+    );
+
+    actual = vec![10; 1000];
+    assert_eq!(200, file.read_at(&mut actual, 100).unwrap());
+    assert_eq!(
+        actual,
+        [vec![0; 200], vec![10; 800]].concat(),
+        "read from start + epsilon to end + epsilon of a single chunk is correct"
+    );
+
+    actual = vec![10; 1000];
+    assert_eq!(0, file.read_at(&mut actual, 1000).unwrap());
+    assert_eq!(
+        actual, [10; 1000],
+        "read from end to end + epsilon of a single chunk is correct"
+    );
+}
+
+#[test]
+fn read_first_chunk_piece() {
+    let fuse_fixture = FuseFixture::with_chunker(LeapChunker::new(SizeParams {
+        min: 1000,
+        avg: 1000,
+        max: 1000,
+    }));
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    let file_path = mount_point.join("file");
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .custom_flags(O_DIRECT)
+        .write(true)
+        .read(true)
+        .open(&file_path)
+        .unwrap();
+
+    file.write_all(&[0; 1000]).unwrap();
+    file.write_all(&[1; 4500]).unwrap();
+
+    let mut actual = vec![10; 40];
+    assert_eq!(40, file.read_at(&mut actual, 0).unwrap());
+    assert_eq!(
+        actual, [0; 40],
+        "read from start to end - epsilon of first chunk is correct"
+    );
+
+    actual = vec![10; 30];
+    assert_eq!(30, file.read_at(&mut actual, 40).unwrap());
+    assert_eq!(
+        actual, [0; 30],
+        "read from start + epsilon to end - epsilon of first chunk is correct"
+    );
+
+    actual = vec![10; 960];
+    assert_eq!(960, file.read_at(&mut actual, 40).unwrap());
+    assert_eq!(
+        actual, [0; 960],
+        "read from start + epsilon to end of first chunk is correct"
+    );
+
+    actual = vec![10; 60];
+    assert_eq!(60, file.read_at(&mut actual, 970).unwrap());
+    assert_eq!(
+        actual,
+        vec![[0; 30], [1; 30]].concat(),
+        "read from start + epsilon to end + epsilon of first chunk is correct"
+    );
+
+    actual = vec![10; 0];
+    assert_eq!(0, file.read_at(&mut actual, 0).unwrap());
+    assert_eq!(
+        actual, [0; 0],
+        "read zero bytes from start of first chunk if correct"
+    );
+
+    actual = vec![10; 0];
+    assert_eq!(0, file.read_at(&mut actual, 1000).unwrap());
+    assert_eq!(
+        actual, [0; 0],
+        "read zero bytes from end of first chunk if correct"
+    );
+}
+
+#[test]
+fn read_middle_chunk_piece() {
+    let fuse_fixture = FuseFixture::with_chunker(LeapChunker::new(SizeParams {
+        min: 1000,
+        avg: 1000,
+        max: 1000,
+    }));
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    let file_path = mount_point.join("file");
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .custom_flags(O_DIRECT)
+        .write(true)
+        .read(true)
+        .open(&file_path)
+        .unwrap();
+
+    file.write_all(&[0; 5500]).unwrap();
+
+    let mut actual = vec![10; 40];
+    assert_eq!(40, file.read_at(&mut actual, 1040).unwrap());
+    assert_eq!(
+        actual, [0; 40],
+        "read from start + epsilon to end - epsilon of middle chunk is correct"
+    );
+
+    actual = vec![10; 0];
+    assert_eq!(0, file.read_at(&mut actual, 1040).unwrap());
+    assert_eq!(
+        actual, [0; 0],
+        "read zero bytes from start + epsilon of middle chunk is correct"
+    );
+}
+
+#[test]
+fn read_last_chunk_piece() {
+    let fuse_fixture = FuseFixture::with_chunker(LeapChunker::new(SizeParams {
+        min: 1000,
+        avg: 1000,
+        max: 1000,
+    }));
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    let file_path = mount_point.join("file");
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .custom_flags(O_DIRECT)
+        .write(true)
+        .read(true)
+        .open(&file_path)
+        .unwrap();
+
+    file.write_all(&[0; 5000]).unwrap();
+    file.write_all(&[1; 500]).unwrap();
+
+    let mut actual = vec![10; 40];
+    assert_eq!(40, file.read_at(&mut actual, 5000).unwrap());
+    assert_eq!(
+        actual, [1; 40],
+        "read from start to end - epsilon of last chunk is correct"
+    );
+
+    actual = vec![10; 30];
+    assert_eq!(30, file.read_at(&mut actual, 5010).unwrap());
+    assert_eq!(
+        actual, [1; 30],
+        "read from start + epsilon to end - epsilon of last chunk is correct"
+    );
+
+    actual = vec![10; 470];
+    assert_eq!(470, file.read_at(&mut actual, 5030).unwrap());
+    assert_eq!(
+        actual, [1; 470],
+        "read from start + epsilon to end of last chunk is correct"
+    );
+
+    actual = vec![10; 500];
+    assert_eq!(470, file.read_at(&mut actual, 5030).unwrap());
+    assert_eq!(
+        actual,
+        [vec![1; 470], vec![10; 30]].concat(),
+        "read from start + epsilon to end + epsilon of last chunk is correct"
+    );
+
+    actual = vec![10; 530];
+    assert_eq!(500, file.read_at(&mut actual, 5000).unwrap());
+    assert_eq!(
+        actual,
+        [vec![1; 500], vec![10; 30]].concat(),
+        "read from start to end + epsilon of last chunk is correct"
+    );
+
+    actual = vec![10; 0];
+    assert_eq!(0, file.read_at(&mut actual, 5000).unwrap());
+    assert_eq!(
+        actual, [0; 0],
+        "read zero bytes from start of last chunk if correct"
+    );
+
+    actual = vec![10; 0];
+    assert_eq!(0, file.read_at(&mut actual, 5500).unwrap());
+    assert_eq!(
+        actual, [0; 0],
+        "read zero bytes from end of last chunk if correct"
+    );
+
+    actual = vec![10; 40];
+    assert_eq!(0, file.read_at(&mut actual, 5600).unwrap());
+    assert_eq!(
+        actual, [10; 40],
+        "read n bytes from end + epsilon of last chunk if correct"
+    );
 }
