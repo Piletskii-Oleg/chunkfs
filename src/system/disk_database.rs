@@ -1,5 +1,6 @@
 use crate::{ChunkHash, Database, IterableDatabase};
 use bincode::{decode_from_slice, encode_to_vec, Decode, Encode};
+use libc::O_DIRECT;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io;
@@ -43,10 +44,12 @@ where
     database_map: HashMap<K, DataInfo>,
     /// Size of the block device (or regular file).
     total_size: u64,
-    /// Block size (when initialized on a regular file, set to 512.
+    /// Block size when initialized on a regular file, set to 512.
     block_size: u64,
     /// Number of occupied blocks.
     used_blocks: u64,
+    /// Whether the device is opened with the O_DIRECT flag.
+    o_direct: bool,
     /// Values data type. Database doesn't actually own them, so this field is necessary.
     _data_type: PhantomData<V>,
 }
@@ -58,15 +61,16 @@ where
 {
     /// Init database on a regular file.
     ///
-    /// Create file with `create_db_file`. Sets the size of the file specified in the path. Considers the block size to be 512.
+    /// Creates file with [`Self::create_db_file`]. Sets the size of the file specified in the path.
+    /// You can specify `o_direct` flag for open file in a O_DIRECT mode. Considers the block size to be 512.
     /// File is removed on a drop() call.
     ///
-    /// Intended for testing so that it does not require privileges for initialization on the block device.
-    pub fn init_on_regular_file<P>(file_path: P, db_size: u64) -> io::Result<Self>
+    /// Intended for testing so that it does not require block device.
+    pub fn init_on_regular_file<P>(file_path: P, db_size: u64, o_direct: bool) -> io::Result<Self>
     where
         P: AsRef<Path>,
     {
-        let file = Self::create_db_file(&file_path, db_size)?;
+        let file = Self::create_db_file(&file_path, db_size, o_direct)?;
 
         let database_map = HashMap::new();
         let total_size = file.metadata()?.len();
@@ -78,48 +82,63 @@ where
             total_size,
             block_size: 512,
             used_blocks: 0,
+            o_direct,
             _data_type: PhantomData,
         })
     }
 
-    /// Creates a regular file in the specified path with the specified size.
-    ///
-    /// Opens the file with O_DIRECT mode to minimize cache effects and returns file handle.
-    fn create_db_file<P>(file_path: P, db_size: u64) -> io::Result<File>
+    /// Creates a regular file in the specified path with the specified size and o_direct flag, if specified.
+    fn create_db_file<P>(file_path: P, db_size: u64, o_direct: bool) -> io::Result<File>
     where
         P: AsRef<Path>,
     {
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .read(true)
-            .write(true)
-            .custom_flags(libc::O_DIRECT)
-            .open(file_path.as_ref())?;
+        let file = if o_direct {
+            OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .read(true)
+                .write(true)
+                .custom_flags(O_DIRECT)
+                .open(file_path)?
+        } else {
+            OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .read(true)
+                .write(true)
+                .open(file_path)?
+        };
         file.set_len(db_size)?;
         Ok(file)
     }
 
-    /// Init database on a block device.
+    /// Init database on a block device, with O_DIRECT flag, if specified.
     ///
     /// Takes information about the block device via ioctl.
-    pub fn init<P>(blkdev_path: P) -> Result<Self, io::Error>
+    pub fn init<P>(blkdev_path: P, o_direct: bool) -> Result<Self, io::Error>
     where
         P: AsRef<Path>,
     {
-        let device = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .custom_flags(libc::O_DIRECT)
-            .open(blkdev_path)?;
-        let _fd = device.as_raw_fd();
+        let device = if o_direct {
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .custom_flags(O_DIRECT)
+                .open(blkdev_path)?
+        } else {
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(blkdev_path)?
+        };
+        let fd = device.as_raw_fd();
 
         let mut total_size: u64 = 0;
         let mut block_size: u64 = 0;
-        if -1 == unsafe { libc::ioctl(_fd, BLKGETSIZE64, &mut total_size) } {
+        if -1 == unsafe { libc::ioctl(fd, BLKGETSIZE64, &mut total_size) } {
             return Err(io::Error::last_os_error());
         };
-        if -1 == unsafe { libc::ioctl(_fd, BLKSSZGET, &mut block_size) } {
+        if -1 == unsafe { libc::ioctl(fd, BLKSSZGET, &mut block_size) } {
             return Err(io::Error::last_os_error());
         };
         if block_size == 0 {
@@ -138,6 +157,7 @@ where
             total_size,
             block_size,
             used_blocks: 0,
+            o_direct,
             _data_type: PhantomData {},
         })
     }
@@ -281,7 +301,7 @@ mod tests {
         let file_path = "pseudo_dev";
         let file_size = 1024 * 1024 * 12;
 
-        let mut db = DiskDatabase::init_on_regular_file(file_path, file_size).unwrap();
+        let mut db = DiskDatabase::init_on_regular_file(file_path, file_size, true).unwrap();
         let v1: Vec<u8> = vec![1; 8 * KB + 30];
         let v2: Vec<u8> = vec![2; 8 * KB + 70];
 
