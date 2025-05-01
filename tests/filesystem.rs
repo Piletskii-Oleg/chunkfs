@@ -91,7 +91,7 @@ fn write_read_blocks_test() {
         buffer.extend_from_slice(&buf);
     }
     assert_eq!(buffer.len(), MB * 3 + 50);
-    assert!(complete == buffer);
+    assert_eq!(complete, buffer);
     assert_eq!(fs.read_from_file(&mut handle).unwrap(), []);
 }
 
@@ -147,11 +147,11 @@ fn non_iterable_database_can_be_used_with_fs() {
     struct DummyDatabase;
 
     impl Database<Vec<u8>, DataContainer<()>> for DummyDatabase {
-        fn insert(&mut self, _key: Vec<u8>, _value: DataContainer<()>) -> std::io::Result<()> {
+        fn insert(&mut self, _key: Vec<u8>, _value: DataContainer<()>) -> io::Result<()> {
             unimplemented!()
         }
 
-        fn get(&self, _key: &Vec<u8>) -> std::io::Result<DataContainer<()>> {
+        fn get(&self, _key: &Vec<u8>) -> io::Result<DataContainer<()>> {
             unimplemented!()
         }
 

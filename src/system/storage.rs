@@ -73,8 +73,8 @@ where
 
     /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
     ///
-    /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
-    /// along with amount of time spent on chunking and hashing.
+    /// Returns the resulting lengths of [chunks][crate::chunker::Chunk] with the corresponding hash,
+    /// along with the amount of time spent on chunking and hashing.
     pub fn write(&mut self, data: &[u8], chunker: &ChunkerRef) -> io::Result<Vec<SpansInfo<Hash>>> {
         let mut writer = StorageWriter::new(chunker, &mut self.hasher);
 
@@ -137,7 +137,7 @@ where
     }
 
     /// Retrieves the data from the storage based on hashes of the data [`segments`][Segment],
-    /// or Error(NotFound) if some of the hashes were not present in the base.
+    /// or Error(NotFound) if some hashes were not present in the base.
     pub fn retrieve(&self, request: &[&Hash]) -> io::Result<Vec<Vec<u8>>> {
         let retrieved = self.database.get_multi(request)?;
 
@@ -199,7 +199,7 @@ where
             })
     }
 
-    /// Calculates deduplication ratio of the storage, not accounting for chunks processed with scrubber.
+    /// Calculates a deduplication ratio of the storage, not accounting for chunks processed with scrubber.
     pub fn cdc_dedup_ratio(&self) -> f64 {
         (self.size_written as f64) / (self.total_cdc_size() as f64)
     }
@@ -297,8 +297,8 @@ where
 
     /// Writes 1 MB of data to the [`base`][crate::base::Base] storage after deduplication.
     ///
-    /// Returns resulting lengths of [chunks][crate::chunker::Chunk] with corresponding hash,
-    /// along with amount of time spent on chunking and hashing.
+    /// Returns the resulting lengths of [chunks][crate::chunker::Chunk] with the corresponding hash,
+    /// along with the amount of time spent on chunking and hashing.
     fn write<K, B: Database<Hash, DataContainer<K>>>(
         &mut self,
         data: &[u8],

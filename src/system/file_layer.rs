@@ -98,7 +98,7 @@ impl FileHandle {
         &self.file_name
     }
 
-    /// Closes handle and returns [`WriteMeasurements`] made while file was open.
+    /// Closes the handle and returns [`WriteMeasurements`] made while a file was open.
     pub(crate) fn close(self) -> WriteMeasurements {
         self.measurements
     }
@@ -170,8 +170,8 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     }
 
     /// Reads the specified amount of data from the open file and
-    /// returns FileSpans in which the necessary data is stored (the side FileSpans may contain it partially).
-    /// Starting point is based on the `FileHandle`'s offset.
+    /// returns FileSpans, in which the necessary data is stored (the side FileSpans may contain it partially).
+    /// The Starting point is based on the `FileHandle`'s offset.
     ///
     /// If `size` + file handle offset is greater than file size, then returns FileSpans up to the end of the file.
     pub fn read(&self, handle: &mut FileHandle, size: usize) -> Vec<&FileSpan<Hash>> {
@@ -226,7 +226,8 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     }
 
     #[cfg(feature = "bench")]
-    /// Generate a new dataset with set deduplication ratio from the existing one.
+    /// Generate a new dataset with 
+    /// a set deduplication ratio from the existing one.
     ///
     /// Returns the name of the new file.
     pub fn get_to_dedup_ratio(&mut self, name: &str, dedup_ratio: f64) -> io::Result<String> {

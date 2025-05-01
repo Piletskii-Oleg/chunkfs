@@ -19,7 +19,7 @@ use std::time::{Duration, SystemTime};
 type Inode = u64;
 type Fh = u64;
 
-/// File is opened for execution.
+/// The File is opened for execution.
 const FMODE_EXEC: i32 = 0x20;
 const FILESYSTEM_CACHE_MAX_SIZE: usize = 25 * MB;
 const FILE_CACHE_MAX_SIZE: usize = 5 * MB;
@@ -178,13 +178,13 @@ fn check_access(file_attr: &FileAttr, req: &Request, access_mask: i32) -> bool {
     let gid = req.gid();
 
     let mut access_mask = access_mask;
-    // F_OK tests for existence of file
+    // F_OK tests for existence of a file
     if access_mask == libc::F_OK {
         return true;
     }
     let file_mode = i32::from(file_mode);
 
-    // root is allowed to read & write anything
+    // root is allowed to read and write anything
     if uid == 0 {
         // root only allowed to exec if one of the Exec bits is set
         access_mask &= libc::X_OK;
@@ -216,38 +216,6 @@ where
             let _ = config.set_max_write(nearest);
         };
         Ok(())
-    }
-
-    fn flush(
-        &mut self,
-        _req: &Request<'_>,
-        ino: u64,
-        fh: u64,
-        _lock_owner: u64,
-        reply: ReplyEmpty,
-    ) {
-        let Some(file_handle) = self.file_handles.get_mut(&fh) else {
-            reply.error(libc::EBADF);
-            return;
-        };
-        if file_handle.inode != ino {
-            reply.error(libc::ESTALE);
-            return;
-        }
-        let Some(_) = self.files.get_mut(&ino) else {
-            reply.error(libc::ENOENT);
-            return;
-        };
-        if !file_handle.write && !file_handle.read {
-            reply.error(libc::EACCES);
-            return;
-        }
-
-        if self.drop_cache(ino, fh).is_err() {
-            reply.error(libc::EIO);
-            return;
-        }
-        reply.ok()
     }
 
     fn lookup(&mut self, _req: &Request<'_>, parent: u64, name: &OsStr, reply: ReplyEntry) {
@@ -530,6 +498,38 @@ where
         file.generation += 1;
 
         reply.written(data.len() as u32);
+    }
+
+    fn flush(
+        &mut self,
+        _req: &Request<'_>,
+        ino: u64,
+        fh: u64,
+        _lock_owner: u64,
+        reply: ReplyEmpty,
+    ) {
+        let Some(file_handle) = self.file_handles.get_mut(&fh) else {
+            reply.error(libc::EBADF);
+            return;
+        };
+        if file_handle.inode != ino {
+            reply.error(libc::ESTALE);
+            return;
+        }
+        let Some(_) = self.files.get_mut(&ino) else {
+            reply.error(libc::ENOENT);
+            return;
+        };
+        if !file_handle.write && !file_handle.read {
+            reply.error(libc::EACCES);
+            return;
+        }
+
+        if self.drop_cache(ino, fh).is_err() {
+            reply.error(libc::EIO);
+            return;
+        }
+        reply.ok()
     }
 
     fn release(

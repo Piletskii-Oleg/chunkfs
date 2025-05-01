@@ -76,6 +76,7 @@ fn get_metadata_times(file: &File) -> (u64, u64, u64) {
         metadata.ctime() as u64,
     )
 }
+
 #[test]
 fn metadata_times() {
     let fuse_fixture = FuseFixture::default();
@@ -147,6 +148,7 @@ fn manual_setattr() {
     assert_eq!(mtime2, to_unix_secs(&now_minus100s));
     assert!(ctime2 > ctime1);
 }
+
 #[test]
 fn readdir() {
     let fuse_fixture = FuseFixture::default();
@@ -497,7 +499,7 @@ fn concurrent_file_handles() {
 }
 
 #[test]
-fn offset_change_not_affects_cache_drop() {
+fn offset_change_does_not_affect_cache_drop() {
     let fuse_fixture = FuseFixture::default();
     let mount_point = Path::new(&fuse_fixture.mount_point);
 

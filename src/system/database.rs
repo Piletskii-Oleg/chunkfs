@@ -14,7 +14,7 @@ pub trait Database<K, V> {
     /// Retrieves a value by a given key. Note that it returns a value, not a reference.
     ///
     /// # Errors
-    /// Should return [ErrorKind::NotFound], if the key-value pair
+    /// Should return [ErrorKind::NotFound] if the key-value pair
     /// was not found in the storage.
     fn get(&self, key: &K) -> io::Result<V>;
 

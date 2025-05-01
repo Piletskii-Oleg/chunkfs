@@ -18,7 +18,7 @@ use super::storage::DataContainer;
 ///
 /// After moving the data from `database` to `target_map`, we should be able to have access to it via the `database`.
 /// Therefore, after moving, we should leave a `Vec<Key>` in place of the source chunk. It is done via [DataContainer::make_target] method.
-/// Not using it will lead to either not getting any benefits from the algorithm, or to being unable to access the initial chunk anymore, if it was deleted.
+/// Not using it will lead to either not getting any benefits from the algorithm or to being unable to access the initial chunk anymore if it is deleted.
 ///
 /// # Arguments
 /// The only method [scrub][Scrub::scrub] takes two arguments:
@@ -40,7 +40,7 @@ where
     /// [DataContainer::extract] or [DataContainer::extract_mut] should be used.
     ///
     /// If the chunk is suitable for being transferred to the `target_map`, it should NOT be deleted, but instead be replaced by the `target_map`'s keys,
-    /// using which the original chunk can be restored. This is accomplished by the [DataContainer::make_target] method.
+    /// using which the original chunk can be restored. This is achieved by the [DataContainer::make_target] method.
     ///
     /// It should also gather information to return the [measurements][ScrubMeasurements].
     ///
@@ -55,7 +55,7 @@ where
     ///
     /// # CDC Database
     /// We should be able to iterate over the `database` to process all chunks we had stored before.
-    /// The [IntoIterator] trait should be implemented for `database`, but it should not be a big concern, because the only structure that should be implemented
+    /// The [IntoIterator] trait should be implemented for `database`, but it should not be a big concern because the only structure that should be implemented
     /// for the algorithm is the scrubber itself. `database` should be considered a given entity, along with the `target_map`.
     fn scrub<'a>(&mut self, database: &mut B, target_map: &mut T) -> io::Result<ScrubMeasurements>
     where
