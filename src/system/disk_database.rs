@@ -8,7 +8,7 @@ use std::io;
 use std::marker::PhantomData;
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::{FileExt, OpenOptionsExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Constant for requesting total size of the block device via ioctl
 const BLKGETSIZE64: u64 = 0x80081272;
@@ -44,7 +44,7 @@ enum InitType {
     /// [`DiskDatabase`] is initialized on a block device.
     BlockDevice,
     /// [`DiskDatabase`] is initialized on regular file. Contains path to the file.
-    RegularFile(String),
+    RegularFile(PathBuf),
 }
 
 /// Database that stores data on a block device
@@ -94,7 +94,7 @@ where
 
         Ok(Self {
             device: file,
-            init_type: InitType::RegularFile(file_path.as_ref().to_string_lossy().to_string()),
+            init_type: InitType::RegularFile(file_path.as_ref().to_path_buf()),
             database_map,
             total_size,
             block_size: 512,
