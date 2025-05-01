@@ -185,7 +185,10 @@ fn permissions() {
     };
     let read_denied = || {
         let res = OpenOptions::new().read(true).open(&file_path);
-        assert_eq!(res.unwrap_err().kind(), std::io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            res.unwrap_err().kind(),
+            std::io::ErrorKind::PermissionDenied
+        );
     };
     let write_ok = || {
         let file = OpenOptions::new().write(true).open(&file_path).unwrap();
@@ -194,7 +197,10 @@ fn permissions() {
     };
     let write_denied = || {
         let res = OpenOptions::new().write(true).open(&file_path);
-        assert_eq!(res.unwrap_err().kind(), std::io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            res.unwrap_err().kind(),
+            std::io::ErrorKind::PermissionDenied
+        );
     };
 
     let perms: Vec<_> = (0o000..=0o777).map(Permissions::from_mode).collect();
@@ -763,4 +769,51 @@ fn read_last_chunk_piece() {
         actual, [10; 40],
         "read n bytes from end + epsilon of last chunk if correct"
     );
+}
+
+#[test]
+fn lookup_permission() {
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+    File::create(mount_point.join("file1")).unwrap();
+    File::create(mount_point.join("file2")).unwrap();
+
+    let lookup_ok = || {
+        let mut files = vec![];
+
+        for entry in fs::read_dir(mount_point).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            assert!(path.is_file());
+            let _ = entry.metadata().unwrap();
+            files.push(path.file_name().unwrap().to_str().unwrap().to_string());
+        }
+        assert!(files.contains(&"file1".to_string()));
+        assert!(files.contains(&"file2".to_string()));
+        assert_eq!(files.len(), 2);
+    };
+    let lookup_denied = || {
+        for entry in fs::read_dir(mount_point).unwrap() {
+            let metadata = entry.unwrap().metadata();
+            assert_eq!(
+                metadata.unwrap_err().kind(),
+                std::io::ErrorKind::PermissionDenied
+            );
+        }
+    };
+
+    let perms: Vec<_> = (0o000..=0o777).map(Permissions::from_mode).collect();
+    for perm in perms {
+        // reading mount directory is handled by upper filesystem
+        if perm.mode() & 0o400 == 0 {
+            continue;
+        }
+
+        fs::set_permissions(mount_point, perm.clone()).unwrap();
+        if perm.mode() & 0o100 != 0 {
+            lookup_ok();
+        } else {
+            lookup_denied();
+        }
+    }
 }

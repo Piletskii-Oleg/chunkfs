@@ -218,7 +218,7 @@ where
         Ok(())
     }
 
-    fn lookup(&mut self, _req: &Request<'_>, parent: u64, name: &OsStr, reply: ReplyEntry) {
+    fn lookup(&mut self, req: &Request<'_>, parent: u64, name: &OsStr, reply: ReplyEntry) {
         let name = name.to_str().unwrap().to_owned();
         if parent != 1 {
             reply.error(libc::EINVAL);
@@ -229,6 +229,12 @@ where
             reply.error(libc::ENOENT);
             return;
         };
+        let parent_attr = self.files.get(&parent).unwrap().attr;
+        if !check_access(&parent_attr, req, libc::X_OK) {
+            reply.error(libc::EACCES);
+            return;
+        }
+
         let file = self.files.get(inode).unwrap();
         reply.entry(&Duration::new(0, 0), &file.attr, file.generation)
     }
