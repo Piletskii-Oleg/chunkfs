@@ -1,6 +1,7 @@
+use crate::system::data_block::{Alignment, DataBlock, DataInfo};
 use crate::{ChunkHash, Database, IterableDatabase};
 use bincode::error::EncodeError;
-use bincode::{decode_from_slice, encode_to_vec, Decode, Encode};
+use bincode::{encode_to_vec, Decode, Encode};
 use libc::O_DIRECT;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
@@ -14,31 +15,6 @@ use std::path::{Path, PathBuf};
 const BLKGETSIZE64: u64 = 0x80081272;
 /// Constant for requesting size of the block in the block device via ioctl
 const BLKSSZGET: u64 = 0x1268;
-
-/// Information about the location of the data on the disk.
-#[derive(Clone)]
-struct DataInfo {
-    /// Offset of the data on the block device.
-    offset: u64,
-    /// Serialized data length.
-    data_length: u64,
-}
-
-/// Continuous data interval with information about internal values. Offsets of the internal values must be sequential and continuous.
-/// Need for more convenient large aggregated read requests.
-///
-/// `Is not written to disk`, only used when processing read operations.
-///
-/// If a device is opened with the O_DIRECT flag, then additional padding is added to the beginning and end of the DataBlock to align it to the block size.
-/// Also, with the O_DIRECT, it is possible that several DataBlocks may overlap during the processing of multiple write/read operations.
-struct DataBlock {
-    /// Actual data of the DataBlock.
-    data: Vec<u8>,
-    /// DataBlock offset. The first value may not be at this offset but after padding.
-    offset: u64,
-    /// Internal values info. Must be sequential and continuous, so that each successive offset is equal to the previous offset plus the previous size.
-    data_infos: Vec<DataInfo>,
-}
 
 enum InitType {
     /// [`DiskDatabase`] is initialized on a block device.
@@ -61,12 +37,10 @@ where
     database_map: HashMap<K, DataInfo>,
     /// Size of the block device (or regular file).
     total_size: u64,
-    /// Block size when initialized on a regular file, set to 512.
-    block_size: u64,
     /// Number of occupied blocks.
     used_size: u64,
     /// Whether the device is opened with the O_DIRECT flag.
-    o_direct: bool,
+    alignment: Alignment,
     /// Values data type. Database doesn't actually own them, so this field is necessary.
     _data_type: PhantomData<V>,
 }
@@ -97,9 +71,8 @@ where
             init_type: InitType::RegularFile(file_path.as_ref().to_path_buf()),
             database_map,
             total_size,
-            block_size: 512,
             used_size: 0,
-            o_direct,
+            alignment: Alignment::ByBlockSize(512),
             _data_type: PhantomData,
         })
     }
@@ -149,6 +122,11 @@ where
                 "block size cannot be 0",
             ));
         }
+        let alignment = if o_direct {
+            Alignment::ByBlockSize(block_size)
+        } else {
+            Alignment::None
+        };
 
         let database_map = HashMap::new();
 
@@ -157,103 +135,22 @@ where
             init_type: InitType::BlockDevice,
             database_map,
             total_size,
-            block_size,
             used_size: 0,
-            o_direct,
+            alignment,
             _data_type: PhantomData {},
         })
-    }
-
-    /// Looks for the complement of a number up to a multiple of the block size.
-    ///
-    /// For example, the result for 1000 with a block size of 512 would be 24.
-    fn padding_to_multiple_block_size(&self, length: u64) -> u64 {
-        if length % self.block_size == 0 {
-            0
-        } else {
-            let blocks_number = length.div_ceil(self.block_size);
-            blocks_number * self.block_size - length
-        }
-    }
-
-    /// Constructs [`DataBlock`] by vector of sequential and continuous [`DataInfo`].
-    ///
-    /// Padded at start and end if a block device is initialized with an O_DIRECT flag.
-    fn datablock_from_data_infos(&self, data_infos: Vec<DataInfo>) -> io::Result<DataBlock> {
-        if data_infos.is_empty() {
-            return Err(io::Error::from(io::ErrorKind::InvalidData));
-        }
-
-        let first = data_infos.first().unwrap();
-        let last = data_infos.last().unwrap();
-        let (start_padding, end_padding) = if self.o_direct {
-            (
-                first.offset % self.block_size,
-                self.padding_to_multiple_block_size(last.offset + last.data_length),
-            )
-        } else {
-            (0, 0)
-        };
-        let total_len = last.offset + last.data_length - first.offset + start_padding + end_padding;
-
-        Ok(DataBlock {
-            data: vec![0; total_len as usize],
-            offset: first.offset - start_padding,
-            data_infos,
-        })
-    }
-
-    /// Split [`DataInfo`] vector into continuous intervals ([`DataBlock`]'s).
-    ///
-    /// If some intervals follow each other by offsets but don't follow each other in the vector, they are split into different intervals.
-    fn split_to_datablocks(&self, data_infos: Vec<&DataInfo>) -> Vec<DataBlock> {
-        if data_infos.is_empty() {
-            return vec![];
-        }
-
-        let mut sequential_data_infos = vec![vec![data_infos[0].clone()]];
-        for &data_info in data_infos[1..].iter() {
-            let last_seq = sequential_data_infos.last_mut().unwrap();
-            let last = last_seq.last().unwrap();
-
-            if data_info.offset == last.offset + last.data_length {
-                last_seq.push(data_info.clone());
-                continue;
-            }
-            sequential_data_infos.push(vec![data_info.clone()]);
-        }
-
-        sequential_data_infos
-            .into_iter()
-            .map(|seq| self.datablock_from_data_infos(seq))
-            .collect::<io::Result<Vec<DataBlock>>>()
-            .unwrap()
     }
 
     /// Read into datablocks from the block device based on their offsets.
     fn fill_datablocks(&self, datablocks: Vec<&mut DataBlock>) -> io::Result<()> {
         datablocks
             .into_iter()
-            .map(|datablock| self.device.read_at(&mut datablock.data, datablock.offset))
+            .map(|datablock| {
+                let offset = datablock.offset();
+                self.device.read_at(datablock.data_mut(), offset)
+            })
             .collect::<io::Result<Vec<_>>>()?;
         Ok(())
-    }
-
-    /// Decode each internal value of each datablock and concat them into a vector of decoded values.
-    fn decode_datablock<T: Decode<()>>(datablock: Vec<&DataBlock>) -> io::Result<Vec<T>> {
-        let mut decoded = vec![];
-        datablock.iter().try_for_each(|&datablock| {
-            datablock.data_infos.iter().try_for_each(|data_info| {
-                let start = (data_info.offset - datablock.offset) as usize;
-                let end = start + data_info.data_length as usize;
-                let (value, _) =
-                    decode_from_slice(&datablock.data[start..end], bincode::config::standard())
-                        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-                decoded.push(value);
-                Ok::<(), io::Error>(())
-            })
-        })?;
-        Ok(decoded)
     }
 
     /// Read and decode multiple data from the disk.
@@ -262,42 +159,34 @@ where
             return Ok(Vec::new());
         }
 
-        let mut datablocks = self.split_to_datablocks(data_infos);
+        let mut datablocks = DataBlock::split_to_datablocks(self.alignment.clone(), data_infos);
         self.fill_datablocks(datablocks.iter_mut().collect())?;
-        Self::decode_datablock(datablocks.iter().collect())
+        DataBlock::decode_datablocks(datablocks.iter().collect())
     }
 
     /// Serializes and writes multiple data to the disk. Returns `Vec<DataInfo>` with information about the allocated data.
     fn write_multi<T: Encode>(&mut self, values: &[&T]) -> io::Result<Vec<DataInfo>> {
-        let encoded = values
+        if values.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let encoded_values = values
             .iter()
             .map(|value| encode_to_vec(value, bincode::config::standard()))
             .collect::<Result<Vec<_>, EncodeError>>()
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        let encoded_size: usize = encoded.iter().map(|vec| vec.len()).sum();
+        let encoded_size: usize = encoded_values.iter().map(|vec| vec.len()).sum();
         if self.used_size + encoded_size as u64 >= self.total_size {
             return Err(io::Error::from(io::ErrorKind::OutOfMemory));
         }
-        let data_infos = encoded.iter().fold(vec![], |mut data_infos, vec| {
-            data_infos.push(DataInfo {
-                offset: self.used_size,
-                data_length: vec.len() as u64,
-            });
-            self.used_size += vec.len() as u64;
-            data_infos
-        });
 
-        let mut encoded = encoded.concat();
-        if self.o_direct {
-            let padding_size = self.padding_to_multiple_block_size(encoded.len() as u64);
-            self.used_size += padding_size;
-            encoded.extend(vec![0; padding_size as usize]); // padding for work with an O_DIRECT flag
-        }
-        self.device
-            .write_all_at(&encoded, self.used_size - encoded.len() as u64)?;
+        let datablock =
+            DataBlock::from_values(self.alignment.clone(), encoded_values, self.used_size)?;
+        self.device.write_all_at(datablock.data(), self.used_size)?;
+        self.used_size += datablock.data().len() as u64;
 
-        Ok(data_infos)
+        Ok(datablock.data_infos())
     }
 }
 
