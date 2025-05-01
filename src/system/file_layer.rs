@@ -226,7 +226,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     }
 
     #[cfg(feature = "bench")]
-    /// Generate a new dataset with 
+    /// Generate a new dataset with
     /// a set deduplication ratio from the existing one.
     ///
     /// Returns the name of the new file.

@@ -21,23 +21,38 @@ type Fh = u64;
 
 /// The File is opened for execution.
 const FMODE_EXEC: i32 = 0x20;
+/// Total cache size of all files, after which all caches will be [`dropped and shrank`][FuseFS::drop_and_shrink_cache] to the [`underlying filesystem`][FileSystem].
 const FILESYSTEM_CACHE_MAX_SIZE: usize = 25 * MB;
+/// Maximum cache size, after which it will drop [`dropped and shrank`][FuseFS::drop_and_shrink_cache] to the [`underlying filesystem`][FileSystem].
 const FILE_CACHE_MAX_SIZE: usize = 5 * MB;
 
+/// [`FuseFS`] file entity.
 #[derive(Clone)]
 struct FuseFile {
+    /// File cache. Cache fills up with every [`write`][FuseFS::write] on a file's opened [`file handles`][FuseFileHandle],
+    /// until it reaches its [`maximum size`][FILE_CACHE_MAX_SIZE],
+    /// or the total size of the file system caches reaches the [`maximum size`][FILESYSTEM_CACHE_MAX_SIZE].
     cache: Vec<u8>,
+    /// File attributes.
     attr: FileAttr,
+    /// File name.
     name: String,
+    /// Generation of a file. Increments every time the file content is modified.
     generation: u64,
+    /// Number of opened file handles.
     handles: u64,
 }
 
+/// [`FuseFS`] file handle entity.
 struct FuseFileHandle {
+    /// Underlying file handle.
     underlying_file_handle: FileHandle,
+    /// Read permission.
     read: bool,
+    /// Write permission.
     write: bool,
-    inode: u64,
+    /// Inode number with which the file handle is associated.
+    inode: Inode,
 }
 
 /// Wrap around [`FileSystem`] for implementing [`Filesystem`] trait.
@@ -48,13 +63,19 @@ where
     B: Database<Hash, DataContainer<()>>,
     Hash: ChunkHash,
 {
+    /// Underlying [chunkfs][`FileSystem`].
     underlying_fs: FileSystem<B, Hash, (), HashMap<(), Vec<u8>>>,
+    /// Files map <[`Inode`], [`FuseFile`]>.
     files: HashMap<Inode, FuseFile>,
-    inodes: HashMap<String, Inode>,
-    /// Number for the next created file handle.
-    next_fh: u64,
+    /// File handles map <[`Fh`], [`FuseFileHandle`]>.
     file_handles: HashMap<Fh, FuseFileHandle>,
+    /// Inodes map <String, [`Inode`]>.
+    inodes: HashMap<String, Inode>,
+    /// Number for the next file handle to be created. Increments on every [`FuseFS::open`].
+    next_fh: u64,
+    /// Chunker set for the filesystem.
     chunker: ChunkerRef,
+    /// Total cache size of opened file handles.
     total_cache: usize,
 }
 
@@ -117,16 +138,20 @@ where
         }
     }
 
+    /// Get new inode number for a new file. After creation, the new inode is inserted into the inodes map,
+    /// incrementing the next new inode number. The filesystem does not provide a file removing, so the inodes do not overlap.
     fn get_new_inode(&self) -> Inode {
         self.inodes.len() as Inode
     }
 
+    /// Get new file handle number for a new file handle. Increments next fh counter on every call.
     fn get_new_fh(&mut self) -> Fh {
         let next_fh = self.next_fh;
         self.next_fh += 1;
         next_fh
     }
 
+    /// Writes cache content to the [`underlying filesystem`][FileSystem] and shrinks its size.
     fn drop_and_shrink_cache(&mut self, file: Inode, handle: Fh) -> io::Result<()> {
         self.drop_cache(file, handle)?;
 
@@ -136,6 +161,7 @@ where
         Ok(())
     }
 
+    /// Writes cache content to the [`underlying filesystem`][FileSystem].
     fn drop_cache(&mut self, file: Inode, handle: Fh) -> io::Result<()> {
         let file = self.files.get_mut(&file).ok_or(io::ErrorKind::NotFound)?;
         let handle = self
@@ -153,6 +179,9 @@ where
         Ok(())
     }
 
+    /// Writes all file caches content to the [`underlying filesystem`][FileSystem] and shrinks its size.
+    ///
+    /// Called after the [`maximum filesystem cache size`][FILESYSTEM_CACHE_MAX_SIZE] has been reached.
     fn drop_and_shrink_caches(&mut self) -> io::Result<()> {
         for handle in self.file_handles.values_mut() {
             let file = self
