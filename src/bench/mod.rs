@@ -106,6 +106,7 @@ where
         let write_time = now.elapsed();
 
         let WriteMeasurements {
+            save_time,
             chunk_time,
             hash_time,
         } = self.fs.close_file(file)?;
@@ -115,6 +116,7 @@ where
         let measurement = TimeMeasurement {
             write_time,
             read_time,
+            save_time,
             chunk_time,
             hash_time,
         };
@@ -239,18 +241,23 @@ where
     ///
     /// Returns read time for the file.
     fn verify(&self, dataset: &Dataset, uuid: &str) -> io::Result<Duration> {
-        let file = self.fs.open_file_readonly(uuid)?;
+        let mut file = self.fs.open_file_readonly(uuid)?;
 
         let now = Instant::now();
-        let read = self.fs.read_file_complete(&file)?;
+        let mut read_size = 0;
+        loop {
+            let segment_len = self.fs.read_from_file(&mut file)?.len();
+            if segment_len == 0 {
+                break;
+            }
+            read_size += segment_len;
+        }
         let read_time = now.elapsed();
 
-        if read.len() != dataset.size {
+        if read_size != dataset.size {
             let msg = "dataset size and size of written file are different";
             return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
         }
-
-        drop(read);
 
         let mut fs_file = self.fs.open_file_readonly(uuid)?;
         let mut dataset_file = dataset.open()?;

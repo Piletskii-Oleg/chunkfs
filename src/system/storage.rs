@@ -1,20 +1,20 @@
+use crate::{ChunkHash, Hasher, SEG_SIZE};
+use crate::{ChunkerRef, WriteMeasurements};
+use bincode::{Decode, Encode};
 use std::cmp::min;
 use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
 
-use crate::{ChunkHash, Hasher, SEG_SIZE};
-use crate::{ChunkerRef, WriteMeasurements};
-
 use super::database::{Database, IterableDatabase};
 use super::scrub::{Scrub, ScrubMeasurements};
 
 /// Container for storage data.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Encode, Decode)]
 pub struct DataContainer<K>(Data<K>);
 
 /// Contains either a chunk produced by [Chunker], or a vector of target keys, using which the initial chunk can be restored.
-#[derive(Clone)]
+#[derive(Clone, Encode, Decode)]
 pub enum Data<K> {
     Chunk(Vec<u8>),
     TargetChunk(Vec<K>),
@@ -347,11 +347,13 @@ where
             .map(|chunk| DataContainer(Data::Chunk(chunk)));
 
         let pairs = hashes.into_iter().zip(converted_chunks).collect(); // we allocate memory for (K, V) pairs, which is not really required
+        let start = Instant::now();
         base.insert_multi(pairs)?;
+        let save_time = start.elapsed();
 
         Ok(SpansInfo {
             spans,
-            measurements: WriteMeasurements::new(chunk_time, hash_time),
+            measurements: WriteMeasurements::new(save_time, chunk_time, hash_time),
             total_length,
         })
     }
@@ -372,12 +374,14 @@ where
         let hash = self.hasher.hash(&remainder);
         let hash_time = start.elapsed();
 
+        let start = Instant::now();
         base.insert(hash.clone(), DataContainer(Data::Chunk(remainder)))?;
+        let save_time = start.elapsed();
 
         let span = Span::new(hash, remainder_length);
         Ok(SpansInfo {
             spans: vec![span],
-            measurements: WriteMeasurements::new(Duration::default(), hash_time),
+            measurements: WriteMeasurements::new(save_time, Duration::default(), hash_time),
             total_length: remainder_length,
         })
     }

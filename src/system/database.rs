@@ -1,14 +1,12 @@
+use crate::ChunkHash;
 use std::collections::HashMap;
 use std::io;
-use std::io::ErrorKind;
-
-use crate::ChunkHash;
 
 /// Serves as base functionality for storing the actual data as key-value pairs.
 ///
 /// Supports inserting and getting values by key, checking if the key is present in the storage.
 pub trait Database<K, V> {
-    /// Inserts a key-value pair into the storage.
+    /// Inserts a key-value pair into the storage. If the key is already present, then nothing happens.
     fn insert(&mut self, key: K, value: V) -> io::Result<()>;
 
     /// Retrieves a value by a given key. Note that it returns a value, not a reference.
@@ -18,7 +16,7 @@ pub trait Database<K, V> {
     /// was not found in the storage.
     fn get(&self, key: &K) -> io::Result<V>;
 
-    /// Inserts multiple key-value pairs into the storage.
+    /// Try inserts multiple key-value pairs into the storage.
     fn insert_multi(&mut self, pairs: Vec<(K, V)>) -> io::Result<()> {
         for (key, value) in pairs.into_iter() {
             self.insert(key, value)?;
@@ -46,18 +44,10 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
     /// Returns an immutable iterator over keys.
     fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &'a K> + 'a>
     where
-        V: 'a,
-    {
-        Box::new(self.iterator().map(|(k, _)| k))
-    }
+        V: 'a;
 
-    /// Returns an immutable iterator over values.
-    fn values<'a>(&'a self) -> Box<dyn Iterator<Item = &'a V> + 'a>
-    where
-        K: 'a,
-    {
-        Box::new(self.iterator().map(|(_, v)| v))
-    }
+    //// Returns an immutable iterator over value copies.
+    fn values(&self) -> Box<dyn Iterator<Item = V> + '_>;
 
     /// Returns a mutable iterator over values.
     fn values_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut V> + 'a>
@@ -78,7 +68,7 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
     }
 
     fn get(&self, key: &Hash) -> io::Result<V> {
-        self.get(key).ok_or(ErrorKind::NotFound.into()).cloned()
+        self.get(key).ok_or(io::ErrorKind::NotFound.into()).cloned()
     }
 
     fn contains(&self, key: &Hash) -> bool {
@@ -93,6 +83,17 @@ impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
 
     fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {
         Box::new(self.iter_mut())
+    }
+
+    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Hash> + 'a>
+    where
+        V: 'a,
+    {
+        Box::new(self.keys())
+    }
+
+    fn values(&self) -> Box<dyn Iterator<Item = V> + '_> {
+        Box::new(self.values().cloned())
     }
 
     fn clear(&mut self) -> io::Result<()> {
