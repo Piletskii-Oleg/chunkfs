@@ -211,21 +211,21 @@ where
             return vec![];
         }
 
-        let mut sequential_data_infos = vec![vec![data_infos.first().unwrap()]];
-        let mut last_end = data_infos[0].offset + data_infos[0].data_length;
-        for data_info in data_infos[1..].iter() {
-            if data_info.offset == last_end {
-                sequential_data_infos.last_mut().unwrap().push(data_info)
-            } else {
-                sequential_data_infos.push(vec![data_info]);
+        let mut sequential_data_infos = vec![vec![data_infos[0].clone()]];
+        for &data_info in data_infos[1..].iter() {
+            let last_seq = sequential_data_infos.last_mut().unwrap();
+            let last = last_seq.last().unwrap();
+
+            if data_info.offset == last.offset + last.data_length {
+                last_seq.push(data_info.clone());
+                continue;
             }
-            last_end = data_info.offset + data_info.data_length
+            sequential_data_infos.push(vec![data_info.clone()]);
         }
+
         sequential_data_infos
             .into_iter()
-            .map(|seq| {
-                self.datablock_from_data_infos(seq.into_iter().map(|&di| di.clone()).collect())
-            })
+            .map(|seq| self.datablock_from_data_infos(seq))
             .collect::<io::Result<Vec<DataBlock>>>()
             .unwrap()
     }
