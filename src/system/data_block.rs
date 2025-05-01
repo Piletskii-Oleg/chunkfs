@@ -2,12 +2,21 @@ use bincode::{decode_from_slice, Decode};
 use std::io;
 
 /// Information about the location of the data on the disk.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DataInfo {
     /// Offset of the data on the block device.
     offset: u64,
     /// Serialized data length.
     data_length: u64,
+}
+
+impl DataInfo {
+    fn new(offset: u64, data_length: u64) -> Self {
+        Self {
+            offset,
+            data_length,
+        }
+    }
 }
 
 /// Type of the data alignment.
@@ -26,6 +35,7 @@ pub enum Alignment {
 ///
 /// DataBlock is either [`without alignment`][Alignment::None] when the first value starts at the DataBlock's offset,
 /// or [`with alignment`][Alignment::ByBlockSize] by the block size, with padding at the beginning and end.
+#[derive(Debug)]
 pub struct DataBlock {
     /// Actual data of the DataBlock.
     data: Vec<u8>,
@@ -99,10 +109,7 @@ impl DataBlock {
 
         let given_offset = offset;
         let data_infos = values.iter().fold(vec![], |mut data_infos, vec| {
-            data_infos.push(DataInfo {
-                offset,
-                data_length: vec.len() as u64,
-            });
+            data_infos.push(DataInfo::new(offset, vec.len() as u64));
             offset += vec.len() as u64;
             data_infos
         });
@@ -191,5 +198,161 @@ fn start_and_end_padding_of_datablock(start: u64, end: u64, alignment: Alignment
         )
     } else {
         (0, 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_data_infos_empty_fails() {
+        let res = DataBlock::from_data_infos(Alignment::None, vec![]);
+        assert_eq!(res.unwrap_err().kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn from_data_infos_not_sequential_fails() {
+        let data_infos = vec![DataInfo::new(100, 100), DataInfo::new(0, 100)];
+        let res = DataBlock::from_data_infos(Alignment::None, data_infos);
+        assert_eq!(res.unwrap_err().kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn from_data_infos_not_continuous_fails() {
+        let data_infos = vec![DataInfo::new(0, 100), DataInfo::new(101, 100)];
+        let res = DataBlock::from_data_infos(Alignment::None, data_infos);
+        assert_eq!(res.unwrap_err().kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn from_single_data_info_without_alignment_ok() {
+        let data_info = DataInfo::new(50, 150);
+        let data_infos = vec![data_info.clone()];
+        let datablock = DataBlock::from_data_infos(Alignment::None, data_infos).unwrap();
+        assert_eq!(datablock.data.len(), 150);
+        assert_eq!(datablock.offset, 50);
+        assert_eq!(datablock.data_infos, vec![data_info.clone()]);
+    }
+
+    #[test]
+    fn from_single_data_info_with_alignment_ok() {
+        let data_info = DataInfo::new(50, 150);
+        let data_infos = vec![data_info.clone()];
+        let datablock =
+            DataBlock::from_data_infos(Alignment::ByBlockSize(512), data_infos).unwrap();
+        assert_eq!(datablock.data.len(), 512);
+        assert_eq!(datablock.offset, 0);
+        assert_eq!(datablock.data_infos, vec![data_info.clone()]);
+    }
+
+    #[test]
+    fn from_single_data_info_block_intersection_with_alignment_ok() {
+        let data_info = DataInfo::new(400, 150);
+        let data_infos = vec![data_info.clone()];
+        let datablock =
+            DataBlock::from_data_infos(Alignment::ByBlockSize(512), data_infos).unwrap();
+        assert_eq!(datablock.data.len(), 512 * 2);
+        assert_eq!(datablock.offset, 0);
+        assert_eq!(datablock.data_infos, vec![data_info.clone()]);
+    }
+
+    #[test]
+    fn from_multi_data_info_without_alignment_ok() {
+        let data_infos = vec![
+            DataInfo::new(50, 150),
+            DataInfo::new(200, 500),
+            DataInfo::new(700, 1024),
+        ];
+        let datablock = DataBlock::from_data_infos(Alignment::None, data_infos.clone()).unwrap();
+        assert_eq!(datablock.data.len(), 150 + 500 + 1024);
+        assert_eq!(datablock.offset, 50);
+        assert_eq!(datablock.data_infos, data_infos.clone());
+    }
+
+    #[test]
+    fn from_multi_data_info_with_alignment_ok() {
+        let data_infos = vec![
+            DataInfo::new(550, 150),
+            DataInfo::new(700, 500),
+            DataInfo::new(1200, 1024),
+        ];
+        let datablock =
+            DataBlock::from_data_infos(Alignment::ByBlockSize(512), data_infos.clone()).unwrap();
+        assert_eq!(datablock.data.len(), 512 * 4);
+        assert_eq!(datablock.offset, 512);
+        assert_eq!(datablock.data_infos, data_infos.clone());
+    }
+
+    #[test]
+    fn from_values_empty_fails() {
+        let res = DataBlock::from_values(Alignment::None, vec![], 10);
+        assert_eq!(res.unwrap_err().kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn from_single_value_without_alignment_ok() {
+        let data = vec![1; 1500];
+        let values = vec![data.clone()];
+        let datablock = DataBlock::from_values(Alignment::None, values, 150).unwrap();
+        assert_eq!(datablock.data.len(), 1500);
+        assert_eq!(datablock.offset, 150);
+        assert_eq!(datablock.data, data);
+        assert_eq!(datablock.data_infos, vec![DataInfo::new(150, 1500)]);
+    }
+
+    #[test]
+    fn from_single_value_with_alignment_ok() {
+        let data = vec![1; 1500];
+        let values = vec![data.clone()];
+        let datablock = DataBlock::from_values(Alignment::ByBlockSize(512), values, 150).unwrap();
+        assert_eq!(datablock.data.len(), 512 * 4);
+        assert_eq!(datablock.offset, 0);
+        assert_eq!(
+            datablock.data,
+            [vec![0; 150], data, vec![0; 512 * 4 - 1500 - 150]].concat()
+        );
+        assert_eq!(datablock.data_infos, vec![DataInfo::new(150, 1500)]);
+    }
+
+    #[test]
+    fn from_multi_values_without_alignment_ok() {
+        let values = vec![vec![1; 150], vec![2; 500], vec![3; 1024]];
+        let datablock = DataBlock::from_values(Alignment::None, values.clone(), 50).unwrap();
+        assert_eq!(datablock.data.len(), 150 + 500 + 1024);
+        assert_eq!(datablock.offset, 50);
+        assert_eq!(datablock.data, values.concat());
+        assert_eq!(
+            datablock.data_infos,
+            vec![
+                DataInfo::new(50, 150),
+                DataInfo::new(50 + 150, 500),
+                DataInfo::new(50 + 150 + 500, 1024)
+            ]
+        );
+    }
+
+    #[test]
+    fn from_multi_values_with_alignment_ok() {
+        let values = vec![vec![1; 150], vec![2; 500], vec![3; 1024]];
+        let datablock =
+            DataBlock::from_values(Alignment::ByBlockSize(512), values.clone(), 50).unwrap();
+        assert_eq!(datablock.data.len(), 512 * 4);
+        assert_eq!(datablock.offset, 0);
+        let datablock_expected_data = [
+            vec![0; 50],
+            values.concat(),
+            vec![0; 512 * 4 - 50 - 150 - 500 - 1024],
+        ]
+        .concat();
+        assert_eq!(datablock.data, datablock_expected_data);
+        assert_eq!(
+            datablock.data_infos,
+            vec![
+                DataInfo::new(50, 150),
+                DataInfo::new(50 + 150, 500),
+                DataInfo::new(50 + 150 + 500, 1024)
+            ]
+        );
     }
 }
