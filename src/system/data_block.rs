@@ -55,10 +55,15 @@ impl DataBlock {
     /// Constructs a [`DataBlock`] from a vector of sequential and continuous [`DataInfo`].
     ///
     /// Padded at the start and end by the block size if the corresponding alignment is passed.
-    /// Returns [`io::ErrorKind::InvalidData`] if data_infos is empty.
+    /// If data_infos is empty or not sequential and continuous, then [`io::ErrorKind::InvalidData`] is returned.
     fn from_data_infos(alignment: Alignment, data_infos: Vec<DataInfo>) -> io::Result<Self> {
         if data_infos.is_empty() {
             return Err(io::Error::from(io::ErrorKind::InvalidData));
+        }
+        for (i, data_info) in data_infos.iter().enumerate().skip(1) {
+            if data_info.offset != data_infos[i - 1].offset + data_infos[i - 1].data_length {
+                return Err(io::Error::from(io::ErrorKind::InvalidData));
+            }
         }
 
         let first = data_infos.first().unwrap();
