@@ -109,22 +109,13 @@ where
     where
         P: AsRef<Path>,
     {
-        let file = if o_direct {
-            OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .read(true)
-                .write(true)
-                .custom_flags(O_DIRECT)
-                .open(file_path)?
-        } else {
-            OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .read(true)
-                .write(true)
-                .open(file_path)?
+        let mut options = OpenOptions::new();
+        options.create(true).truncate(true).read(true).write(true);
+        if o_direct {
+            options.custom_flags(O_DIRECT);
         };
+
+        let file = options.open(file_path)?;
         file.set_len(db_size)?;
         Ok(file)
     }
@@ -136,18 +127,12 @@ where
     where
         P: AsRef<Path>,
     {
-        let device = if o_direct {
-            OpenOptions::new()
-                .read(true)
-                .write(true)
-                .custom_flags(O_DIRECT)
-                .open(blkdev_path)?
-        } else {
-            OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(blkdev_path)?
-        };
+        let mut options = OpenOptions::new();
+        options.read(true).write(true);
+        if o_direct {
+            options.custom_flags(O_DIRECT);
+        }
+        let device = options.open(blkdev_path)?;
         let fd = device.as_raw_fd();
 
         let mut total_size: u64 = 0;
