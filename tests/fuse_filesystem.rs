@@ -165,7 +165,7 @@ fn readdir() {
         files.push(path.file_name().unwrap().to_owned());
     }
     assert!(files.contains(&OsString::from("file1")));
-    assert!(files.contains(&OsString::from("file1")));
+    assert!(files.contains(&OsString::from("file2")));
     assert_eq!(files.len(), 2)
 }
 
