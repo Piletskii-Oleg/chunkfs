@@ -326,8 +326,8 @@ where
     }
 
     fn insert_multi(&mut self, pairs: Vec<(K, V)>) -> io::Result<()> {
-        let mut unique_keys = vec![];
-        let mut unique_values = vec![];
+        let mut unique_keys = Vec::with_capacity(pairs.len());
+        let mut unique_values = Vec::with_capacity(pairs.len());
         pairs.iter().for_each(|(k, v)| {
             if !self.database_map.contains_key(k) {
                 unique_keys.push(k.clone());
