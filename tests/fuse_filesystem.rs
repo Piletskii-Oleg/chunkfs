@@ -185,7 +185,7 @@ fn permissions() {
     };
     let read_denied = || {
         let res = OpenOptions::new().read(true).open(&file_path);
-        assert!(res.is_err());
+        assert_eq!(res.unwrap_err().kind(), std::io::ErrorKind::PermissionDenied);
     };
     let write_ok = || {
         let file = OpenOptions::new().write(true).open(&file_path).unwrap();
@@ -194,7 +194,7 @@ fn permissions() {
     };
     let write_denied = || {
         let res = OpenOptions::new().write(true).open(&file_path);
-        assert!(res.is_err());
+        assert_eq!(res.unwrap_err().kind(), std::io::ErrorKind::PermissionDenied);
     };
 
     let perms: Vec<_> = (0o000..=0o777).map(Permissions::from_mode).collect();
@@ -221,7 +221,7 @@ fn create_dir_fails() {
 
     let dir_path = mount_point.join("directory");
     let res = fs::create_dir(&dir_path);
-    assert!(res.is_err());
+    assert_eq!(res.unwrap_err().raw_os_error(), Some(libc::ENOSYS));
 }
 
 #[test]
