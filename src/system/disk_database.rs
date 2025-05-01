@@ -10,7 +10,7 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::{FileExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
-/// Constant for requesting total size of the block device via ioctl
+/// Constant for requesting the total size of the block device via ioctl
 const BLKGETSIZE64: u64 = 0x80081272;
 /// Constant for requesting size of the block in the block device via ioctl
 const BLKSSZGET: u64 = 0x1268;
@@ -24,26 +24,26 @@ struct DataInfo {
     data_length: u64,
 }
 
-/// Continuous data interval with information about sub-intervals. Offsets of the sub-intervals must be sequential and continuous.
+/// Continuous data interval with information about internal values. Offsets of the internal values must be sequential and continuous.
 /// Need for more convenient large aggregated read requests.
 ///
 /// `Is not written to disk`, only used when processing read operations.
 ///
-/// If device is opened with O_DIRECT flag, offset is a multiple of a block size, since it padded at start and end.
-/// Also, with O_DIRECT it is possible that they may overlap during the processing of a multiple write/read operations.
-struct SuperBlock {
-    /// Actual data of the superblock.
+/// If a device is opened with the O_DIRECT flag, then additional padding is added to the beginning and end of the DataBlock to align it to the block size.
+/// Also, with the O_DIRECT, it is possible that several DataBlocks may overlap during the processing of multiple write/read operations.
+struct DataBlock {
+    /// Actual data of the DataBlock.
     data: Vec<u8>,
-    /// Superblock offset. First subinterval can
+    /// DataBlock offset. The first value may not be at this offset but after padding.
     offset: u64,
-    /// Sub-intervals info. Must be sequential and continuous.
+    /// Internal values info. Must be sequential and continuous, so that each successive offset is equal to the previous offset plus the previous size.
     data_infos: Vec<DataInfo>,
 }
 
 enum InitType {
     /// [`DiskDatabase`] is initialized on a block device.
     BlockDevice,
-    /// [`DiskDatabase`] is initialized on regular file. Contains path to the file.
+    /// [`DiskDatabase`] is initialized on a regular file. Contains a path to the file.
     RegularFile(PathBuf),
 }
 
@@ -53,7 +53,7 @@ where
     K: ChunkHash,
     V: Clone + Encode + Decode<()>,
 {
-    /// Handle for an open block device (or regular file if initialized via `init_on_regular_file`.
+    /// Handle for an open block device (or regular file if initialized via `init_on_regular_file`).
     device: File,
     /// Type of the database initialization.
     init_type: InitType,
@@ -78,11 +78,11 @@ where
 {
     /// Init database on a regular file.
     ///
-    /// Creates file with [`Self::create_db_file`]. Sets the size of the file specified in the path.
-    /// You can specify `o_direct` flag for open file in a O_DIRECT mode. Considers the block size to be 512.
-    /// File is removed on a drop() call.
+    /// Creates a file with [`Self::create_db_file`]. Set the size of the file specified in the path.
+    /// You can specify the ` o_direct ` flag for an open file in O_DIRECT mode. Consider the block size to be 512.
+    /// The File is removed on a drop() call.
     ///
-    /// Intended for testing so that it does not require block device.
+    /// Intended for testing so that it does not require a block device.
     pub fn init_on_regular_file<P>(file_path: P, db_size: u64, o_direct: bool) -> io::Result<Self>
     where
         P: AsRef<Path>,
@@ -120,7 +120,7 @@ where
         Ok(file)
     }
 
-    /// Init database on a block device, with O_DIRECT flag, if specified.
+    /// Init database on a block device, with an O_DIRECT flag, if specified.
     ///
     /// Takes information about the block device via ioctl.
     pub fn init<P>(blkdev_path: P, o_direct: bool) -> Result<Self, io::Error>
@@ -176,10 +176,10 @@ where
         }
     }
 
-    /// Constructs [`SuperBlock`] by vector of sequential and continuous [`DataInfo`].
+    /// Constructs [`DataBlock`] by vector of sequential and continuous [`DataInfo`].
     ///
-    /// Padded at start and end, if block device is inited with O_DIRECT flag.
-    fn superblock_from_data_infos(&self, data_infos: Vec<DataInfo>) -> io::Result<SuperBlock> {
+    /// Padded at start and end if a block device is initialized with an O_DIRECT flag.
+    fn datablock_from_data_infos(&self, data_infos: Vec<DataInfo>) -> io::Result<DataBlock> {
         if data_infos.is_empty() {
             return Err(io::Error::from(io::ErrorKind::InvalidData));
         }
@@ -196,16 +196,17 @@ where
         };
         let total_len = last.offset + last.data_length - first.offset + start_padding + end_padding;
 
-        Ok(SuperBlock {
+        Ok(DataBlock {
             data: vec![0; total_len as usize],
             offset: first.offset - start_padding,
             data_infos,
         })
     }
 
-    /// Split [`DataInfo`] vector into continuous intervals ([`SuperBlock`]'s).
-    /// If some of the intervals follow each other by offsets, but don't follow each other in the vector, they are split into different intervals.
-    fn split_to_superblocks(&self, data_infos: Vec<&DataInfo>) -> Vec<SuperBlock> {
+    /// Split [`DataInfo`] vector into continuous intervals ([`DataBlock`]'s).
+    ///
+    /// If some intervals follow each other by offsets but don't follow each other in the vector, they are split into different intervals.
+    fn split_to_datablocks(&self, data_infos: Vec<&DataInfo>) -> Vec<DataBlock> {
         if data_infos.is_empty() {
             return vec![];
         }
@@ -223,30 +224,30 @@ where
         sequential_data_infos
             .into_iter()
             .map(|seq| {
-                self.superblock_from_data_infos(seq.into_iter().map(|&di| di.clone()).collect())
+                self.datablock_from_data_infos(seq.into_iter().map(|&di| di.clone()).collect())
             })
-            .collect::<io::Result<Vec<SuperBlock>>>()
+            .collect::<io::Result<Vec<DataBlock>>>()
             .unwrap()
     }
 
-    /// Read into superblocks from the block device based on their offsets.
-    fn fill_superblocks(&self, superblocks: Vec<&mut SuperBlock>) -> io::Result<()> {
-        superblocks
+    /// Read into datablocks from the block device based on their offsets.
+    fn fill_datablocks(&self, datablocks: Vec<&mut DataBlock>) -> io::Result<()> {
+        datablocks
             .into_iter()
-            .map(|superblock| self.device.read_at(&mut superblock.data, superblock.offset))
+            .map(|datablock| self.device.read_at(&mut datablock.data, datablock.offset))
             .collect::<io::Result<Vec<_>>>()?;
         Ok(())
     }
 
-    /// Decode each sub-interval of each superblock and concats them into vector of decoded values.
-    fn decode_superblocks<T: Decode<()>>(superblocks: Vec<&SuperBlock>) -> io::Result<Vec<T>> {
+    /// Decode each internal value of each datablock and concat them into a vector of decoded values.
+    fn decode_datablock<T: Decode<()>>(datablock: Vec<&DataBlock>) -> io::Result<Vec<T>> {
         let mut decoded = vec![];
-        superblocks.iter().try_for_each(|&superblock| {
-            superblock.data_infos.iter().try_for_each(|data_info| {
-                let start = (data_info.offset - superblock.offset) as usize;
+        datablock.iter().try_for_each(|&datablock| {
+            datablock.data_infos.iter().try_for_each(|data_info| {
+                let start = (data_info.offset - datablock.offset) as usize;
                 let end = start + data_info.data_length as usize;
                 let (value, _) =
-                    decode_from_slice(&superblock.data[start..end], bincode::config::standard())
+                    decode_from_slice(&datablock.data[start..end], bincode::config::standard())
                         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
                 decoded.push(value);
                 Ok::<(), io::Error>(())
@@ -261,12 +262,12 @@ where
             return Ok(Vec::new());
         }
 
-        let mut superblocks = self.split_to_superblocks(data_infos);
-        self.fill_superblocks(superblocks.iter_mut().collect())?;
-        Self::decode_superblocks(superblocks.iter().collect())
+        let mut datablocks = self.split_to_datablocks(data_infos);
+        self.fill_datablocks(datablocks.iter_mut().collect())?;
+        Self::decode_datablock(datablocks.iter().collect())
     }
 
-    /// Serializes and writes multiple data to disk. Returns `Vec<DataInfo>` with information about the allocated data.
+    /// Serializes and writes multiple data to the disk. Returns `Vec<DataInfo>` with information about the allocated data.
     fn write_multi<T: Encode>(&mut self, values: &[&T]) -> io::Result<Vec<DataInfo>> {
         let encoded = values
             .iter()
@@ -291,7 +292,7 @@ where
         if self.o_direct {
             let padding_size = self.padding_to_multiple_block_size(encoded.len() as u64);
             self.used_size += padding_size;
-            encoded.extend(vec![0; padding_size as usize]); // padding for work with O_DIRECT flag
+            encoded.extend(vec![0; padding_size as usize]); // padding for work with an O_DIRECT flag
         }
         self.device
             .write_all_at(&encoded, self.used_size - encoded.len() as u64)?;
