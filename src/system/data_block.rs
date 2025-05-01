@@ -204,6 +204,35 @@ fn start_and_end_padding_of_datablock(start: u64, end: u64, alignment: Alignment
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::KB;
+    use crate::MB;
+    use bincode::encode_to_vec;
+
+    #[test]
+    fn padding_to_multiple_block_ok() {
+        assert_eq!(20, padding_to_multiple_block_size(490, 510));
+        assert_eq!(1500, padding_to_multiple_block_size(1200, 2700));
+        assert_eq!(0, padding_to_multiple_block_size(500, 500));
+        assert_eq!(1, padding_to_multiple_block_size(500, 501));
+    }
+
+    #[test]
+    fn start_end_padding_ok() {
+        let (st, end) = start_and_end_padding_of_datablock(10, 200, Alignment::ByBlockSize(3));
+        assert_eq!((st, end), (1, 1));
+
+        let (st, end) = start_and_end_padding_of_datablock(200, 805, Alignment::ByBlockSize(400));
+        assert_eq!((st, end), (200, 395));
+
+        let (st, end) = start_and_end_padding_of_datablock(200, 805, Alignment::None);
+        assert_eq!((st, end), (0, 0));
+
+        let (st, end) = start_and_end_padding_of_datablock(1400, 1500, Alignment::ByBlockSize(512));
+        assert_eq!((st, end), (1400 - 512 * 2, 512 * 3 - 1500));
+
+        let (st, end) = start_and_end_padding_of_datablock(700, 2500, Alignment::ByBlockSize(2500));
+        assert_eq!((st, end), (700, 0));
+    }
 
     #[test]
     fn from_data_infos_empty_fails() {
@@ -354,5 +383,104 @@ mod tests {
                 DataInfo::new(50 + 150 + 500, 1024)
             ]
         );
+    }
+
+    #[test]
+    fn split_to_datablocks_empty_ok() {
+        let datablocks = DataBlock::split_to_datablocks(Alignment::None, vec![]);
+        assert!(datablocks.is_empty());
+    }
+
+    #[test]
+    fn split_to_datablocks_several_intervals_with_alignment_ok() {
+        let data_infos = [
+            DataInfo::new(2000, 1500),
+            DataInfo::new(3500, 500),
+            DataInfo::new(4000, 300),
+            DataInfo::new(5000, 1024),
+            DataInfo::new(6024, 1024),
+        ];
+        let datablocks = DataBlock::split_to_datablocks(
+            Alignment::ByBlockSize(512),
+            data_infos.iter().collect(),
+        );
+        assert_eq!(datablocks.len(), 2);
+
+        assert_eq!(datablocks[0].offset, 512 * 3);
+        assert_eq!(datablocks[0].data.len(), 512 * 6);
+        assert_eq!(
+            datablocks[0].data_infos,
+            vec![
+                DataInfo::new(2000, 1500),
+                DataInfo::new(3500, 500),
+                DataInfo::new(4000, 300)
+            ]
+        );
+
+        assert_eq!(datablocks[1].offset, 512 * 9);
+        assert_eq!(datablocks[1].data.len(), 512 * 5);
+        assert_eq!(
+            datablocks[1].data_infos,
+            vec![DataInfo::new(5000, 1024), DataInfo::new(6024, 1024)]
+        );
+    }
+
+    #[test]
+    fn split_to_datablocks_several_intervals_without_alignment_ok() {
+        let data_infos = [
+            DataInfo::new(10200, 1500),
+            DataInfo::new(11700, 550),
+            DataInfo::new(12250, 5000),
+            DataInfo::new(200, 700),
+            DataInfo::new(900, 4500),
+            DataInfo::new(4000, 30),
+        ];
+        let datablocks =
+            DataBlock::split_to_datablocks(Alignment::None, data_infos.iter().collect());
+        assert_eq!(datablocks.len(), 3);
+
+        assert_eq!(datablocks[0].offset, 10200);
+        assert_eq!(datablocks[0].data.len(), 1500 + 550 + 5000);
+        assert_eq!(
+            datablocks[0].data_infos,
+            vec![
+                DataInfo::new(10200, 1500),
+                DataInfo::new(11700, 550),
+                DataInfo::new(12250, 5000),
+            ]
+        );
+
+        assert_eq!(datablocks[1].offset, 200);
+        assert_eq!(datablocks[1].data.len(), 700 + 4500);
+        assert_eq!(
+            datablocks[1].data_infos,
+            vec![DataInfo::new(200, 700), DataInfo::new(900, 4500),]
+        );
+
+        assert_eq!(datablocks[2].offset, 4000);
+        assert_eq!(datablocks[2].data.len(), 30);
+        assert_eq!(datablocks[2].data_infos, vec![DataInfo::new(4000, 30),]);
+    }
+
+    #[test]
+    fn decode_aligned_and_not_aligned_datablocks_ok() {
+        let data_vectors1 = vec![vec![1; MB], vec![2; 5 * MB], vec![3; 1024]];
+        let data_vectors2 = vec![vec![4; 500 * KB], vec![2; 2 * MB], vec![10; 10]];
+        let encoded1 = encode_to_vec(data_vectors1.clone(), bincode::config::standard()).unwrap();
+        let encoded2 = encode_to_vec(data_vectors2.clone(), bincode::config::standard()).unwrap();
+        let datablock1 =
+            DataBlock::from_values(Alignment::ByBlockSize(2300), vec![encoded1, encoded2], 5000)
+                .unwrap();
+
+        let data_vectors3 = vec![vec![9; 400 * KB], vec![150; MB + 1], vec![]];
+        let encoded3 = encode_to_vec(data_vectors3.clone(), bincode::config::standard()).unwrap();
+        let datablock2 = DataBlock::from_values(Alignment::None, vec![encoded3], 200).unwrap();
+
+        let mut decoded: Vec<Vec<Vec<i32>>> =
+            DataBlock::decode_datablocks(vec![&datablock2, &datablock1]).unwrap();
+        decoded.sort();
+        let mut all_data_vectors = vec![data_vectors1, data_vectors2, data_vectors3];
+        all_data_vectors.sort();
+        assert_eq!(all_data_vectors, decoded);
     }
 }
