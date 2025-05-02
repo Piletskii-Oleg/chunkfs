@@ -701,10 +701,10 @@ where
         };
 
         let fh = self.get_new_fh();
-        reply.created(&Duration::new(0, 0), &file.attr, 0, fh, flags as u32);
-
-        self.files.insert(ino, file);
+        self.files.insert(ino, file.clone());
         self.inodes.insert(name, ino);
         self.file_handles.insert(fh, file_handle);
+
+        reply.created(&Duration::new(0, 0), &file.attr, 0, fh, flags as u32);
     }
 }
