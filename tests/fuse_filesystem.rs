@@ -804,7 +804,7 @@ fn lookup_permission() {
 
     let perms: Vec<_> = (0o000..=0o777).map(Permissions::from_mode).collect();
     for perm in perms {
-        // reading mount directory is handled by upper filesystem
+        // reading mount directory is handled by the upper filesystem
         if perm.mode() & 0o400 == 0 {
             continue;
         }
@@ -816,4 +816,26 @@ fn lookup_permission() {
             lookup_denied();
         }
     }
+}
+
+#[test]
+fn concurrent_write_and_lookup() {
+    let fuse_fixture = FuseFixture::default();
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+    let file_path = mount_point.join("file");
+
+    let mut file = File::create(&file_path).unwrap();
+    let handle = std::thread::spawn(move || {
+        for _ in 0..10 {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            let _ = File::open(&file_path).unwrap().metadata().unwrap();
+        }
+    });
+    let buf = vec![0; 5 * MB];
+    for _ in 0..10 {
+        file.write_all(&buf).unwrap()
+    }
+
+    handle.join().unwrap();
+    assert_eq!(file.metadata().unwrap().len(), 50 * MB as u64);
 }

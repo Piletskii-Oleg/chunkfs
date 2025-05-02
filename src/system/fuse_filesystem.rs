@@ -37,8 +37,6 @@ struct FuseFile {
     attr: FileAttr,
     /// File name.
     name: String,
-    /// Generation of a file. Increments every time the file content is modified.
-    generation: u64,
     /// Number of opened file handles.
     handles: u64,
 }
@@ -118,7 +116,6 @@ where
             cache: Vec::new(),
             attr: root_attr,
             name: ".".to_string(),
-            generation: 0,
             handles: 0,
         };
         let mut parent_dir = root_dir.clone();
@@ -265,7 +262,7 @@ where
         }
 
         let file = self.files.get(inode).unwrap();
-        reply.entry(&Duration::new(0, 0), &file.attr, file.generation)
+        reply.entry(&Duration::new(0, 0), &file.attr, 0)
     }
 
     fn getattr(&mut self, _req: &Request<'_>, ino: u64, _fh: Option<u64>, reply: ReplyAttr) {
@@ -530,7 +527,6 @@ where
         let file = self.files.get_mut(&ino).unwrap();
         file.attr.ctime = now;
         file.attr.mtime = now;
-        file.generation += 1;
 
         reply.written(data.len() as u32);
     }
@@ -701,7 +697,6 @@ where
             cache: Vec::new(),
             attr,
             name: name.clone(),
-            generation: 0,
             handles: 1,
         };
 
