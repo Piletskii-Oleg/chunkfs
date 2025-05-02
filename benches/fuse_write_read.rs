@@ -5,10 +5,12 @@ use chunkfs::{ChunkerRef, FuseFS, MB};
 use criterion::measurement::WallTime;
 use criterion::{BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 use fuser::MountOption::AutoUnmount;
+use libc::O_DIRECT;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 const SAMPLE_SIZE: usize = 30;
@@ -106,6 +108,7 @@ fn bench_write(
                     .write(true)
                     .read(true)
                     .create(true)
+                    .custom_flags(O_DIRECT)
                     .truncate(true)
                     .open(&fuse_path)
                     .unwrap();
@@ -170,7 +173,13 @@ fn bench_read(
     let parameter = format!("read_fuse-{:?}-{}", algorithm, params);
     group.bench_function(BenchmarkId::new(bench_name, parameter), |b| {
         b.iter_batched(
-            || File::open(&fuse_path).unwrap(),
+            || {
+                OpenOptions::new()
+                    .read(true)
+                    .custom_flags(O_DIRECT)
+                    .open(&fuse_path)
+                    .unwrap()
+            },
             |mut fuse_file| {
                 let mut buf = vec![0; 50 * MB];
                 loop {
