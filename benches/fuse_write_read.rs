@@ -1,4 +1,5 @@
 use cdc_chunkers::SizeParams;
+use chunkfs::bench::Dataset;
 use chunkfs::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker};
 use chunkfs::hashers::Sha256Hasher;
 use chunkfs::{ChunkerRef, FuseFS, IOC_GET_AVG_CHUNK_SIZE, IOC_GET_DEDUP_RATIO, MB};
@@ -55,23 +56,13 @@ fn get_default_sizes(algorithm: Algorithms) -> SizeParams {
     }
 }
 
-struct Dataset {
-    filename: String,
-    size: u64,
-}
-
 pub fn bench(c: &mut Criterion) {
-    let dataset1_len = File::open("archX4.tar").unwrap().metadata().unwrap().len();
-    let dataset1 = Dataset {
-        filename: "archX4.tar".to_string(),
-        size: dataset1_len,
-    };
-    let datasets = vec![dataset1];
+    let datasets = vec![Dataset::new("archX4.tar", "archX4").unwrap()];
 
     for dataset in datasets {
         let mut group = c.benchmark_group("FuseChunkers");
         group.sample_size(SAMPLE_SIZE);
-        group.throughput(Throughput::Bytes(dataset.size));
+        group.throughput(Throughput::Bytes(dataset.size as u64));
 
         for chunker in chunkers() {
             let params = get_default_sizes(chunker);
@@ -109,7 +100,7 @@ fn dedup_ratio_and_avg_chunk(dataset: &Dataset, algorithm: Algorithms, params: S
         .open(&fuse_path)
         .unwrap();
 
-    let mut source = File::open(&dataset.filename).unwrap();
+    let mut source = File::open(&dataset.path).unwrap();
     let mut buf = vec![0; 50 * MB];
     loop {
         let bytes_read = source.read(&mut buf).unwrap();
@@ -148,7 +139,7 @@ fn bench_write(
     algorithm: Algorithms,
     params: SizeParams,
 ) {
-    let bench_name = dataset.filename.clone();
+    let bench_name = dataset.path.clone();
     let parameter = format!("write_fuse-{:?}-{}", algorithm, params);
     group.bench_function(BenchmarkId::new(bench_name, parameter), |b| {
         b.iter_batched(
@@ -171,7 +162,7 @@ fn bench_write(
                     .open(&fuse_path)
                     .unwrap();
 
-                let source = File::open(&dataset.filename).unwrap();
+                let source = File::open(&dataset.path).unwrap();
 
                 (session, source, fuse_file)
             },
@@ -215,7 +206,7 @@ fn bench_read(
         .open(&fuse_path)
         .unwrap();
 
-    let mut source = File::open(&dataset.filename).unwrap();
+    let mut source = File::open(&dataset.path).unwrap();
 
     let mut buf = vec![0; 50 * MB];
     loop {
@@ -228,7 +219,7 @@ fn bench_read(
     fuse_file.flush().unwrap();
     drop(fuse_file);
 
-    let bench_name = dataset.filename.clone();
+    let bench_name = dataset.path.clone();
     let parameter = format!("read_fuse-{:?}-{}", algorithm, params);
     group.bench_function(BenchmarkId::new(bench_name, parameter), |b| {
         b.iter_batched(
