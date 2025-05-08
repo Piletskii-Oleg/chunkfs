@@ -20,9 +20,9 @@ use std::time::{Duration, SystemTime};
 /// The File is opened for execution.
 const FMODE_EXEC: i32 = 0x20;
 /// Total cache size of all files, after which all caches will be [`dropped and shrank`][FuseFS::drop_and_shrink_cache] to the [`underlying filesystem`][FileSystem].
-const FILESYSTEM_CACHE_MAX_SIZE: usize = 25 * MB;
+const FILESYSTEM_CACHE_MAX_SIZE: usize = 250 * MB;
 /// Maximum cache size, after which it will drop [`dropped and shrank`][FuseFS::drop_and_shrink_cache] to the [`underlying filesystem`][FileSystem].
-const FILE_CACHE_MAX_SIZE: usize = 5 * MB;
+const FILE_CACHE_MAX_SIZE: usize = 100 * MB;
 
 /// Command number for filesystem dedup ratio request via ioctl.
 pub const IOC_GET_DEDUP_RATIO: u64 = nix::request_code_read!('S', 0, size_of::<f64>());
