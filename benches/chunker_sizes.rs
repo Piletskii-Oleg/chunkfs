@@ -54,8 +54,8 @@ fn get_chunker(algorithm: Algorithms, params: SizeParams) -> ChunkerRef {
     match algorithm {
         Algorithms::Rabin => RabinChunker::new(params).into(),
         Algorithms::Leap => LeapChunker::new(params).into(),
-        Algorithms::Super => UltraChunker::new(params).into(),
-        Algorithms::Ultra => SuperChunker::new(params).into(),
+        Algorithms::Super => SuperChunker::new(params).into(),
+        Algorithms::Ultra => UltraChunker::new(params).into(),
     }
 }
 
