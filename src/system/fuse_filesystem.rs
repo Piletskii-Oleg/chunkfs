@@ -511,9 +511,13 @@ where
             reply.error(libc::EACCES);
             return;
         }
-
+        
+        let cache_cap_before = file.cache.capacity();
         file.cache.extend_from_slice(data);
+        let cache_cap_after = file.cache.capacity();
+        self.total_cache += cache_cap_after - cache_cap_before;
         file.attr.size += data.len() as u64;
+        
         if file.cache.len() > FILE_CACHE_MAX_SIZE && self.drop_cache(ino, fh).is_err() {
             reply.error(libc::EIO);
             return;
