@@ -1,13 +1,14 @@
 use crate::system::file_layer::FileHandle;
 use crate::{
-    create_cdc_filesystem, ChunkHash, ChunkerRef, DataContainer, Database, FileSystem, Hasher, MB,
+    create_cdc_filesystem, ChunkHash, ChunkerRef, DataContainer, FileSystem, Hasher,
+    IterableDatabase, MB,
 };
 use fuser::consts::FUSE_BIG_WRITES;
 use fuser::FileType::RegularFile;
 use fuser::TimeOrNow::Now;
 use fuser::{
     FileAttr, FileType, Filesystem, KernelConfig, ReplyAttr, ReplyCreate, ReplyData,
-    ReplyDirectory, ReplyEmpty, ReplyEntry, ReplyOpen, ReplyWrite, Request, TimeOrNow,
+    ReplyDirectory, ReplyEmpty, ReplyEntry, ReplyIoctl, ReplyOpen, ReplyWrite, Request, TimeOrNow,
 };
 use libc::c_int;
 use std::cmp::min;
@@ -16,15 +17,20 @@ use std::ffi::OsStr;
 use std::io;
 use std::time::{Duration, SystemTime};
 
-type Inode = u64;
-type Fh = u64;
-
 /// The File is opened for execution.
 const FMODE_EXEC: i32 = 0x20;
 /// Total cache size of all files, after which all caches will be [`dropped and shrank`][FuseFS::drop_and_shrink_cache] to the [`underlying filesystem`][FileSystem].
 const FILESYSTEM_CACHE_MAX_SIZE: usize = 25 * MB;
 /// Maximum cache size, after which it will drop [`dropped and shrank`][FuseFS::drop_and_shrink_cache] to the [`underlying filesystem`][FileSystem].
 const FILE_CACHE_MAX_SIZE: usize = 5 * MB;
+
+/// Command number for filesystem dedup ratio request via ioctl.
+pub const IOC_GET_DEDUP_RATIO: u64 = nix::request_code_read!('S', 0, size_of::<f64>());
+/// Command number for filesystem average chunk size request via ioctl.
+pub const IOC_GET_AVG_CHUNK_SIZE: u64 = nix::request_code_read!('S', 1, size_of::<usize>());
+
+type Inode = u64;
+type Fh = u64;
 
 /// [`FuseFS`] file entity.
 #[derive(Clone)]
@@ -58,7 +64,7 @@ struct FuseFileHandle {
 /// After creation, it should be passed to [`mount2`][fuser::mount2] or [`spawn_mount2`][fuser::spawn_mount2].
 pub struct FuseFS<B, Hash>
 where
-    B: Database<Hash, DataContainer<()>>,
+    B: IterableDatabase<Hash, DataContainer<()>>,
     Hash: ChunkHash,
 {
     /// Underlying [chunkfs][`FileSystem`].
@@ -79,7 +85,7 @@ where
 
 impl<B, Hash> FuseFS<B, Hash>
 where
-    B: Database<Hash, DataContainer<()>>,
+    B: IterableDatabase<Hash, DataContainer<()>>,
     Hash: ChunkHash,
 {
     /// Creates a file system with the given [`hasher`][Hasher], [`database`][Database] and [`chunker`][ChunkerRef].
@@ -233,7 +239,7 @@ fn check_access(file_attr: &FileAttr, req: &Request, access_mask: i32) -> bool {
 
 impl<B, Hash> Filesystem for FuseFS<B, Hash>
 where
-    B: Database<Hash, DataContainer<()>>,
+    B: IterableDatabase<Hash, DataContainer<()>>,
     Hash: ChunkHash,
 {
     fn init(&mut self, _req: &Request<'_>, config: &mut KernelConfig) -> Result<(), c_int> {
@@ -511,13 +517,13 @@ where
             reply.error(libc::EACCES);
             return;
         }
-        
+
         let cache_cap_before = file.cache.capacity();
         file.cache.extend_from_slice(data);
         let cache_cap_after = file.cache.capacity();
         self.total_cache += cache_cap_after - cache_cap_before;
         file.attr.size += data.len() as u64;
-        
+
         if file.cache.len() > FILE_CACHE_MAX_SIZE && self.drop_cache(ino, fh).is_err() {
             reply.error(libc::EIO);
             return;
@@ -710,5 +716,43 @@ where
         self.file_handles.insert(fh, file_handle);
 
         reply.created(&Duration::new(0, 0), &file.attr, 0, fh, flags as u32);
+    }
+
+    fn ioctl(
+        &mut self,
+        _req: &Request<'_>,
+        ino: u64,
+        fh: u64,
+        _flags: u32,
+        cmd: u32,
+        _in_data: &[u8],
+        _out_size: u32,
+        reply: ReplyIoctl,
+    ) {
+        let Some(file_handle) = self.file_handles.get_mut(&fh) else {
+            reply.error(libc::EBADF);
+            return;
+        };
+        if file_handle.inode != ino {
+            reply.error(libc::ESTALE);
+            return;
+        }
+        if self.drop_and_shrink_caches().is_err() {
+            reply.error(libc::EIO);
+            return;
+        }
+        match cmd.into() {
+            IOC_GET_AVG_CHUNK_SIZE => {
+                let avg_chunk_size = self.underlying_fs.average_chunk_size();
+                reply.ioctl(0, &avg_chunk_size.to_ne_bytes());
+            }
+            IOC_GET_DEDUP_RATIO => {
+                let dedup_ratio = self.underlying_fs.cdc_dedup_ratio();
+                reply.ioctl(0, &dedup_ratio.to_ne_bytes());
+            }
+            _ => {
+                reply.error(libc::EINVAL);
+            }
+        }
     }
 }

@@ -1,7 +1,7 @@
 use cdc_chunkers::SizeParams;
 use chunkfs::chunkers::{LeapChunker, SuperChunker};
 use chunkfs::hashers::Sha256Hasher;
-use chunkfs::{ChunkerRef, FuseFS, MB};
+use chunkfs::{ChunkerRef, FuseFS, IOC_GET_AVG_CHUNK_SIZE, IOC_GET_DEDUP_RATIO, MB};
 use filetime::FileTime;
 use fuser::BackgroundSession;
 use fuser::MountOption::AutoUnmount;
@@ -11,6 +11,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, OpenOptions, Permissions};
 use std::io::{Read, Write};
+use std::os::fd::AsRawFd;
 use std::os::unix::fs::{FileExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -838,4 +839,45 @@ fn concurrent_write_and_lookup() {
 
     handle.join().unwrap();
     assert_eq!(file.metadata().unwrap().len(), 50 * MB as u64);
+}
+
+#[test]
+fn ioctl() {
+    let fuse_fixture = FuseFixture::with_chunker(SuperChunker::new(SizeParams {
+        min: 1000,
+        avg: 1000,
+        max: 1000,
+    }));
+    let mount_point = Path::new(&fuse_fixture.mount_point);
+
+    let file_path = mount_point.join("file");
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .custom_flags(O_DIRECT)
+        .write(true)
+        .read(true)
+        .open(&file_path)
+        .unwrap();
+
+    file.write_all(&[0; 5000]).unwrap();
+
+    let mut dedup_ratio = [0u8; size_of::<f64>()];
+    let ret = unsafe { libc::ioctl(file.as_raw_fd(), IOC_GET_DEDUP_RATIO, &mut dedup_ratio) };
+    assert_eq!(ret, 0);
+
+    let mut avg_chunk_size = [0u8; size_of::<usize>()];
+    let ret = unsafe {
+        libc::ioctl(
+            file.as_raw_fd(),
+            IOC_GET_AVG_CHUNK_SIZE,
+            &mut avg_chunk_size,
+        )
+    };
+    assert_eq!(ret, 0);
+
+    let dedup_ratio = f64::from_ne_bytes(dedup_ratio);
+    let avg_chunk_size = usize::from_ne_bytes(avg_chunk_size);
+    assert_eq!(dedup_ratio, 5.);
+    assert_eq!(avg_chunk_size, 1000);
 }

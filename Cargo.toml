@@ -30,6 +30,7 @@ serde_with = { version = "3", optional = true }
 chrono = { version = "0.4", optional = true, features = ["serde"] }
 libc = "0.2.171"
 fuser = { version = "0.15.1", features = ["abi-7-28"] }
+nix = { version = "0.30.1", features = ["ioctl"] }
 
 [features]
 chunkers = ["cdc-chunkers", "fastcdc"]

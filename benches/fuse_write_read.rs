@@ -1,7 +1,7 @@
 use cdc_chunkers::SizeParams;
 use chunkfs::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker};
 use chunkfs::hashers::Sha256Hasher;
-use chunkfs::{ChunkerRef, FuseFS, MB};
+use chunkfs::{ChunkerRef, FuseFS, IOC_GET_AVG_CHUNK_SIZE, IOC_GET_DEDUP_RATIO, MB};
 use criterion::measurement::WallTime;
 use criterion::{BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 use fuser::MountOption::AutoUnmount;
@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+use std::os::fd::AsRawFd;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
@@ -74,6 +75,11 @@ pub fn bench(c: &mut Criterion) {
 
         for chunker in chunkers() {
             let params = get_default_sizes(chunker);
+            dedup_ratio_and_avg_chunk(&dataset, chunker, params);
+        }
+
+        for chunker in chunkers() {
+            let params = get_default_sizes(chunker);
             bench_write(&dataset, &mut group, chunker, params);
         }
 
@@ -82,6 +88,58 @@ pub fn bench(c: &mut Criterion) {
             bench_read(&dataset, &mut group, chunker, params);
         }
     }
+}
+
+fn dedup_ratio_and_avg_chunk(dataset: &Dataset, algorithm: Algorithms, params: SizeParams) {
+    let mount_point = Path::new("mount_dir/mount_point");
+    let db = HashMap::default();
+    let chunker = get_chunker(algorithm, params);
+    let fuse_fs = FuseFS::new(db, Sha256Hasher::default(), chunker);
+
+    fs::create_dir_all(mount_point).unwrap();
+    let session = fuser::spawn_mount2(fuse_fs, mount_point, &[AutoUnmount]).unwrap();
+
+    let fuse_path = mount_point.join("file");
+    let mut fuse_file = OpenOptions::new()
+        .write(true)
+        .read(true)
+        .create(true)
+        .custom_flags(O_DIRECT)
+        .truncate(true)
+        .open(&fuse_path)
+        .unwrap();
+
+    let mut source = File::open(&dataset.filename).unwrap();
+    let mut buf = vec![0; 50 * MB];
+    loop {
+        let bytes_read = source.read(&mut buf).unwrap();
+        if bytes_read == 0 {
+            break;
+        }
+        fuse_file.write_all(&buf[..bytes_read]).unwrap();
+    }
+    fuse_file.flush().unwrap();
+
+    let mut dedup_ratio = [0u8; size_of::<f64>()];
+    let mut avg_chunk_size = [0u8; size_of::<usize>()];
+    unsafe { libc::ioctl(fuse_file.as_raw_fd(), IOC_GET_DEDUP_RATIO, &mut dedup_ratio) };
+    unsafe {
+        libc::ioctl(
+            fuse_file.as_raw_fd(),
+            IOC_GET_AVG_CHUNK_SIZE,
+            &mut avg_chunk_size,
+        )
+    };
+
+    let dedup_ratio = f64::from_ne_bytes(dedup_ratio);
+    let avg_chunk_size = usize::from_ne_bytes(avg_chunk_size);
+    println!("{:?}-{} dedup ratio: {:.2}", algorithm, params, dedup_ratio);
+    println!(
+        "{:?}-{} average chunk size: {}",
+        algorithm, params, avg_chunk_size
+    );
+
+    drop(session)
 }
 
 fn bench_write(
@@ -126,6 +184,7 @@ fn bench_write(
                     }
                     fuse_file.write_all(&buf[..bytes_read]).unwrap();
                 }
+                fuse_file.flush().unwrap();
                 drop(fuse_file);
             },
             BatchSize::PerIteration,
