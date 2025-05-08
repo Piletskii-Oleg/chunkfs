@@ -191,6 +191,9 @@ where
                 .files
                 .get_mut(&handle.inode)
                 .ok_or(io::ErrorKind::NotFound)?;
+            handle
+                .underlying_file_handle
+                .set_offset(file.attr.size as usize - file.cache.len());
             self.underlying_fs
                 .write_to_file(&mut handle.underlying_file_handle, &file.cache)?;
 
