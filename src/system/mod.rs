@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::collections::HashMap;
 use std::io;
 use std::io::Write;
@@ -8,10 +9,11 @@ use file_layer::{FileHandle, FileLayer};
 use scrub::{Scrub, ScrubMeasurements};
 use storage::{ChunkStorage, DataContainer};
 
-use super::{ChunkHash, ChunkerRef, Hasher, WriteMeasurements};
+use super::{ChunkHash, ChunkerRef, Hasher, WriteMeasurements, SEG_SIZE};
 
 pub mod database;
 pub mod file_layer;
+pub mod fuse_filesystem;
 pub mod scrub;
 pub mod storage;
 
@@ -151,12 +153,43 @@ where
         Ok(self.storage.retrieve(&hashes)?.concat()) // it assumes that all retrieved data segments are in correct order
     }
 
-    /// Reads at most 1 MB of data from a file and returns it.
+    /// Reads 1 MB of data from a file and returns it.
+    /// If file handle offset + 1 MB is greater than file size, then returns data starting from the offset to the end of the file
     ///
     /// **Careful:** it modifies internal `FileHandle` data. After using this `write_to_file` should not be used on the same FileHandle.
     pub fn read_from_file(&self, handle: &mut FileHandle) -> io::Result<Vec<u8>> {
-        let hashes = self.file_layer.read(handle);
-        Ok(self.storage.retrieve(&hashes)?.concat())
+        self.read(handle, SEG_SIZE)
+    }
+
+    /// Reads the specified amount of data from the open file.
+    /// Starting point is based on the `FileHandle`'s offset.
+    ///
+    /// If `size` + file handle offset is greater than file size, then returns data starting from the offset to the end of the file
+    /// **Careful:** it modifies internal `FileHandle` data. After using this `write_to_file` should not be used on the same FileHandle.
+    pub fn read(&self, handle: &mut FileHandle, size: usize) -> io::Result<Vec<u8>> {
+        let original_offset = handle.offset();
+        let spans = self.file_layer.read(handle, size);
+        if spans.is_empty() {
+            return Ok(vec![]);
+        }
+        let hashes: Vec<_> = spans.iter().map(|span| span.hash()).collect();
+        let mut data_vectors = self.storage.retrieve(&hashes)?;
+
+        // Since we read by offset, which may be somewhere in the middle of the FileSpan offset,
+        // we need to remove the extra at the beginning of the first span
+        let first_span = spans.first().unwrap();
+        let data_extra_start = original_offset - first_span.offset(); // amount of data from start to be removed
+        data_vectors.first_mut().unwrap().drain(0..data_extra_start);
+
+        // Same, we need to remove the extra at the end of the last span.
+        let last_span = spans.last().unwrap();
+        let read_size_possible = last_span.offset() + last_span.len() - original_offset;
+        let read_size_actual = min(size, read_size_possible);
+        let data_extra_end = read_size_possible - read_size_actual; // amount of data from end to be removed
+        let last_vector = data_vectors.last_mut().unwrap();
+        last_vector.truncate(last_vector.len() - data_extra_end);
+
+        Ok(data_vectors.concat())
     }
 
     /// Gives out a distribution of the chunks with the same hash for the given file.

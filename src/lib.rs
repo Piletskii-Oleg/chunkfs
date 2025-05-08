@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub use system::database::{Database, IterableDatabase};
+pub use system::fuse_filesystem::{FuseFS, IOC_GET_AVG_CHUNK_SIZE, IOC_GET_DEDUP_RATIO};
 pub use system::scrub::{CopyScrubber, Scrub, ScrubMeasurements};
 pub use system::storage::{Data, DataContainer};
 pub use system::{create_cdc_filesystem, FileSystem};
@@ -71,15 +72,15 @@ impl Chunk {
 /// Chunks that are found are returned by [`chunk_data`][Chunker::chunk_data] method.
 /// If some contents were cut because the end of `data` and not the end of the chunk was reached,
 /// it must be returned with [`rest`][Chunker::rest] instead of storing it in the [`chunk_data`][Chunker::chunk_data]'s output.
-pub trait Chunker: Debug {
-    /// Goes through whole `data` and finds chunks. If last chunk is not actually a chunk but a leftover,
+pub trait Chunker: Debug + Send {
+    /// Goes through whole `data` and finds chunks. If the last chunk is not actually a chunk but a leftover,
     /// it is returned via [`rest`][Chunker::rest] method and is not contained in the vector.
     ///
     /// `empty` is an empty vector whose capacity is determined by [`estimate_chunk_count`][Chunker::estimate_chunk_count].
-    /// Resulting chunks should be written right to it, and it should be returned as result.
+    /// Resulting chunks should be written right to it, and it should be returned as a result.
     fn chunk_data(&mut self, data: &[u8], empty: Vec<Chunk>) -> Vec<Chunk>;
 
-    /// Returns an estimate amount of chunks that will be created once the algorithm runs through the whole
+    /// Returns an estimate number of chunks that will be created once the algorithm runs through the whole
     /// data buffer. Used to pre-allocate the buffer with the required size so that allocation times are not counted
     /// towards total chunking time.
     fn estimate_chunk_count(&self, data: &[u8]) -> usize;
@@ -125,7 +126,7 @@ impl Debug for ChunkerRef {
 }
 
 /// Functionality for an object that hashes the input.
-pub trait Hasher {
+pub trait Hasher: Send {
     /// Hash type that would be returned by the hasher.
     type Hash: ChunkHash;
 

@@ -28,6 +28,9 @@ csv = { version = "1", optional = true }
 serde = { version = "1", optional = true, features = ["derive"] }
 serde_with = { version = "3", optional = true }
 chrono = { version = "0.4", optional = true, features = ["serde"] }
+libc = "0.2.171"
+fuser = { version = "0.15.1", features = ["abi-7-28"] }
+nix = { version = "0.30.1", features = ["ioctl"] }
 
 [features]
 chunkers = ["cdc-chunkers", "fastcdc"]
@@ -40,6 +43,7 @@ criterion = "0.5"
 sha3 = "0.10"
 approx = "0.5"
 tempfile = "3.14"
+filetime = "0.2.25"
 
 serde_json = "1"
 
@@ -49,4 +53,8 @@ harness = false
 
 [[bench]]
 name = "chunker_sizes"
+harness = false
+
+[[bench]]
+name = "fuse_write_read"
 harness = false

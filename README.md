@@ -82,6 +82,21 @@ To use provided chunkers and hashers, use the corresponding features:
 chunkfs = { version = "0.1", features = ["chunkers", "hashers"] }
 ```
 
+## FUSE native dependepcies
+
+To use FuseFS structure, mountable with FUSE, you need to install the following native dependencies:
+
+```bash
+sudo apt update
+sudo apt install -y fuse3 libfuse3-dev
+```
+
+To use the file system correctly, you need to allow other users to access the mounted file system.
+
+```bash
+echo "user_allow_other" | sudo tee -a /etc/fuse.conf
+```
+
 ## Examples
 
 Examples for chunkfs usage and benching are provided in [examples](examples) folder.
