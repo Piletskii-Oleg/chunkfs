@@ -204,6 +204,31 @@ where
         (self.size_written as f64) / (self.total_cdc_size() as f64)
     }
 
+    fn full_dedup_size(&self) -> usize {
+        let size = self.database.iterator().fold(0, |acc, (_, container)| {
+            acc + match container.extract() {
+                Data::Chunk(chunk) => chunk.len(),
+                Data::TargetChunk(k) => k
+                    .iter()
+                    .filter_map(|k| self.target_map.get(k).ok()) // Skip the target if it doesn't exist
+                    .map(|v| v.len())
+                    .sum(),
+            }
+        });
+        size
+    }
+
+    /// Calculates full deduplication ratio of the storage
+    pub fn full_dedup_ratio(&self) -> f64 {
+        let key_size = self
+            .database
+            .keys()
+            .map(|key| self.hasher.len(key))
+            .sum::<usize>();
+
+        (self.size_written as f64) / (self.full_dedup_size() as f64 + key_size as f64)
+    }
+
     /// Returns average chunk size in the storage.
     pub fn average_chunk_size(&self) -> usize {
         let (count, size) = self
@@ -258,6 +283,24 @@ where
 
     pub fn total_dedup_ratio(&self) -> f64 {
         (self.size_written as f64) / (self.total_size() as f64)
+    }
+
+    fn target_dedup_size(&self) -> usize {
+        self.database.iterator().fold(0, |acc, (_, container)| {
+            acc + match container.extract() {
+                Data::Chunk(_) => 0,
+                Data::TargetChunk(k) => k
+                    .iter()
+                    .filter_map(|k| self.target_map.get(k).ok()) // Skip the target if it doesn't exist
+                    .map(|v| v.len())
+                    .sum(),
+            }
+        })
+    }
+    pub fn target_dedup_ratio(&self) -> f64 {
+        let l_size = self.target_dedup_size();
+        let p_size: usize = self.target_map.values().map(|v| v.len()).sum();
+        l_size as f64 / p_size as f64
     }
 
     /// Removes all stored data in the target map and sets written size to 0.

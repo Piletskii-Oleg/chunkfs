@@ -258,6 +258,11 @@ where
         self.storage.full_cdc_dedup_ratio()
     }
 
+    /// Calculates full deduplication ratio of the storage
+    pub fn full_dedup_ratio(&self) -> f64 {
+        self.storage.full_dedup_ratio()
+    }
+
     /// Returns average chunk size in the storage.
     pub fn average_chunk_size(&self) -> usize {
         self.storage.average_chunk_size()
@@ -288,6 +293,10 @@ where
     /// accounting for chunks both unprocessed and processed with scrubber.
     pub fn total_dedup_ratio(&self) -> f64 {
         self.storage.total_dedup_ratio()
+    }
+
+    pub fn target_dedup_ratio(&self) -> f64 {
+        self.storage.target_dedup_ratio()
     }
 
     /// Completely clears the whole file system.
