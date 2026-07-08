@@ -3,11 +3,10 @@ use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
 
+use super::database::{Database, IterableDatabase};
+use super::scrub::{Scrub, ScrubberReport};
 use crate::{ChunkHash, Hasher, SEG_SIZE};
 use crate::{ChunkerRef, WriteMeasurements};
-
-use super::database::{Database, IterableDatabase};
-use super::scrub::{Scrub, ScrubMeasurements};
 
 /// Container for storage data.
 #[derive(Clone, Debug, Default)]
@@ -177,7 +176,7 @@ where
         }
     }
 
-    pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
+    pub fn scrub(&mut self) -> io::Result<ScrubberReport> {
         self.scrubber
             .as_mut()
             .ok_or_else(|| {
@@ -435,14 +434,14 @@ impl<K> Default for Data<K> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::ChunkStorage;
     use super::DataContainer;
-    use super::ScrubMeasurements;
     use crate::chunkers::{FSChunker, SuperChunker};
     use crate::hashers::SimpleHasher;
     use crate::system::scrub::DumbScrubber;
+    use crate::system::ScrubberReport;
+    use crate::ScrubMeasurements;
+    use std::collections::HashMap;
 
     #[test]
     fn hashmap_works_as_cdc_map() {
@@ -463,7 +462,10 @@ mod tests {
             .unwrap()
             .scrub(&mut chunk_storage.database, &mut chunk_storage.target_map)
             .unwrap();
-        assert_eq!(measurements, ScrubMeasurements::default());
+        assert_eq!(
+            measurements,
+            ScrubberReport::Generic(ScrubMeasurements::default())
+        );
 
         println!("{:?}", chunk_storage.database)
     }

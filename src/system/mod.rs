@@ -5,7 +5,7 @@ use std::path::Path;
 
 use database::{Database, IterableDatabase};
 use file_layer::{FileHandle, FileLayer};
-use scrub::{Scrub, ScrubMeasurements};
+use scrub::{Scrub, ScrubberReport};
 use storage::{ChunkStorage, DataContainer};
 
 use super::{ChunkHash, ChunkerRef, Hasher, WriteMeasurements};
@@ -242,7 +242,7 @@ where
     /// otherwise it returns [`ErrorKind::InvalidInput`][io::ErrorKind::InvalidInput].
     ///
     /// For more info check [`Scrub`][Scrub] trait and its [`scrub`][Scrub::scrub] method.
-    pub fn scrub(&mut self) -> io::Result<ScrubMeasurements> {
+    pub fn scrub(&mut self) -> io::Result<ScrubberReport> {
         self.storage.scrub()
     }
 
