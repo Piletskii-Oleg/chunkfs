@@ -3,11 +3,10 @@ use std::fmt::Formatter;
 use std::io;
 use std::time::{Duration, Instant};
 
-use crate::{ChunkHash, Hasher, SEG_SIZE};
-use crate::{ChunkerRef, WriteMeasurements};
-
 use super::database::{Database, IterableDatabase};
 use super::scrub::{Scrub, ScrubMeasurements};
+use crate::{ChunkHash, Hasher, SEG_SIZE};
+use crate::{ChunkerRef, WriteMeasurements};
 
 /// Container for storage data.
 #[derive(Clone, Debug, Default)]
@@ -435,14 +434,13 @@ impl<K> Default for Data<K> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::ChunkStorage;
     use super::DataContainer;
-    use super::ScrubMeasurements;
     use crate::chunkers::{FSChunker, SuperChunker};
     use crate::hashers::SimpleHasher;
     use crate::system::scrub::DumbScrubber;
+    use crate::system::ScrubMeasurements;
+    use std::collections::HashMap;
 
     #[test]
     fn hashmap_works_as_cdc_map() {
