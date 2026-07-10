@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io;
 use std::time::{Duration, Instant};
 
@@ -67,8 +68,8 @@ where
 ///
 /// Contains information about the amount of data processed by the scrubber (in bytes),
 /// time spent on scrubbing,
-/// and the amount of data left untouched.
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone)]
+/// the amount of data left untouched and clustering information.
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct ScrubMeasurements {
     /// How much data was processed by the scrubber (in bytes).
     pub processed_data: usize,
@@ -76,12 +77,38 @@ pub struct ScrubMeasurements {
     pub running_time: Duration,
     /// The amount of data left untouched (in bytes).
     pub data_left: usize,
+    /// All information about clusterization:
+    /// 1. Total cluster size (number of vertices).
+    /// 2. Number of clusters (total number of parent vertices).
+    /// 3. The number of vertices within a single cluster.
+    /// 4. Distance to the parent vertex.
+    /// 5. Distance between clusters (between parent vertices).
+    /// 6. Deduplication coefficient for each cluster.
+    pub clusterization_report: ClusteringMeasurements,
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct ClusteringMeasurements {
+    /// Number of vertices (chunks).
+    pub total_cluster_size: usize,
+    /// Total number of parent vertices.
+    pub number_of_clusters: usize,
+    /// The number of vertices within a single cluster.
+    /// It contains the hash values of the parent vertices as keys.
+    pub number_of_vertices_in_cluster: HashMap<u32, usize>,
+    /// Distance to the parent vertex.
+    /// It contains the hash values of the parent vertices as keys.
+    pub distance_to_vertices_in_cluster: HashMap<u32, Vec<usize>>,
+    /// Distance between clusters (between parent vertices).
+    /// The key is the parent in the cluster. The distance is calculated to the other parents.
+    pub distance_to_other_clusters: HashMap<u32, Vec<usize>>,
+    /// Deduplication coefficient for each cluster.
+    pub cluster_dedup_ratio: HashMap<u32, f64>,
 }
 
 pub struct CopyScrubber;
 
 pub struct DumbScrubber;
-
 impl<Hash, B, T> Scrub<Hash, B, Hash, T> for CopyScrubber
 where
     Hash: ChunkHash,
@@ -92,23 +119,57 @@ where
     where
         Hash: 'a,
     {
+        let mut total_cluster_size: usize = 0;
+        let mut number_of_vertices_in_cluster = HashMap::new();
+        let mut distance_to_other_clusters = HashMap::new();
+        let mut parent_vertices: Vec<usize> = Vec::new();
+        let cluster_dedup_ratio = HashMap::new();
         let now = Instant::now();
         let mut processed_data = 0;
+
         for (hash, container) in database.iterator_mut() {
             match container.extract() {
                 Data::Chunk(chunk) => {
                     target.insert(hash.clone(), chunk.clone())?;
+                    total_cluster_size += 1;
                     processed_data += chunk.len();
+                    number_of_vertices_in_cluster.insert(total_cluster_size as u32, 1);
+                    parent_vertices.push(total_cluster_size);
                 }
                 Data::TargetChunk(_) => (),
             }
             container.make_target(vec![hash.clone()]);
         }
+
+        for i in 0..parent_vertices.len() {
+            let mut distances = Vec::new();
+
+            for j in 0..parent_vertices.len() {
+                if i != j {
+                    let distance = parent_vertices[i].abs_diff(parent_vertices[j]);
+                    distances.push(distance);
+                }
+            }
+
+            distance_to_other_clusters.insert(parent_vertices[i] as u32, distances);
+        }
+
         let running_time = now.elapsed();
+        let number_of_clusters = total_cluster_size;
+        let distance_to_vertices_in_cluster = HashMap::new();
+        let clusterization_report = ClusteringMeasurements {
+            total_cluster_size,
+            number_of_clusters,
+            number_of_vertices_in_cluster,
+            distance_to_vertices_in_cluster,
+            distance_to_other_clusters,
+            cluster_dedup_ratio,
+        };
         Ok(ScrubMeasurements {
             processed_data,
             running_time,
             data_left: 0,
+            clusterization_report,
         })
     }
 }
@@ -125,5 +186,74 @@ where
         Key: 'a,
     {
         Ok(ScrubMeasurements::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::system::HashMap;
+    use crate::DataContainer;
+
+    fn create_test_data() -> Vec<(Vec<u8>, Vec<u8>)> {
+        vec![
+            (b"chunk1".to_vec(), b"content1".to_vec()),
+            (b"chunk2".to_vec(), b"content2".to_vec()),
+            (b"chunk3".to_vec(), b"content3".to_vec()),
+            (b"duplicate_chunk".to_vec(), b"same_content".to_vec()),
+            (b"another_duplicate".to_vec(), b"same_content".to_vec()),
+        ]
+    }
+
+    #[test]
+    fn scrub_should_return_correct_scrub_measurements_for_copy_scrubber() {
+        let test_data = create_test_data();
+        let mut total_data_size = 0;
+
+        let mut database: HashMap<Vec<u8>, DataContainer<Vec<u8>>> = HashMap::new();
+        let test_data_len = test_data.len();
+        for (hash, chunk) in test_data {
+            total_data_size += chunk.len();
+            database.insert(hash.clone(), DataContainer::from(chunk));
+        }
+
+        let mut target_map: HashMap<Vec<u8>, Vec<u8>> = HashMap::new();
+        let mut scrubber = CopyScrubber;
+        let scrub_report = scrubber.scrub(&mut database, &mut target_map).unwrap();
+
+        assert_eq!(scrub_report.processed_data, total_data_size);
+        assert!(scrub_report.running_time > Duration::from_secs(0));
+        assert_eq!(scrub_report.data_left, 0);
+
+        let cluster_report = &scrub_report.clusterization_report;
+        assert_eq!(cluster_report.total_cluster_size, test_data_len);
+        assert_eq!(cluster_report.number_of_clusters, test_data_len);
+        assert!(cluster_report
+            .number_of_vertices_in_cluster
+            .values()
+            .all(|&v| v == 1));
+        assert!(cluster_report.distance_to_vertices_in_cluster.is_empty());
+        assert!(cluster_report
+            .distance_to_other_clusters
+            .values()
+            .all(|v| v.len() == test_data_len - 1));
+        assert!(cluster_report
+            .cluster_dedup_ratio
+            .values()
+            .all(|&v| v == 0.0));
+    }
+
+    #[test]
+    fn scrub_should_handle_empty_database() {
+        let mut scrubber = CopyScrubber;
+        let mut database: HashMap<Vec<u8>, DataContainer<Vec<u8>>> = HashMap::new();
+        let mut target_map: HashMap<Vec<u8>, Vec<u8>> = HashMap::new();
+
+        let scrub_report = scrubber.scrub(&mut database, &mut target_map).unwrap();
+
+        assert_eq!(scrub_report.processed_data, 0);
+        assert_eq!(scrub_report.data_left, 0);
+        assert_eq!(scrub_report.clusterization_report.total_cluster_size, 0);
+        assert!(target_map.is_empty());
     }
 }
