@@ -4,7 +4,7 @@ use std::ops::{Add, AddAssign, Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-pub use system::database::{Database, IterableDatabase};
+pub use system::database::{ContainerDatabase, Database, IterableDatabase};
 pub use system::scrub::{
     ClusteringMeasurements, CopyScrubber, DumbScrubber, Scrub, ScrubMeasurements,
 };
