@@ -205,7 +205,7 @@ where
     }
 
     fn full_dedup_size(&self) -> usize {
-        let size = self.database.iterator().fold(0, |acc, (_, container)| {
+        self.database.iterator().fold(0, |acc, (_, container)| {
             acc + match container.extract() {
                 Data::Chunk(chunk) => chunk.len(),
                 Data::TargetChunk(k) => k
@@ -214,8 +214,7 @@ where
                     .map(|v| v.len())
                     .sum(),
             }
-        });
-        size
+        })
     }
 
     /// Calculates full deduplication ratio of the storage
@@ -297,6 +296,8 @@ where
             }
         })
     }
+
+    /// Calculates deduplication ratio for chunks processed by scrubber
     pub fn target_dedup_ratio(&self) -> f64 {
         let l_size = self.target_dedup_size();
         let p_size: usize = self.target_map.values().map(|v| v.len()).sum();
