@@ -8,7 +8,7 @@ use criterion::{BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 use itertools::iproduct;
 
 use chunkfs::bench::Dataset;
-use chunkfs::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker};
+use chunkfs::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker, FastChunker};
 use chunkfs::hashers::Sha256Hasher;
 use chunkfs::{create_cdc_filesystem, ChunkerRef};
 
@@ -37,6 +37,7 @@ enum Algorithms {
     Leap,
     Super,
     Ultra,
+    Fast,
 }
 
 #[allow(dead_code)]
@@ -46,6 +47,7 @@ fn chunkers() -> Vec<Algorithms> {
         Algorithms::Leap,
         Algorithms::Super,
         Algorithms::Ultra,
+        Algorithms::Fast,
     ]
 }
 
@@ -54,8 +56,9 @@ fn get_chunker(algorithm: Algorithms, params: SizeParams) -> ChunkerRef {
     match algorithm {
         Algorithms::Rabin => RabinChunker::new(params).into(),
         Algorithms::Leap => LeapChunker::new(params).into(),
-        Algorithms::Super => UltraChunker::new(params).into(),
-        Algorithms::Ultra => SuperChunker::new(params).into(),
+        Algorithms::Super => SuperChunker::new(params).into(),
+        Algorithms::Ultra => UltraChunker::new(params).into(),
+        Algorithms::Fast => FastChunker::new(params).into(),
     }
 }
 
@@ -65,7 +68,7 @@ pub fn bench(c: &mut Criterion) {
     let size_params = SizeParameters {
         min: vec![1024, 2048, 4096],
         avg: vec![4096, 20000],
-        max: vec![40000, 60000, 10000],
+        max: vec![40000, 60000, 100000],
     };
 
     for dataset in datasets {
