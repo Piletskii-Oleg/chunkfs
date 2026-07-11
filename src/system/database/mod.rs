@@ -1,0 +1,73 @@
+use std::io;
+
+pub mod container;
+pub mod hash_map;
+
+pub use container::ContainerDatabase;
+
+/// Serves as base functionality for storing the actual data as key-value pairs.
+///
+/// Supports inserting and getting values by key, checking if the key is present in the storage.
+pub trait Database<K, V> {
+    /// Inserts a key-value pair into the storage.
+    fn insert(&mut self, key: K, value: V) -> io::Result<()>;
+
+    /// Retrieves a value by a given key. Note that it returns a value, not a reference.
+    ///
+    /// # Errors
+    /// Should return [ErrorKind::NotFound], if the key-value pair
+    /// was not found in the storage.
+    fn get(&self, key: &K) -> io::Result<V>;
+
+    /// Inserts multiple key-value pairs into the storage.
+    fn insert_multi(&mut self, pairs: Vec<(K, V)>) -> io::Result<()> {
+        for (key, value) in pairs.into_iter() {
+            self.insert(key, value)?;
+        }
+        Ok(())
+    }
+
+    /// Retrieves a multitude of values, corresponding to the keys, in the correct order.
+    fn get_multi(&self, keys: &[K]) -> io::Result<Vec<V>> {
+        keys.iter().map(|key| self.get(key)).collect()
+    }
+
+    /// Returns `true` if the database contains a value for the specified key.
+    fn contains(&self, key: &K) -> bool;
+}
+
+/// Allows iteration over database contents.
+pub trait IterableDatabase<K, V>: Database<K, V> {
+    /// Returns a simple immutable iterator over values.
+    fn iterator(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_>;
+
+    /// Returns an iterator that can mutate values but not keys.
+    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_>;
+
+    /// Returns an immutable iterator over keys.
+    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &'a K> + 'a>
+    where
+        V: 'a,
+    {
+        Box::new(self.iterator().map(|(k, _)| k))
+    }
+
+    /// Returns an immutable iterator over values.
+    fn values<'a>(&'a self) -> Box<dyn Iterator<Item = &'a V> + 'a>
+    where
+        K: 'a,
+    {
+        Box::new(self.iterator().map(|(_, v)| v))
+    }
+
+    /// Returns a mutable iterator over values.
+    fn values_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut V> + 'a>
+    where
+        K: 'a,
+    {
+        Box::new(self.iterator_mut().map(|(_, v)| v))
+    }
+
+    /// Clears the database, removing all contained key-value pairs.
+    fn clear(&mut self) -> io::Result<()>;
+}
