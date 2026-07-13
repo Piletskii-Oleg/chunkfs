@@ -236,8 +236,9 @@ where
 
     /// Removes all stored data in the database and sets written size to 0.
     pub fn clear_database(&mut self) -> io::Result<()> {
+        self.database.clear()?;
         self.size_written = 0;
-        self.database.clear()
+        Ok(())
     }
 }
 
@@ -262,9 +263,10 @@ where
 
     /// Removes all stored data in the target map and sets written size to 0.
     pub fn clear_database_full(&mut self) -> io::Result<()> {
-        self.size_written = 0;
         self.database.clear()?;
-        self.target_map.clear()
+        self.target_map.clear()?;
+        self.size_written = 0;
+        Ok(())
     }
 }
 
