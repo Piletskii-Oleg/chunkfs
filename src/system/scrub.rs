@@ -77,10 +77,14 @@ pub struct ScrubMeasurements {
     pub running_time: Duration,
     /// The amount of data left untouched (in bytes).
     pub data_left: usize,
-    /// Clustering measurements, if the scrubber supports clusterization.
-    /// Set to `None` for scrubbers that do not produce clustering metrics
-    /// (e.g. [CopyScrubber]).
-    pub clustering: Option<ClusteringMeasurements>,
+    /// All information about clusterization:
+    /// 1. Total cluster size (number of vertices).
+    /// 2. Number of clusters (total number of parent vertices).
+    /// 3. The number of vertices within a single cluster.
+    /// 4. Distance to the parent vertex.
+    /// 5. Distance between clusters (between parent vertices).
+    /// 6. Deduplication coefficient for each cluster.
+    pub clusterization_report: Option<ClusteringMeasurements>,
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -135,7 +139,7 @@ where
             processed_data,
             running_time,
             data_left: 0,
-            clustering: None,
+            clusterization_report: None,
         })
     }
 }
@@ -189,7 +193,7 @@ mod tests {
         assert_eq!(scrub_report.processed_data, total_data_size);
         assert!(scrub_report.running_time > Duration::from_secs(0));
         assert_eq!(scrub_report.data_left, 0);
-        assert_eq!(scrub_report.clustering, None);
+        assert_eq!(scrub_report.clusterization_report, None);
     }
 
     #[test]
@@ -202,7 +206,7 @@ mod tests {
 
         assert_eq!(scrub_report.processed_data, 0);
         assert_eq!(scrub_report.data_left, 0);
-        assert_eq!(scrub_report.clustering, None);
+        assert_eq!(scrub_report.clusterization_report, None);
         assert!(target_map.is_empty());
     }
 }
