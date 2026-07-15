@@ -6,7 +6,7 @@ use criterion::measurement::WallTime;
 use criterion::{BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 
 use chunkfs::bench::Dataset;
-use chunkfs::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker};
+use chunkfs::chunkers::{LeapChunker, RabinChunker, SuperChunker, UltraChunker, FastChunker};
 use chunkfs::hashers::Sha256Hasher;
 use chunkfs::{create_cdc_filesystem, ChunkerRef};
 
@@ -18,6 +18,7 @@ enum Algorithms {
     Leap,
     Super,
     Ultra,
+    Fast,
 }
 
 fn chunkers() -> Vec<Algorithms> {
@@ -26,6 +27,7 @@ fn chunkers() -> Vec<Algorithms> {
         Algorithms::Leap,
         Algorithms::Super,
         Algorithms::Ultra,
+        Algorithms::Fast,
     ]
 }
 
@@ -33,8 +35,9 @@ fn get_chunker(algorithm: Algorithms) -> ChunkerRef {
     match algorithm {
         Algorithms::Rabin => RabinChunker::default().into(),
         Algorithms::Leap => LeapChunker::default().into(),
-        Algorithms::Super => UltraChunker::default().into(),
-        Algorithms::Ultra => SuperChunker::default().into(),
+        Algorithms::Super => SuperChunker::default().into(),
+        Algorithms::Ultra => UltraChunker::default().into(),
+        Algorithms::Fast => FastChunker::default().into(),
     }
 }
 
