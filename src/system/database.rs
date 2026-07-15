@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::io;
-use std::io::ErrorKind;
 
 use crate::{ChunkHash, MB};
 
@@ -78,7 +77,7 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
     }
 
     fn get(&self, key: &Hash) -> io::Result<V> {
-        self.get(key).ok_or(ErrorKind::NotFound.into()).cloned()
+        self.get(key).ok_or(io::ErrorKind::NotFound.into()).cloned()
     }
 
     fn contains(&self, key: &Hash) -> bool {
@@ -152,7 +151,7 @@ where
     fn insert(&mut self, key: K, value: V, value_size: usize) -> io::Result<()> {
         if self.size + value_size > self.max_size {
             let msg = "The container is too full for the desired data";
-            return Err(io::Error::new(io::ErrorKind::OutOfMemory, msg));
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, msg));
         }
 
         self.values.insert(key, value);
@@ -165,7 +164,7 @@ where
     fn get(&self, key: &K) -> io::Result<V> {
         self.values
             .get(key)
-            .ok_or(ErrorKind::NotFound.into())
+            .ok_or(io::ErrorKind::NotFound.into())
             .cloned()
     }
 }
