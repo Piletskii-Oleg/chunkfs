@@ -8,7 +8,9 @@ use approx::assert_relative_eq;
 
 use chunkfs::chunkers::{FSChunker, LeapChunker, SuperChunker};
 use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
-use chunkfs::{create_cdc_filesystem, ChunkerRef, DataContainer, Database, WriteMeasurements};
+use chunkfs::{
+    create_cdc_filesystem, ChunkerRef, DataContainer, Database, Hash, WriteMeasurements,
+};
 
 const MB: usize = 1024 * 1024;
 
@@ -115,16 +117,16 @@ fn two_file_handles_to_one_file() {
 fn non_iterable_database_can_be_used_with_fs() {
     struct DummyDatabase;
 
-    impl Database<Vec<u8>, DataContainer<()>> for DummyDatabase {
-        fn insert(&mut self, _key: Vec<u8>, _value: DataContainer<()>) -> std::io::Result<()> {
+    impl Database<Hash, DataContainer<()>> for DummyDatabase {
+        fn insert(&mut self, _key: Hash, _value: DataContainer<()>) -> std::io::Result<()> {
             unimplemented!()
         }
 
-        fn get(&self, _key: &Vec<u8>) -> std::io::Result<DataContainer<()>> {
+        fn get(&self, _key: &Hash) -> std::io::Result<DataContainer<()>> {
             unimplemented!()
         }
 
-        fn contains(&self, _key: &Vec<u8>) -> bool {
+        fn contains(&self, _key: &Hash) -> bool {
             unimplemented!()
         }
     }

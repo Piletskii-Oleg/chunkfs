@@ -1,19 +1,20 @@
 use sha2::{Digest, Sha256};
 
-use crate::Hasher;
+use crate::{Hash, Hasher};
 
 #[derive(Debug, Default)]
 pub struct SimpleHasher;
 
+/// Trivial hash implementation for testing and benchmarks.
+/// NOT cryptographically secure — collisions are possible for inputs
+/// sharing the first 28 bytes and same length.
 impl Hasher for SimpleHasher {
-    type Hash = Vec<u8>;
-
-    fn hash(&mut self, data: &[u8]) -> Vec<u8> {
-        data.to_vec()
-    }
-
-    fn len(&self, hash: &Self::Hash) -> usize {
-        hash.len()
+    fn hash(&mut self, data: &[u8]) -> Hash {
+        let mut hash = [0u8; 32];
+        let len = data.len().min(32);
+        hash[..len].copy_from_slice(&data[..len]);
+        hash[28..32].copy_from_slice(&(data.len() as u32).to_le_bytes());
+        hash
     }
 }
 
@@ -23,14 +24,8 @@ pub struct Sha256Hasher {
 }
 
 impl Hasher for Sha256Hasher {
-    type Hash = [u8; 32];
-
-    fn hash(&mut self, data: &[u8]) -> Self::Hash {
+    fn hash(&mut self, data: &[u8]) -> Hash {
         Digest::update(&mut self.hasher, data);
         Digest::finalize_reset(&mut self.hasher).into()
-    }
-
-    fn len(&self, hash: &Self::Hash) -> usize {
-        hash.len()
     }
 }

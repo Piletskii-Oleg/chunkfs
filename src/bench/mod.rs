@@ -11,8 +11,8 @@ use uuid::Uuid;
 
 use crate::system::file_layer::FileHandle;
 use crate::{
-    create_cdc_filesystem, ChunkHash, ChunkerRef, DataContainer, FileSystem, Hasher,
-    IterableDatabase, WriteMeasurements, MB,
+    create_cdc_filesystem, ChunkerRef, DataContainer, FileSystem, Hash, Hasher, IterableDatabase,
+    WriteMeasurements, MB,
 };
 
 use report::{DedupMeasurement, MeasureResult, Throughput, TimeMeasurement};
@@ -55,23 +55,21 @@ impl Dataset {
 /// for CDC algorithms.
 ///
 /// Clears the database before each method call.
-pub struct CDCFixture<B, Hash>
+pub struct CDCFixture<B>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    Hash: ChunkHash,
 {
-    pub fs: FileSystem<B, Hash, (), HashMap<(), Vec<u8>>>,
+    pub fs: FileSystem<B, (), HashMap<(), Vec<u8>>>,
 }
 
-impl<B, Hash> CDCFixture<B, Hash>
+impl<B> CDCFixture<B>
 where
     B: IterableDatabase<Hash, DataContainer<()>>,
-    Hash: ChunkHash,
 {
     /// Creates a fixture, opening a database with given base and hasher.
     pub fn new<H>(base: B, hasher: H) -> Self
     where
-        H: Into<Box<dyn Hasher<Hash = Hash> + 'static>>,
+        H: Into<Box<dyn Hasher + 'static>>,
     {
         let fs = create_cdc_filesystem(base, hasher.into());
         Self { fs }

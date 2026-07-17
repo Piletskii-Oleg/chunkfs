@@ -3,12 +3,12 @@ use std::io;
 use std::io::ErrorKind;
 
 use crate::system::storage::SpansInfo;
-use crate::{ChunkHash, ChunkerRef};
+use crate::{ChunkerRef, Hash};
 use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
 #[derive(Debug, PartialEq, Eq, Default, Clone, Hash)]
-pub struct FileSpan<Hash: ChunkHash> {
+pub struct FileSpan {
     hash: Hash,
     offset: usize,
     len: usize,
@@ -17,15 +17,15 @@ pub struct FileSpan<Hash: ChunkHash> {
 /// A named file, doesn't store actual contents,
 /// but rather hashes for them.
 #[derive(Clone)]
-pub struct File<Hash: ChunkHash> {
+pub struct File {
     name: String,
-    spans: Vec<FileSpan<Hash>>,
+    spans: Vec<FileSpan>,
 }
 
 /// Layer that contains all [`files`][File], accessed by their names.
 #[derive(Default)]
-pub struct FileLayer<Hash: ChunkHash> {
-    files: HashMap<String, File<Hash>>,
+pub struct FileLayer {
+    files: HashMap<String, File>,
 }
 
 /// Handle for an open [`file`][File].
@@ -40,7 +40,7 @@ pub struct FileHandle {
     pub(crate) chunker: Option<ChunkerRef>,
 }
 
-impl<Hash: ChunkHash> File<Hash> {
+impl File {
     fn new(name: String) -> Self {
         File {
             name,
@@ -50,7 +50,7 @@ impl<Hash: ChunkHash> File<Hash> {
 }
 
 impl FileHandle {
-    fn new<Hash: ChunkHash>(file: &File<Hash>, chunker: ChunkerRef) -> Self {
+    fn new(file: &File, chunker: ChunkerRef) -> Self {
         FileHandle {
             file_name: file.name.clone(),
             offset: 0,
@@ -59,7 +59,7 @@ impl FileHandle {
         }
     }
 
-    fn new_readonly<Hash: ChunkHash>(file: &File<Hash>) -> Self {
+    fn new_readonly(file: &File) -> Self {
         FileHandle {
             file_name: file.name.clone(),
             offset: 0,
@@ -79,7 +79,7 @@ impl FileHandle {
     }
 }
 
-impl<Hash: ChunkHash> FileLayer<Hash> {
+impl FileLayer {
     /// Creates a [`file`][File] and returns its [`FileHandle`]
     pub fn create(
         &mut self,
@@ -109,31 +109,28 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     pub fn open_readonly(&self, name: &str) -> io::Result<FileHandle> {
         self.files
             .get(name)
-            .map(|file| FileHandle::new_readonly(file))
+            .map(FileHandle::new_readonly)
             .ok_or(ErrorKind::NotFound.into())
     }
 
     /// Returns reference to a file using [`FileHandle`] that corresponds to it.
-    fn find_file(&self, handle: &FileHandle) -> &File<Hash> {
+    fn find_file(&self, handle: &FileHandle) -> &File {
         self.files.get(&handle.file_name).unwrap()
     }
 
     /// Returns mutable reference to a file using [`FileHandle`] that corresponds to it.
-    fn find_file_mut(&mut self, handle: &FileHandle) -> &mut File<Hash> {
+    fn find_file_mut(&mut self, handle: &FileHandle) -> &mut File {
         self.files.get_mut(&handle.file_name).unwrap()
     }
 
     /// Reads all hashes of the file, from beginning to end.
     pub fn read_complete(&self, handle: &FileHandle) -> Vec<Hash> {
         let file = self.find_file(handle);
-        file.spans
-            .iter()
-            .map(|span| span.hash.clone()) // cloning hashes, takes a lot of time
-            .collect()
+        file.spans.iter().map(|span| span.hash).collect()
     }
 
     /// Writes spans to the end of the file.
-    pub fn write(&mut self, handle: &mut FileHandle, info: SpansInfo<Hash>) {
+    pub fn write(&mut self, handle: &mut FileHandle, info: SpansInfo) {
         let file = self.find_file_mut(handle);
         for span in info.spans {
             file.spans.push(FileSpan {
@@ -166,7 +163,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
                     true
                 }
             }) // take 1 MB of spans after current one
-            .map(|span| span.hash.clone()) // take their hashes
+            .map(|span| span.hash) // take their hashes
             .collect();
 
         handle.offset += bytes_read;
@@ -198,7 +195,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
 
         for (span, length) in file.spans.iter().zip(lengths) {
             distribution
-                .entry(span.hash.clone())
+                .entry(span.hash)
                 .and_modify(|(count, _)| *count += 1)
                 .or_insert((1, length));
         }
@@ -228,7 +225,7 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
             .zip(file.spans.iter().skip(1))
             .map(|(first, second)| (first, second.offset - first.offset))
             .unique_by(|(span, _)| &span.hash)
-            .collect::<Vec<(&FileSpan<Hash>, usize)>>();
+            .collect::<Vec<(&FileSpan, usize)>>();
 
         let unique_length = unique_spans.iter().map(|(_, length)| length).sum::<usize>();
         let total_size = ((unique_length as f64) * dedup_ratio) as usize;
@@ -282,7 +279,7 @@ mod tests {
 
     #[test]
     fn file_layer_create_file() {
-        let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
+        let mut fl: FileLayer = FileLayer::default();
         let name = "hello";
         let chunker = FSChunker::default().into();
         fl.create(name, chunker, true).unwrap();
@@ -293,7 +290,7 @@ mod tests {
 
     #[test]
     fn cant_create_two_files_with_same_name() {
-        let mut fl: FileLayer<Vec<u8>> = FileLayer::default();
+        let mut fl: FileLayer = FileLayer::default();
         fl.create("hello".to_string(), FSChunker::new(4096).into(), false)
             .unwrap();
 

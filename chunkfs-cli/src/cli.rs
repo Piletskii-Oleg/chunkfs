@@ -5,7 +5,7 @@ use chunkfs::chunkers::{
     UltraChunker,
 };
 use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
-use chunkfs::{ChunkHash, ChunkerRef, DataContainer, Hasher, IterableDatabase, KB};
+use chunkfs::{ChunkerRef, DataContainer, Hash, Hasher, IterableDatabase, KB};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -226,10 +226,10 @@ impl Cli {
         }
     }
 
-    fn choose_database<Hash: ChunkHash>(
+    fn choose_database(
         args: &CliArgs,
         command: &Commands,
-        hasher: Box<dyn Hasher<Hash = Hash>>,
+        hasher: Box<dyn Hasher>,
     ) -> io::Result<()> {
         match args.database {
             CliDatabase::Hashmap => {
@@ -239,14 +239,13 @@ impl Cli {
         }
     }
 
-    fn execute_command<B, Hash>(
+    fn execute_command<B>(
         args: &CliArgs,
         command: &Commands,
-        mut fixture: CDCFixture<B, Hash>,
+        mut fixture: CDCFixture<B>,
     ) -> io::Result<()>
     where
         B: IterableDatabase<Hash, DataContainer<()>>,
-        Hash: ChunkHash,
     {
         let chunker = get_chunker(args);
 
@@ -319,14 +318,13 @@ impl Cli {
         Ok(())
     }
 
-    fn fill_with<B, Hash>(
-        fixture: &mut CDCFixture<B, Hash>,
+    fn fill_with<B>(
+        fixture: &mut CDCFixture<B>,
         chunker: &ChunkerRef,
         fill_paths: &Option<Vec<String>>,
     ) -> io::Result<()>
     where
         B: IterableDatabase<Hash, DataContainer<()>>,
-        Hash: ChunkHash,
     {
         if let Some(fill_paths) = fill_paths {
             for fill_path in fill_paths {

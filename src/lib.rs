@@ -1,5 +1,4 @@
 use std::fmt::{Debug, Formatter};
-use std::hash;
 use std::ops::{Add, AddAssign, Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -19,12 +18,7 @@ pub mod chunkers;
 pub mod hashers;
 mod system;
 
-/// Trait for a CDC hash, combining several other traits: [hash::Hash], [Clone], [Eq], [PartialEq], [Default].
-///
-/// Auto-implemented for those structures that implement all the listed traits.
-pub trait ChunkHash: hash::Hash + Clone + Eq + PartialEq + Default {}
-
-impl<T: hash::Hash + Clone + Eq + PartialEq + Default> ChunkHash for T {}
+pub type Hash = [u8; 32];
 
 /// One kilobyte.
 pub const KB: usize = 1024;
@@ -128,19 +122,13 @@ impl Debug for ChunkerRef {
 
 /// Functionality for an object that hashes the input.
 pub trait Hasher {
-    /// Hash type that would be returned by the hasher.
-    type Hash: ChunkHash;
-
     /// Takes some `data` and returns its `hash`.
-    fn hash(&mut self, data: &[u8]) -> Self::Hash;
-
-    /// Returns length of the given hash.
-    fn len(&self, hash: &Self::Hash) -> usize;
+    fn hash(&mut self, data: &[u8]) -> Hash;
 }
 
-impl<H, Hash> From<H> for Box<dyn Hasher<Hash = Hash>>
+impl<H> From<H> for Box<dyn Hasher>
 where
-    H: Hasher<Hash = Hash> + 'static,
+    H: Hasher + 'static,
 {
     fn from(hasher: H) -> Self {
         Box::new(hasher)

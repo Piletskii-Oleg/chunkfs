@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
 
-use crate::{ChunkHash, MB};
+use crate::MB;
 
 /// Serves as base functionality for storing the actual data as key-value pairs.
 ///
@@ -71,27 +71,33 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
     fn clear(&mut self) -> io::Result<()>;
 }
 
-impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
-    fn insert(&mut self, key: Hash, value: V) -> io::Result<()> {
+impl<K, V: Clone> Database<K, V> for HashMap<K, V>
+where
+    K: std::hash::Hash + Eq + Clone,
+{
+    fn insert(&mut self, key: K, value: V) -> io::Result<()> {
         self.entry(key).or_insert(value);
         Ok(())
     }
 
-    fn get(&self, key: &Hash) -> io::Result<V> {
+    fn get(&self, key: &K) -> io::Result<V> {
         self.get(key).ok_or(ErrorKind::NotFound.into()).cloned()
     }
 
-    fn contains(&self, key: &Hash) -> bool {
+    fn contains(&self, key: &K) -> bool {
         self.contains_key(key)
     }
 }
 
-impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
-    fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &V)> + '_> {
+impl<K, V: Clone> IterableDatabase<K, V> for HashMap<K, V>
+where
+    K: std::hash::Hash + Eq + Clone,
+{
+    fn iterator(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_> {
         Box::new(self.iter())
     }
 
-    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {
+    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_> {
         Box::new(self.iter_mut())
     }
 
@@ -100,8 +106,6 @@ impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
         Ok(())
     }
 }
-
-use std::hash::Hash;
 
 /// Container subsystem configuration.
 #[derive(Clone, Debug)]
@@ -129,7 +133,7 @@ struct Container<K, V> {
 
 impl<K, V> Container<K, V>
 where
-    K: Hash + Eq + Clone,
+    K: std::hash::Hash + Eq + Clone,
     V: Clone,
 {
     // Creates a new container with fixed maximum available space.
@@ -184,7 +188,7 @@ pub struct ContainerDatabase<K, V> {
 
 impl<K, V> ContainerDatabase<K, V>
 where
-    K: Hash + Eq + Clone,
+    K: std::hash::Hash + Eq + Clone,
     V: Clone,
 {
     // Creates a new containerized key-value database from with the desired config.
@@ -259,7 +263,7 @@ where
 
 impl<K, V> Default for ContainerDatabase<K, V>
 where
-    K: Hash + Eq + Clone,
+    K: std::hash::Hash + Eq + Clone,
     V: Clone,
 {
     fn default() -> Self {
@@ -269,7 +273,7 @@ where
 
 impl<K, V> Database<K, V> for ContainerDatabase<K, V>
 where
-    K: Hash + Eq + Clone,
+    K: std::hash::Hash + Eq + Clone,
     V: Clone + AsRef<[u8]>,
 {
     fn insert(&mut self, key: K, value: V) -> io::Result<()> {
@@ -307,7 +311,7 @@ where
 
 impl<K, V> IterableDatabase<K, V> for ContainerDatabase<K, V>
 where
-    K: Hash + Eq + Clone,
+    K: std::hash::Hash + Eq + Clone,
     V: Clone + AsRef<[u8]>,
 {
     fn iterator(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_> {
