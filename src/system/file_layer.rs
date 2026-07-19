@@ -1,10 +1,12 @@
+use std::cmp::min;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::io;
 use std::io::ErrorKind;
 
 use crate::system::storage::SpansInfo;
+use crate::WriteMeasurements;
 use crate::{ChunkHash, ChunkerRef};
-use crate::{WriteMeasurements, SEG_SIZE};
 
 /// Hashed span, starting at `offset`.
 #[derive(Debug, PartialEq, Eq, Default, Clone, Hash)]
@@ -12,6 +14,20 @@ pub struct FileSpan<Hash: ChunkHash> {
     hash: Hash,
     offset: usize,
     len: usize,
+}
+
+impl<Hash: ChunkHash> FileSpan<Hash> {
+    pub fn hash(&self) -> &Hash {
+        &self.hash
+    }
+
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
 }
 
 /// A named file, doesn't store actual contents,
@@ -68,12 +84,21 @@ impl FileHandle {
         }
     }
 
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    /// Sets the offset for the file handle.
+    pub fn set_offset(&mut self, offset: usize) {
+        self.offset = offset;
+    }
+
     /// Returns name of the file.
     pub fn name(&self) -> &str {
         &self.file_name
     }
 
-    /// Closes handle and returns [`WriteMeasurements`] made while file was open.
+    /// Closes the handle and returns [`WriteMeasurements`] made while a file was open.
     pub(crate) fn close(self) -> WriteMeasurements {
         self.measurements
     }
@@ -124,12 +149,9 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     }
 
     /// Reads all hashes of the file, from beginning to end.
-    pub fn read_complete(&self, handle: &FileHandle) -> Vec<Hash> {
+    pub fn read_complete(&self, handle: &FileHandle) -> Vec<&Hash> {
         let file = self.find_file(handle);
-        file.spans
-            .iter()
-            .map(|span| span.hash.clone()) // cloning hashes, takes a lot of time
-            .collect()
+        file.spans.iter().map(|span| span.hash()).collect()
     }
 
     /// Writes spans to the end of the file.
@@ -147,31 +169,29 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
         handle.measurements += info.measurements;
     }
 
-    /// Reads 1 MB of data from the open file and returns received hashes,
-    /// starting point is based on the `FileHandle`'s offset.
-    pub fn read(&self, handle: &mut FileHandle) -> Vec<Hash> {
+    /// Reads the specified amount of data from the open file and
+    /// returns FileSpans, in which the necessary data is stored (the side FileSpans may contain it partially).
+    /// The Starting point is based on the `FileHandle`'s offset.
+    ///
+    /// If `size` + file handle offset is greater than file size, then returns FileSpans up to the end of the file.
+    pub fn read(&self, handle: &mut FileHandle, size: usize) -> Vec<&FileSpan<Hash>> {
         let file = self.find_file(handle);
 
-        let mut bytes_read = 0;
-        let hashes = file
+        let spans: Vec<_> = file
             .spans
             .iter()
-            .skip_while(|span| span.offset < handle.offset) // find current span in the file
-            .take_while(|span| {
-                bytes_read += span.len;
-                if bytes_read > SEG_SIZE {
-                    bytes_read -= span.len;
-                    false
-                } else {
-                    true
-                }
-            }) // take 1 MB of spans after current one
-            .map(|span| span.hash.clone()) // take their hashes
+            .skip_while(|span| span.offset + span.len < handle.offset) // find the first span that contains required data
+            .take_while(|span| span.offset < handle.offset + size)
             .collect();
 
-        handle.offset += bytes_read;
+        if spans.is_empty() {
+            return spans;
+        }
 
-        hashes
+        let last_span = spans.last().unwrap();
+        let read_size_possible = last_span.offset + last_span.len - handle.offset;
+        handle.offset += min(read_size_possible, size);
+        spans
     }
 
     /// Checks if the file with the given name exists.
@@ -206,7 +226,8 @@ impl<Hash: ChunkHash> FileLayer<Hash> {
     }
 
     #[cfg(feature = "bench")]
-    /// Generate a new dataset with set deduplication ratio from the existing one.
+    /// Generate a new dataset with
+    /// a set deduplication ratio from the existing one.
     ///
     /// Returns the name of the new file.
     pub fn get_to_dedup_ratio(&mut self, name: &str, dedup_ratio: f64) -> io::Result<String> {

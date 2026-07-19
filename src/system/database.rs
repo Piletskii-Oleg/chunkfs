@@ -14,7 +14,7 @@ pub trait Database<K, V> {
     /// Retrieves a value by a given key. Note that it returns a value, not a reference.
     ///
     /// # Errors
-    /// Should return [ErrorKind::NotFound], if the key-value pair
+    /// Should return [ErrorKind::NotFound] if the key-value pair
     /// was not found in the storage.
     fn get(&self, key: &K) -> io::Result<V>;
 
@@ -27,7 +27,7 @@ pub trait Database<K, V> {
     }
 
     /// Retrieves a multitude of values, corresponding to the keys, in the correct order.
-    fn get_multi(&self, keys: &[K]) -> io::Result<Vec<V>> {
+    fn get_multi(&self, keys: &[&K]) -> io::Result<Vec<V>> {
         keys.iter().map(|key| self.get(key)).collect()
     }
 

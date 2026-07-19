@@ -33,8 +33,8 @@ fn get_chunker(algorithm: Algorithms) -> ChunkerRef {
     match algorithm {
         Algorithms::Rabin => RabinChunker::default().into(),
         Algorithms::Leap => LeapChunker::default().into(),
-        Algorithms::Super => UltraChunker::default().into(),
-        Algorithms::Ultra => SuperChunker::default().into(),
+        Algorithms::Super => SuperChunker::default().into(),
+        Algorithms::Ultra => UltraChunker::default().into(),
     }
 }
 

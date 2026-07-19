@@ -11,6 +11,37 @@ use chunkfs::hashers::{Sha256Hasher, SimpleHasher};
 use chunkfs::{create_cdc_filesystem, ChunkerRef, DataContainer, Database, WriteMeasurements};
 
 const MB: usize = 1024 * 1024;
+const KB: usize = 1024;
+
+#[test]
+fn write_read_with_strange_size() {
+    let mut fs = create_cdc_filesystem(HashMap::default(), SimpleHasher);
+
+    let mut handle = fs.create_file("file", FSChunker::new(4096)).unwrap();
+
+    let mut data1 = vec![0; 433 * KB];
+    let data2 = vec![1; 2 * MB + 3];
+    let data3 = vec![2; 2 * MB];
+    fs.write_to_file(&mut handle, &data1).unwrap();
+    fs.write_to_file(&mut handle, &data2).unwrap();
+    fs.write_to_file(&mut handle, &data3).unwrap();
+    fs.close_file(handle).unwrap();
+
+    let mut handle = fs.open_file_readonly("file").unwrap();
+
+    data1.append(&mut vec![1; MB]);
+    let actual = fs.read(&mut handle, 433 * KB + MB).unwrap();
+    assert_eq!(actual, data1);
+
+    let mut ones_w_twos = vec![1; MB + 3];
+    ones_w_twos.append(&mut vec![2; MB]);
+    let actual = fs.read(&mut handle, 2 * MB + 3).unwrap();
+    assert_eq!(actual, ones_w_twos);
+
+    handle.set_offset(433 * KB + 2 * MB + 3 + MB / 2);
+    let actual = fs.read(&mut handle, 10 * MB).unwrap();
+    assert_eq!(actual, vec![2; MB + MB / 2]);
+}
 
 #[test]
 fn write_read_complete_test() {
@@ -60,7 +91,7 @@ fn write_read_blocks_test() {
         buffer.extend_from_slice(&buf);
     }
     assert_eq!(buffer.len(), MB * 3 + 50);
-    assert!(complete == buffer);
+    assert_eq!(complete, buffer);
     assert_eq!(fs.read_from_file(&mut handle).unwrap(), []);
 }
 
@@ -116,11 +147,11 @@ fn non_iterable_database_can_be_used_with_fs() {
     struct DummyDatabase;
 
     impl Database<Vec<u8>, DataContainer<()>> for DummyDatabase {
-        fn insert(&mut self, _key: Vec<u8>, _value: DataContainer<()>) -> std::io::Result<()> {
+        fn insert(&mut self, _key: Vec<u8>, _value: DataContainer<()>) -> io::Result<()> {
             unimplemented!()
         }
 
-        fn get(&self, _key: &Vec<u8>) -> std::io::Result<DataContainer<()>> {
+        fn get(&self, _key: &Vec<u8>) -> io::Result<DataContainer<()>> {
             unimplemented!()
         }
 
