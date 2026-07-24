@@ -40,9 +40,6 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
     /// Returns a simple immutable iterator over values.
     fn iterator(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_>;
 
-    /// Returns an iterator that can mutate values but not keys.
-    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_>;
-
     /// Returns an immutable iterator over keys.
     fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &'a K> + 'a>
     where
@@ -57,14 +54,6 @@ pub trait IterableDatabase<K, V>: Database<K, V> {
         K: 'a,
     {
         Box::new(self.iterator().map(|(_, v)| v))
-    }
-
-    /// Returns a mutable iterator over values.
-    fn values_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut V> + 'a>
-    where
-        K: 'a,
-    {
-        Box::new(self.iterator_mut().map(|(_, v)| v))
     }
 
     /// Clears the database, removing all contained key-value pairs.
@@ -89,10 +78,6 @@ impl<Hash: ChunkHash, V: Clone> Database<Hash, V> for HashMap<Hash, V> {
 impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
     fn iterator(&self) -> Box<dyn Iterator<Item = (&Hash, &V)> + '_> {
         Box::new(self.iter())
-    }
-
-    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {
-        Box::new(self.iter_mut())
     }
 
     fn clear(&mut self) -> io::Result<()> {
@@ -316,15 +301,6 @@ where
                 .iter()
                 .flat_map(|c| c.values.iter())
                 .chain(self.current.values.iter()),
-        )
-    }
-
-    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_> {
-        Box::new(
-            self.containers
-                .iter_mut()
-                .flat_map(|c| c.values.iter_mut())
-                .chain(self.current.values.iter_mut()),
         )
     }
 
