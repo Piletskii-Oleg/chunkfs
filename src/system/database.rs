@@ -80,10 +80,6 @@ impl<Hash: ChunkHash, V: Clone> IterableDatabase<Hash, V> for HashMap<Hash, V> {
         Box::new(self.iter())
     }
 
-    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&Hash, &mut V)> + '_> {
-        Box::new(self.iter_mut())
-    }
-
     fn clear(&mut self) -> io::Result<()> {
         HashMap::clear(self);
         Ok(())
@@ -305,15 +301,6 @@ where
                 .iter()
                 .flat_map(|c| c.values.iter())
                 .chain(self.current.values.iter()),
-        )
-    }
-
-    fn iterator_mut(&mut self) -> Box<dyn Iterator<Item = (&K, &mut V)> + '_> {
-        Box::new(
-            self.containers
-                .iter_mut()
-                .flat_map(|c| c.values.iter_mut())
-                .chain(self.current.values.iter_mut()),
         )
     }
 
